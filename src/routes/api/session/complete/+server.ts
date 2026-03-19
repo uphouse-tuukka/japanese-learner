@@ -23,10 +23,13 @@ const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
 return {
 sessionId,
 userId,
-summary: `Practice complete: ${correct}/${total} correct (${accuracy}%).`,
-strengths: accuracy >= 70 ? ['Consistent results in review mode'] : ['You completed a full review set'],
-weaknesses: accuracy >= 70 ? ['Aim for faster recall next time'] : ['Review incorrect items and retry soon'],
-nextSteps: ['Repeat one weak exercise type', 'Do another quick practice set today'],
+summary: `You answered ${correct} out of ${total} correctly (${accuracy}%).`,
+strengths: accuracy >= 70 ? ['Good recall of basic sentence patterns'] : ['You completed the session'],
+weaknesses:
+accuracy >= 70
+? ['Work on speed and confidence']
+: ['Review core vocabulary and repeat short exercises'],
+nextSteps: ['Review mistakes once', 'Do one short session tomorrow', 'Keep your streak alive'],
 accuracy,
 generatedAt: new Date().toISOString()
 };
@@ -46,7 +49,7 @@ return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 
 await insertExerciseResults({
 userId,
 sessionId,
-mode: 'practice',
+mode: 'ai',
 results: results.map((result) => ({
 exerciseId: result.exerciseId,
 answerText: result.answerText,
@@ -59,7 +62,7 @@ await completeSessionRecord(sessionId, { summary: summary.summary });
 
 return json({ ok: true, state: 'done', summary });
 } catch (error) {
-console.error('[api/practice/complete] failed', { error });
-return json({ ok: false, error: 'Failed to complete practice session.' }, { status: 500 });
+console.error('[api/session/complete] failed', { error });
+return json({ ok: false, error: 'Failed to complete session.' }, { status: 500 });
 }
 };
