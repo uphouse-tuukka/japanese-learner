@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { getHistoryByUser } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ cookies }) => {
-const selectedUserId = cookies.get('selected_user_id');
+const selectedUserId = cookies.get('selected_user');
 if (!selectedUserId) throw redirect(302, '/');
 const history = await getHistoryByUser(selectedUserId);
 return { selectedUserId, history: history.filter((item) => item.session.mode === 'practice').slice(0, 20) };

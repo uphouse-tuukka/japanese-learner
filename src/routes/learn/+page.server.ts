@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { checkBudget } from '$lib/server/token-limiter';
 
 export const load: PageServerLoad = async ({ cookies }) => {
-const selectedUserId = cookies.get('selected_user_id');
+const selectedUserId = cookies.get('selected_user');
 if (!selectedUserId) {
 throw redirect(302, '/');
 }
