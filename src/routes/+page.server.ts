@@ -46,10 +46,10 @@ async function loadStatsForUser(userId: string): Promise<{ sessions: number; str
   const db = await getDb();
   const result = await db.execute({
     sql: `
-      SELECT date
+      SELECT created_at AS date
       FROM sessions
       WHERE user_id = ?
-      ORDER BY date DESC, created_at DESC
+      ORDER BY created_at DESC
     `,
     args: [userId]
   });
