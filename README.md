@@ -1,35 +1,87 @@
-# sv
+# Japanese Learner (SvelteKit 2 + Svelte 5 + TypeScript)
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Minimal full-stack Japanese learning app with:
+- user profiles
+- learn sessions
+- practice sessions
+- session history
+- DB-backed seed exercises
+- TTS with browser + `/api/tts` server fallback
 
-## Creating a project
+## Tech stack
+- SvelteKit 2
+- Svelte 5 runes syntax
+- TypeScript
+- Turso (`@libsql/client`)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Setup
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Copy env file:
+   ```bash
+   cp .env.example .env
+   ```
+3. Fill required env vars (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `OPENAI_API_KEY` if you use TTS).
+4. Run checks:
+   ```bash
+   npm run check
+   npm run build
+   ```
+5. Start dev server:
+   ```bash
+   npm run dev
+   ```
 
-```sh
-# create a new project
-npx sv create my-app
-```
+## Environment variables
+See `.env.example` for full list and comments.
 
-## Developing
+Important values:
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
+- `OPENAI_API_KEY`
+- `DAILY_TOKEN_LIMIT`
+- `MAX_USERS`
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## App routes
+- `/` Home: profile selection + profile creation, first-visit seed loading
+- `/learn`: generates and completes AI mode sessions via API
+- `/practice`: generates and completes practice sessions via API
+- `/history`: session history from DB
 
-```sh
-npm run dev
+## API routes
+- `POST /api/session/generate`
+- `POST /api/session/complete`
+- `POST /api/practice/generate`
+- `POST /api/practice/complete`
+- `GET /api/tts` (server fallback TTS)
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+## Architecture summary
+- `src/lib/server/db.ts`: DB initialization and query helpers
+- `src/lib/server/seed.ts`: loads `src/lib/data/seed-exercises.json` into DB
+- `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to 6 exercise components
+- `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
+- `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
 
-## Building
+## Token limiting
+Token usage budget is enforced by server token-limiter utilities.
+- Learn page reads budget status from server load.
+- Daily limits and monthly budget are configured in env vars.
 
-To create a production version of your app:
+## Adding users
+Use Home page:
+1. Create user with display name and starting level.
+2. User is stored in `users` table.
+3. Selected user id is stored in cookie `selected_user_id`.
 
-```sh
-npm run build
-```
+## Database notes
+Tables created on startup:
+- `users`
+- `sessions`
+- `exercises`
+- `session_exercises`
+- `user_exercise_results`
+- `token_usage`
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Seed exercises are loaded once when first visiting Home (if no seed rows exist).

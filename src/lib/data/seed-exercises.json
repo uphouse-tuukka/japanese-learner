@@ -1,0 +1,1100 @@
+[
+  {
+    "id": "seed-001",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 1",
+    "japanese": "えきはどこですか",
+    "romaji": "Eki wa doko desu ka",
+    "englishContext": "Beginner travel - station_directions",
+    "tags": [
+      "travel",
+      "station_directions",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "question": "What is the best translation?",
+    "choices": [
+      "Where is the station?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Where is the station?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-002",
+    "type": "translation",
+    "title": "Translate for travel 2",
+    "japanese": "タクシーがひつようです",
+    "romaji": "Takushii ga hitsuyou desu",
+    "englishContext": "Beginner travel - transport",
+    "tags": [
+      "travel",
+      "transport",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "direction": "en_to_ja",
+    "prompt": "I need a taxi.",
+    "expectedAnswer": "タクシーがひつようです",
+    "expectedRomaji": "Takushii ga hitsuyou desu",
+    "acceptedAnswers": [
+      "タクシーがひつようです",
+      "タクシーがひつようです"
+    ]
+  },
+  {
+    "id": "seed-003",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 3",
+    "japanese": "タクシーをよんでください",
+    "romaji": "Takushii o yonde kudasai",
+    "englishContext": "Beginner travel - transport",
+    "tags": [
+      "travel",
+      "transport",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "sentence": "_____ーをよんでください",
+    "sentenceRomaji": "_____ o yonde kudasai",
+    "sentenceEnglish": "Please call a taxi.",
+    "blank": "first phrase",
+    "answer": "タクシ",
+    "answerRomaji": "Takushii"
+  },
+  {
+    "id": "seed-004",
+    "type": "reorder",
+    "title": "Reorder travel sentence 4",
+    "japanese": "これはいくらですか",
+    "romaji": "Kore wa ikura desu ka",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "prompt": "How much is this?",
+    "tokens": [
+      "ですか",
+      "いくら",
+      "これは"
+    ],
+    "correctOrder": [
+      "これは",
+      "いくら",
+      "ですか"
+    ]
+  },
+  {
+    "id": "seed-005",
+    "type": "reading",
+    "title": "Travel reading check 5",
+    "japanese": "もうすこしやすくしてください",
+    "romaji": "Mou sukoshi yasuku shite kudasai",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "passage": "えきのまえにコンビニがあります。みずとおにぎりをかいました。",
+    "passageRomaji": "Eki no mae ni konbini ga arimasu. Mizu to onigiri o kaimashita.",
+    "passageEnglish": "There is a convenience store in front of the station. I bought water and rice balls.",
+    "question": "What did the speaker buy?",
+    "answer": "Water and rice balls"
+  },
+  {
+    "id": "seed-006",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 6",
+    "japanese": "カードでしはらえますか",
+    "romaji": "Kaado de shiharaemasu ka",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "question": "What is the best translation?",
+    "choices": [
+      "Can I pay by card?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Can I pay by card?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-007",
+    "type": "translation",
+    "title": "Translate for travel 7",
+    "japanese": "これをください",
+    "romaji": "Kore o kudasai",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "direction": "en_to_ja",
+    "prompt": "I would like this, please.",
+    "expectedAnswer": "これをください",
+    "expectedRomaji": "Kore o kudasai",
+    "acceptedAnswers": [
+      "これをください",
+      "これをください"
+    ]
+  },
+  {
+    "id": "seed-008",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 8",
+    "japanese": "えいごのメニューはありますか",
+    "romaji": "Eigo no menyuu wa arimasu ka",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "restaurant",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "sentence": "_____のメニューはありますか",
+    "sentenceRomaji": "_____ no menyuu wa arimasu ka",
+    "sentenceEnglish": "Do you have an English menu?",
+    "blank": "first phrase",
+    "answer": "えいご",
+    "answerRomaji": "Eigo"
+  },
+  {
+    "id": "seed-009",
+    "type": "reorder",
+    "title": "Reorder travel sentence 9",
+    "japanese": "みずをください",
+    "romaji": "Mizu o kudasai",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "restaurant",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "prompt": "Water, please.",
+    "tokens": [
+      "い",
+      "くださ",
+      "みずを"
+    ],
+    "correctOrder": [
+      "みずを",
+      "くださ",
+      "い"
+    ]
+  },
+  {
+    "id": "seed-010",
+    "type": "reading",
+    "title": "Travel reading check 10",
+    "japanese": "からいものはだめです",
+    "romaji": "Karai mono wa dame desu",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 1,
+    "passage": "ホテルのチェックインはごご3じです。わたしは2じにホテルにつきました。",
+    "passageRomaji": "Hoteru no chekkuin wa gogo sanji desu. Watashi wa niji ni hoteru ni tsukimashita.",
+    "passageEnglish": "Hotel check-in is at 3 PM. I arrived at 2 PM.",
+    "question": "Did the speaker arrive before check-in?",
+    "answer": "Yes"
+  },
+  {
+    "id": "seed-011",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 11",
+    "japanese": "きょうとまできっぷをいちまいください",
+    "romaji": "Kyouto made kippu o ichimai kudasai",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "question": "What is the best translation?",
+    "choices": [
+      "One ticket to Kyoto, please.",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "One ticket to Kyoto, please.",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-012",
+    "type": "translation",
+    "title": "Translate for travel 12",
+    "japanese": "つぎのでんしゃはなんじですか",
+    "romaji": "Tsugi no densha wa nanji desu ka",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "direction": "en_to_ja",
+    "prompt": "What time is the next train?",
+    "expectedAnswer": "つぎのでんしゃはなんじですか",
+    "expectedRomaji": "Tsugi no densha wa nanji desu ka",
+    "acceptedAnswers": [
+      "つぎのでんしゃはなんじですか",
+      "つぎのでんしゃはなんじですか"
+    ]
+  },
+  {
+    "id": "seed-013",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 13",
+    "japanese": "なんばんせんですか",
+    "romaji": "Nanban sen desu ka",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "sentence": "_____んせんですか",
+    "sentenceRomaji": "_____ sen desu ka",
+    "sentenceEnglish": "Which platform?",
+    "blank": "first phrase",
+    "answer": "なんば",
+    "answerRomaji": "Nanban"
+  },
+  {
+    "id": "seed-014",
+    "type": "reorder",
+    "title": "Reorder travel sentence 14",
+    "japanese": "よやくしています",
+    "romaji": "Yoyaku shiteimasu",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "hotel",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "prompt": "I have a reservation.",
+    "tokens": [
+      "ます",
+      "してい",
+      "よやく"
+    ],
+    "correctOrder": [
+      "よやく",
+      "してい",
+      "ます"
+    ]
+  },
+  {
+    "id": "seed-015",
+    "type": "reading",
+    "title": "Travel reading check 15",
+    "japanese": "チェックインをおねがいします",
+    "romaji": "Chekkuin o onegai shimasu",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "passage": "きょうとまでしんかんせんで2じかんかかります。あしたあさ8じのしんかんせんにのります。",
+    "passageRomaji": "Kyouto made shinkansen de nijikan kakarimasu. Ashita asa hachiji no shinkansen ni norimasu.",
+    "passageEnglish": "It takes two hours to Kyoto by bullet train. I will take the 8 AM train tomorrow.",
+    "question": "How long does the train ride take?",
+    "answer": "Two hours"
+  },
+  {
+    "id": "seed-016",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 16",
+    "japanese": "にもつをあずけられますか",
+    "romaji": "Nimotsu o azukeraremasu ka",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "hotel",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "question": "What is the best translation?",
+    "choices": [
+      "Can I leave my luggage?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Can I leave my luggage?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-017",
+    "type": "translation",
+    "title": "Translate for travel 17",
+    "japanese": "バスていはどこですか",
+    "romaji": "Basu tei wa doko desu ka",
+    "englishContext": "Beginner travel - bus",
+    "tags": [
+      "travel",
+      "bus",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "direction": "en_to_ja",
+    "prompt": "Where is the bus stop?",
+    "expectedAnswer": "バスていはどこですか",
+    "expectedRomaji": "Basu tei wa doko desu ka",
+    "acceptedAnswers": [
+      "バスていはどこですか",
+      "バスていはどこですか"
+    ]
+  },
+  {
+    "id": "seed-018",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 18",
+    "japanese": "ここでとめてください",
+    "romaji": "Koko de tomete kudasai",
+    "englishContext": "Beginner travel - bus",
+    "tags": [
+      "travel",
+      "bus",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "sentence": "_____とめてください",
+    "sentenceRomaji": "_____ de tomete kudasai",
+    "sentenceEnglish": "Please stop here.",
+    "blank": "first phrase",
+    "answer": "ここで",
+    "answerRomaji": "Koko"
+  },
+  {
+    "id": "seed-019",
+    "type": "reorder",
+    "title": "Reorder travel sentence 19",
+    "japanese": "ピーナッツアレルギーがあります",
+    "romaji": "Piinattsu arerugii ga arimasu",
+    "englishContext": "Beginner travel - health",
+    "tags": [
+      "travel",
+      "health",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "prompt": "I am allergic to peanuts.",
+    "tokens": [
+      "ります",
+      "ーがあ",
+      "レルギ",
+      "ッツア",
+      "ピーナ"
+    ],
+    "correctOrder": [
+      "ピーナ",
+      "ッツア",
+      "レルギ",
+      "ーがあ",
+      "ります"
+    ]
+  },
+  {
+    "id": "seed-020",
+    "type": "reading",
+    "title": "Travel reading check 20",
+    "japanese": "いしゃがひつようです",
+    "romaji": "Isha ga hitsuyou desu",
+    "englishContext": "Beginner travel - health",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 2,
+    "passage": "レストランでカレーをたのみました。でも、からかったです。つぎはからくないものをたのみます。",
+    "passageRomaji": "Resutoran de karee o tanomimashita. Demo, karakatta desu. Tsugi wa karakunai mono o tanomimasu.",
+    "passageEnglish": "I ordered curry at a restaurant, but it was spicy. Next time I will order something not spicy.",
+    "question": "Was the curry spicy?",
+    "answer": "Yes"
+  },
+  {
+    "id": "seed-021",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 21",
+    "japanese": "しゃしんをとってもらえますか",
+    "romaji": "Shashin o totte moraemasu ka",
+    "englishContext": "Beginner travel - sightseeing",
+    "tags": [
+      "travel",
+      "sightseeing",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "question": "What is the best translation?",
+    "choices": [
+      "Could you take a photo?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Could you take a photo?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-022",
+    "type": "translation",
+    "title": "Translate for travel 22",
+    "japanese": "みちをおしえてください",
+    "romaji": "Michi o oshiete kudasai",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "direction": "en_to_ja",
+    "prompt": "Please tell me the way.",
+    "expectedAnswer": "みちをおしえてください",
+    "expectedRomaji": "Michi o oshiete kudasai",
+    "acceptedAnswers": [
+      "みちをおしえてください",
+      "みちをおしえてください"
+    ]
+  },
+  {
+    "id": "seed-023",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 23",
+    "japanese": "どのくらいかかりますか",
+    "romaji": "Dono kurai kakarimasu ka",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "sentence": "_____らいかかりますか",
+    "sentenceRomaji": "_____ kurai kakarimasu ka",
+    "sentenceEnglish": "How long does it take?",
+    "blank": "first phrase",
+    "answer": "どのく",
+    "answerRomaji": "Dono"
+  },
+  {
+    "id": "seed-024",
+    "type": "reorder",
+    "title": "Reorder travel sentence 24",
+    "japanese": "みちにまよいました",
+    "romaji": "Michi ni mayoimashita",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "prompt": "I am lost.",
+    "tokens": [
+      "ました",
+      "まよい",
+      "みちに"
+    ],
+    "correctOrder": [
+      "みちに",
+      "まよい",
+      "ました"
+    ]
+  },
+  {
+    "id": "seed-025",
+    "type": "reading",
+    "title": "Travel reading check 25",
+    "japanese": "トイレはどこですか",
+    "romaji": "Toire wa doko desu ka",
+    "englishContext": "Beginner travel - facilities",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "passage": "バスていはこうえんのとなりです。そこからホテルまで10ぷんです。",
+    "passageRomaji": "Basu tei wa kouen no tonari desu. Soko kara hoteru made juppun desu.",
+    "passageEnglish": "The bus stop is next to the park. It is 10 minutes from there to the hotel.",
+    "question": "How long from the bus stop to the hotel?",
+    "answer": "10 minutes"
+  },
+  {
+    "id": "seed-026",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 26",
+    "japanese": "えきはどこですか",
+    "romaji": "Eki wa doko desu ka",
+    "englishContext": "Beginner travel - station_directions",
+    "tags": [
+      "travel",
+      "station_directions",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "question": "What is the best translation?",
+    "choices": [
+      "Where is the station?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Where is the station?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-027",
+    "type": "translation",
+    "title": "Translate for travel 27",
+    "japanese": "タクシーがひつようです",
+    "romaji": "Takushii ga hitsuyou desu",
+    "englishContext": "Beginner travel - transport",
+    "tags": [
+      "travel",
+      "transport",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "direction": "en_to_ja",
+    "prompt": "I need a taxi.",
+    "expectedAnswer": "タクシーがひつようです",
+    "expectedRomaji": "Takushii ga hitsuyou desu",
+    "acceptedAnswers": [
+      "タクシーがひつようです",
+      "タクシーがひつようです"
+    ]
+  },
+  {
+    "id": "seed-028",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 28",
+    "japanese": "タクシーをよんでください",
+    "romaji": "Takushii o yonde kudasai",
+    "englishContext": "Beginner travel - transport",
+    "tags": [
+      "travel",
+      "transport",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "sentence": "_____ーをよんでください",
+    "sentenceRomaji": "_____ o yonde kudasai",
+    "sentenceEnglish": "Please call a taxi.",
+    "blank": "first phrase",
+    "answer": "タクシ",
+    "answerRomaji": "Takushii"
+  },
+  {
+    "id": "seed-029",
+    "type": "reorder",
+    "title": "Reorder travel sentence 29",
+    "japanese": "これはいくらですか",
+    "romaji": "Kore wa ikura desu ka",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "prompt": "How much is this?",
+    "tokens": [
+      "ですか",
+      "いくら",
+      "これは"
+    ],
+    "correctOrder": [
+      "これは",
+      "いくら",
+      "ですか"
+    ]
+  },
+  {
+    "id": "seed-030",
+    "type": "reading",
+    "title": "Travel reading check 30",
+    "japanese": "もうすこしやすくしてください",
+    "romaji": "Mou sukoshi yasuku shite kudasai",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 3,
+    "passage": "えきのまえにコンビニがあります。みずとおにぎりをかいました。",
+    "passageRomaji": "Eki no mae ni konbini ga arimasu. Mizu to onigiri o kaimashita.",
+    "passageEnglish": "There is a convenience store in front of the station. I bought water and rice balls.",
+    "question": "What did the speaker buy?",
+    "answer": "Water and rice balls"
+  },
+  {
+    "id": "seed-031",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 31",
+    "japanese": "カードでしはらえますか",
+    "romaji": "Kaado de shiharaemasu ka",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "question": "What is the best translation?",
+    "choices": [
+      "Can I pay by card?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Can I pay by card?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-032",
+    "type": "translation",
+    "title": "Translate for travel 32",
+    "japanese": "これをください",
+    "romaji": "Kore o kudasai",
+    "englishContext": "Beginner travel - shopping",
+    "tags": [
+      "travel",
+      "shopping",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "direction": "en_to_ja",
+    "prompt": "I would like this, please.",
+    "expectedAnswer": "これをください",
+    "expectedRomaji": "Kore o kudasai",
+    "acceptedAnswers": [
+      "これをください",
+      "これをください"
+    ]
+  },
+  {
+    "id": "seed-033",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 33",
+    "japanese": "えいごのメニューはありますか",
+    "romaji": "Eigo no menyuu wa arimasu ka",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "restaurant",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "sentence": "_____のメニューはありますか",
+    "sentenceRomaji": "_____ no menyuu wa arimasu ka",
+    "sentenceEnglish": "Do you have an English menu?",
+    "blank": "first phrase",
+    "answer": "えいご",
+    "answerRomaji": "Eigo"
+  },
+  {
+    "id": "seed-034",
+    "type": "reorder",
+    "title": "Reorder travel sentence 34",
+    "japanese": "みずをください",
+    "romaji": "Mizu o kudasai",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "restaurant",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "prompt": "Water, please.",
+    "tokens": [
+      "い",
+      "くださ",
+      "みずを"
+    ],
+    "correctOrder": [
+      "みずを",
+      "くださ",
+      "い"
+    ]
+  },
+  {
+    "id": "seed-035",
+    "type": "reading",
+    "title": "Travel reading check 35",
+    "japanese": "からいものはだめです",
+    "romaji": "Karai mono wa dame desu",
+    "englishContext": "Beginner travel - restaurant",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "passage": "ホテルのチェックインはごご3じです。わたしは2じにホテルにつきました。",
+    "passageRomaji": "Hoteru no chekkuin wa gogo sanji desu. Watashi wa niji ni hoteru ni tsukimashita.",
+    "passageEnglish": "Hotel check-in is at 3 PM. I arrived at 2 PM.",
+    "question": "Did the speaker arrive before check-in?",
+    "answer": "Yes"
+  },
+  {
+    "id": "seed-036",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 36",
+    "japanese": "きょうとまできっぷをいちまいください",
+    "romaji": "Kyouto made kippu o ichimai kudasai",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "question": "What is the best translation?",
+    "choices": [
+      "One ticket to Kyoto, please.",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "One ticket to Kyoto, please.",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-037",
+    "type": "translation",
+    "title": "Translate for travel 37",
+    "japanese": "つぎのでんしゃはなんじですか",
+    "romaji": "Tsugi no densha wa nanji desu ka",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "direction": "en_to_ja",
+    "prompt": "What time is the next train?",
+    "expectedAnswer": "つぎのでんしゃはなんじですか",
+    "expectedRomaji": "Tsugi no densha wa nanji desu ka",
+    "acceptedAnswers": [
+      "つぎのでんしゃはなんじですか",
+      "つぎのでんしゃはなんじですか"
+    ]
+  },
+  {
+    "id": "seed-038",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 38",
+    "japanese": "なんばんせんですか",
+    "romaji": "Nanban sen desu ka",
+    "englishContext": "Beginner travel - train",
+    "tags": [
+      "travel",
+      "train",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "sentence": "_____んせんですか",
+    "sentenceRomaji": "_____ sen desu ka",
+    "sentenceEnglish": "Which platform?",
+    "blank": "first phrase",
+    "answer": "なんば",
+    "answerRomaji": "Nanban"
+  },
+  {
+    "id": "seed-039",
+    "type": "reorder",
+    "title": "Reorder travel sentence 39",
+    "japanese": "よやくしています",
+    "romaji": "Yoyaku shiteimasu",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "hotel",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "prompt": "I have a reservation.",
+    "tokens": [
+      "ます",
+      "してい",
+      "よやく"
+    ],
+    "correctOrder": [
+      "よやく",
+      "してい",
+      "ます"
+    ]
+  },
+  {
+    "id": "seed-040",
+    "type": "reading",
+    "title": "Travel reading check 40",
+    "japanese": "チェックインをおねがいします",
+    "romaji": "Chekkuin o onegai shimasu",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 4,
+    "passage": "きょうとまでしんかんせんで2じかんかかります。あしたあさ8じのしんかんせんにのります。",
+    "passageRomaji": "Kyouto made shinkansen de nijikan kakarimasu. Ashita asa hachiji no shinkansen ni norimasu.",
+    "passageEnglish": "It takes two hours to Kyoto by bullet train. I will take the 8 AM train tomorrow.",
+    "question": "How long does the train ride take?",
+    "answer": "Two hours"
+  },
+  {
+    "id": "seed-041",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 41",
+    "japanese": "にもつをあずけられますか",
+    "romaji": "Nimotsu o azukeraremasu ka",
+    "englishContext": "Beginner travel - hotel",
+    "tags": [
+      "travel",
+      "hotel",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "question": "What is the best translation?",
+    "choices": [
+      "Can I leave my luggage?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Can I leave my luggage?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-042",
+    "type": "translation",
+    "title": "Translate for travel 42",
+    "japanese": "バスていはどこですか",
+    "romaji": "Basu tei wa doko desu ka",
+    "englishContext": "Beginner travel - bus",
+    "tags": [
+      "travel",
+      "bus",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "direction": "en_to_ja",
+    "prompt": "Where is the bus stop?",
+    "expectedAnswer": "バスていはどこですか",
+    "expectedRomaji": "Basu tei wa doko desu ka",
+    "acceptedAnswers": [
+      "バスていはどこですか",
+      "バスていはどこですか"
+    ]
+  },
+  {
+    "id": "seed-043",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 43",
+    "japanese": "ここでとめてください",
+    "romaji": "Koko de tomete kudasai",
+    "englishContext": "Beginner travel - bus",
+    "tags": [
+      "travel",
+      "bus",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "sentence": "_____とめてください",
+    "sentenceRomaji": "_____ de tomete kudasai",
+    "sentenceEnglish": "Please stop here.",
+    "blank": "first phrase",
+    "answer": "ここで",
+    "answerRomaji": "Koko"
+  },
+  {
+    "id": "seed-044",
+    "type": "reorder",
+    "title": "Reorder travel sentence 44",
+    "japanese": "ピーナッツアレルギーがあります",
+    "romaji": "Piinattsu arerugii ga arimasu",
+    "englishContext": "Beginner travel - health",
+    "tags": [
+      "travel",
+      "health",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "prompt": "I am allergic to peanuts.",
+    "tokens": [
+      "ります",
+      "ーがあ",
+      "レルギ",
+      "ッツア",
+      "ピーナ"
+    ],
+    "correctOrder": [
+      "ピーナ",
+      "ッツア",
+      "レルギ",
+      "ーがあ",
+      "ります"
+    ]
+  },
+  {
+    "id": "seed-045",
+    "type": "reading",
+    "title": "Travel reading check 45",
+    "japanese": "いしゃがひつようです",
+    "romaji": "Isha ga hitsuyou desu",
+    "englishContext": "Beginner travel - health",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "passage": "レストランでカレーをたのみました。でも、からかったです。つぎはからくないものをたのみます。",
+    "passageRomaji": "Resutoran de karee o tanomimashita. Demo, karakatta desu. Tsugi wa karakunai mono o tanomimasu.",
+    "passageEnglish": "I ordered curry at a restaurant, but it was spicy. Next time I will order something not spicy.",
+    "question": "Was the curry spicy?",
+    "answer": "Yes"
+  },
+  {
+    "id": "seed-046",
+    "type": "multiple_choice",
+    "title": "Travel phrase meaning 46",
+    "japanese": "しゃしんをとってもらえますか",
+    "romaji": "Shashin o totte moraemasu ka",
+    "englishContext": "Beginner travel - sightseeing",
+    "tags": [
+      "travel",
+      "sightseeing",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "question": "What is the best translation?",
+    "choices": [
+      "Could you take a photo?",
+      "Excuse me",
+      "Thank you",
+      "I am fine"
+    ],
+    "correctAnswer": "Could you take a photo?",
+    "explanation": "Useful beginner travel phrase."
+  },
+  {
+    "id": "seed-047",
+    "type": "translation",
+    "title": "Translate for travel 47",
+    "japanese": "みちをおしえてください",
+    "romaji": "Michi o oshiete kudasai",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "direction": "en_to_ja",
+    "prompt": "Please tell me the way.",
+    "expectedAnswer": "みちをおしえてください",
+    "expectedRomaji": "Michi o oshiete kudasai",
+    "acceptedAnswers": [
+      "みちをおしえてください",
+      "みちをおしえてください"
+    ]
+  },
+  {
+    "id": "seed-048",
+    "type": "fill_blank",
+    "title": "Fill the missing travel word 48",
+    "japanese": "どのくらいかかりますか",
+    "romaji": "Dono kurai kakarimasu ka",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "sentence": "_____らいかかりますか",
+    "sentenceRomaji": "_____ kurai kakarimasu ka",
+    "sentenceEnglish": "How long does it take?",
+    "blank": "first phrase",
+    "answer": "どのく",
+    "answerRomaji": "Dono"
+  },
+  {
+    "id": "seed-049",
+    "type": "reorder",
+    "title": "Reorder travel sentence 49",
+    "japanese": "みちにまよいました",
+    "romaji": "Michi ni mayoimashita",
+    "englishContext": "Beginner travel - directions",
+    "tags": [
+      "travel",
+      "directions",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "prompt": "I am lost.",
+    "tokens": [
+      "ました",
+      "まよい",
+      "みちに"
+    ],
+    "correctOrder": [
+      "みちに",
+      "まよい",
+      "ました"
+    ]
+  },
+  {
+    "id": "seed-050",
+    "type": "reading",
+    "title": "Travel reading check 50",
+    "japanese": "トイレはどこですか",
+    "romaji": "Toire wa doko desu ka",
+    "englishContext": "Beginner travel - facilities",
+    "tags": [
+      "travel",
+      "reading",
+      "beginner"
+    ],
+    "difficulty": 5,
+    "passage": "バスていはこうえんのとなりです。そこからホテルまで10ぷんです。",
+    "passageRomaji": "Basu tei wa kouen no tonari desu. Soko kara hoteru made juppun desu.",
+    "passageEnglish": "The bus stop is next to the park. It is 10 minutes from there to the hotel.",
+    "question": "How long from the bus stop to the hotel?",
+    "answer": "10 minutes"
+  }
+]

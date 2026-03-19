@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getHistoryByUser } from '$lib/server/db';
+import { checkBudget } from '$lib/server/token-limiter';
 
 export const load: PageServerLoad = async ({ cookies }) => {
 const selectedUserId = cookies.get('selected_user_id');
@@ -8,9 +8,14 @@ if (!selectedUserId) {
 throw redirect(302, '/');
 }
 
-const history = await getHistoryByUser(selectedUserId);
+const budget = await checkBudget(selectedUserId);
 return {
 selectedUserId,
-history
+budget: {
+allowed: budget.allowed,
+remaining: Math.max(0, budget.dailyLimit - budget.dailyUsed),
+limit: budget.dailyLimit,
+reason: budget.reason
+}
 };
 };
