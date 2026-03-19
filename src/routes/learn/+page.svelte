@@ -13,7 +13,7 @@ answerExercise,
 nextExercise,
 completeSession,
 resetSession
-} from '$lib/stores/session';
+} from '$lib/stores/session.svelte';
 import type { Exercise, ExerciseAnswerPayload, Session } from '$lib/types';
 import type { PageData } from './$types';
 
