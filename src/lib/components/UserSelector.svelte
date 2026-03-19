@@ -55,7 +55,7 @@ $effect(() => {
   {#if users.length > 0}
     <form method="POST" action="?/selectUser" class="selector-form">
       <label for="user-id">Active profile</label>
-      <select id="user-id" name="user_id" bind:value={selectedId} required>
+      <select id="user-id" name="userId" bind:value={selectedId} required>
         {#each users as user}
           <option value={user.id}>{user.name} · {user.level.replace('_', ' ')}</option>
         {/each}

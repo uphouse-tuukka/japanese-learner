@@ -5,9 +5,9 @@ import type { ActionData, PageData } from './$types';
 let { data, form } = $props<{ data: PageData; form?: ActionData }>();
 
 function levelLabel(level: string): string {
-  if (level === 'absolute_beginner') return 'Absolute Beginner';
+  if (level === 'absolute_beginner') return 'Absolute beginner';
   if (level === 'beginner') return 'Beginner';
-  if (level === 'lower_intermediate') return 'Lower Intermediate';
+  if (level === 'lower_intermediate') return 'Lower intermediate';
   return level;
 }
 </script>
@@ -35,7 +35,9 @@ function levelLabel(level: string): string {
           <label><input type="radio" name="level" value="lower_intermediate" /> Lower intermediate</label>
         </fieldset>
 
-        <button type="submit" class="btn-primary">Create profile</button>
+        <div class="submit-row">
+          <button type="submit" class="btn-primary">Create profile</button>
+        </div>
       </form>
     </article>
   {:else if !data.selectedUser}
@@ -106,6 +108,7 @@ function levelLabel(level: string): string {
     padding: var(--space-3);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
+    background: var(--bg-washi);
   }
 
   .level-group label {
@@ -121,6 +124,11 @@ function levelLabel(level: string): string {
     width: 1rem;
     height: 1rem;
     accent-color: var(--accent-shu);
+  }
+
+  .submit-row {
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-light);
   }
 
   .error-message {

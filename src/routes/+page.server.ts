@@ -129,7 +129,7 @@ export const actions: Actions = {
   },
   selectUser: async ({ request, cookies }) => {
     const formData = await request.formData();
-    const userId = String(formData.get('user_id') ?? '').trim();
+    const userId = String(formData.get('userId') ?? '').trim();
 
     if (!userId) {
       return fail(400, { error: 'Please select a user.' });
