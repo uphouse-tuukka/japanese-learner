@@ -121,20 +121,33 @@ tokensTotal: number;
 createdAt: string;
 }
 
+export interface KeyPhrase {
+japanese: string;
+romaji: string;
+english: string;
+usage: string;
+}
+
+export interface Lesson {
+topic: string;
+explanation: string;
+culturalNote: string;
+keyPhrases: KeyPhrase[];
+}
+
 export interface SessionPlan {
 id: string;
 userId: string;
 mode: SessionMode;
 createdAt: string;
-model: string | null;
+model: string;
+lesson: Lesson;
 exercises: Exercise[];
-tokenUsage: Pick<TokenUsage, 'model' | 'tokensIn' | 'tokensOut' | 'tokensTotal'> | null;
-metadata: {
-focus: string;
-exerciseCount: number;
-selectionStrategy: string;
-[source: string]: unknown;
+tokenUsage: {
+input: number;
+output: number;
 };
+metadata: Record<string, unknown>;
 }
 
 export interface SessionSummary {

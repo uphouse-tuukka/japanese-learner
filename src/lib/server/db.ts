@@ -495,14 +495,48 @@ export const completeSessionRecord = completeSession;
 export const createSessionRecord = createSession;
 export const attachExercisesToSession = createSessionExercises;
 
-export async function getRandomExercises(limit: number): Promise<Exercise[]> {
+export async function getSessionsForUser(userId: string, limit = 20): Promise<Session[]> {
+	const db = await getDb();
 	const safeLimit = Math.max(1, Math.floor(limit));
+	const result = await db.execute({
+		sql: `
+		SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+		FROM sessions
+		WHERE user_id = ?
+		ORDER BY datetime(created_at) DESC
+		LIMIT ?
+		`,
+		args: [userId, safeLimit]
+	});
+	return result.rows.map((row) => mapSessionRow(row as Record<string, unknown>));
+}
+
+export async function getExerciseResultsForUser(userId: string): Promise<
+	Array<{
+		exerciseId: string;
+		sessionId: string | null;
+		isCorrect: boolean;
+		answerText: string;
+		createdAt: string;
+	}>
+> {
 	const db = await getDb();
 	const result = await db.execute({
-		sql: `SELECT content_json FROM exercises ORDER BY RANDOM() LIMIT ?`,
-		args: [safeLimit]
+		sql: `
+		SELECT exercise_id, session_id, is_correct, answer_text, created_at
+		FROM user_exercise_results
+		WHERE user_id = ?
+		ORDER BY datetime(created_at) DESC
+		`,
+		args: [userId]
 	});
-	return result.rows.map((row) => parseExercise((row as Record<string, unknown>).content_json));
+	return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+		exerciseId: asString(row.exercise_id),
+		sessionId: row.session_id ? asString(row.session_id) : null,
+		isCorrect: asNumber(row.is_correct) === 1,
+		answerText: asString(row.answer_text),
+		createdAt: asIso(row.created_at)
+	}));
 }
 
 export async function getHistoryByUser(userId: string): Promise<

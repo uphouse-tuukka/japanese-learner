@@ -19,6 +19,16 @@ isCorrect: normalized === exercise.correctOrder.join(' ')
 <h2>{exercise.title}</h2>
 <p>{exercise.prompt}</p>
 <p>Tokens: {exercise.tokens.join(' | ')}</p>
+<div class="answer-area">
 <input bind:value={answer} placeholder="Type correct order with spaces" />
 <button class="btn btn-primary" type="button" onclick={submit}>Submit answer</button>
+</div>
 </section>
+
+<style>
+.answer-area {
+display: grid;
+gap: var(--space-3);
+margin-top: var(--space-3);
+}
+</style>

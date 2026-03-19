@@ -21,6 +21,16 @@ normalized.toLowerCase() === exercise.answerRomaji.toLowerCase()
 <h2>{exercise.title}</h2>
 <p class="text-japanese">{exercise.sentence}</p>
 <p>{exercise.sentenceEnglish}</p>
+<div class="answer-area">
 <input bind:value={answer} placeholder="Fill the blank" />
 <button class="btn btn-primary" type="button" onclick={submit}>Submit answer</button>
+</div>
 </section>
+
+<style>
+.answer-area {
+display: grid;
+gap: var(--space-3);
+margin-top: var(--space-3);
+}
+</style>

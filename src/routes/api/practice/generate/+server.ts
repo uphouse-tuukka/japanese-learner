@@ -23,13 +23,20 @@ const session = await createSessionRecord({
 userId,
 mode: 'practice',
 status: 'planned',
-model: 'practice-weighted'
+model: practicePlan.model
 });
 await attachExercisesToSession(session.id, practicePlan.exercises);
 
-return json({ ok: true, state: 'active', session, exercises: practicePlan.exercises });
+return json({
+ok: true,
+state: 'active',
+session,
+lesson: practicePlan.lesson,
+exercises: practicePlan.exercises
+});
 } catch (error) {
+const message = error instanceof Error ? error.message : 'Failed to generate practice session.';
 console.error('[api/practice/generate] failed', { error });
-return json({ ok: false, error: 'Failed to generate practice session.' }, { status: 500 });
+return json({ ok: false, error: message }, { status: 500 });
 }
 };

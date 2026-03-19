@@ -19,6 +19,16 @@ isCorrect: normalized.toLowerCase() === exercise.answer.toLowerCase()
 <h2>{exercise.title}</h2>
 <p class="text-japanese">{exercise.passage}</p>
 <p>{exercise.question}</p>
+<div class="answer-area">
 <textarea bind:value={answer} rows="3" placeholder="Type your answer"></textarea>
 <button class="btn btn-primary" type="button" onclick={submit}>Submit answer</button>
+</div>
 </section>
+
+<style>
+.answer-area {
+display: grid;
+gap: var(--space-3);
+margin-top: var(--space-3);
+}
+</style>

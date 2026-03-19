@@ -10,6 +10,7 @@ import ListeningExercise from '$lib/components/exercises/ListeningExercise.svelt
 let { exercise, onAnswer }: { exercise: Exercise; onAnswer: OnAnswer } = $props();
 </script>
 
+{#key exercise.id}
 {#if exercise.type === 'multiple_choice'}
 <MultipleChoiceExercise exercise={exercise} {onAnswer} />
 {:else if exercise.type === 'translation'}
@@ -23,3 +24,4 @@ let { exercise, onAnswer }: { exercise: Exercise; onAnswer: OnAnswer } = $props(
 {:else}
 <ListeningExercise exercise={exercise} {onAnswer} />
 {/if}
+{/key}
