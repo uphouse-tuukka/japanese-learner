@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { SessionSummary } from '$lib/types';
+import type { Exercise, SessionMeta, SessionSummary } from '$lib/types';
 import {
 	completeSessionRecord,
 	getSessionExercises,
@@ -20,6 +20,8 @@ type CompleteRequest = {
 userId?: string;
 sessionId?: string;
 results?: ResultPayload[];
+lessonTopic?: string;
+keyPhrases?: string[];
 };
 
 function buildFallbackSummary(userId: string, sessionId: string, results: ResultPayload[]): SessionSummary {
@@ -42,12 +44,45 @@ generatedAt: new Date().toISOString()
 };
 }
 
+function toStringList(value: unknown): string[] {
+if (!Array.isArray(value)) {
+return [];
+}
+return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function inferLessonTopic(exercises: Exercise[], fallback = 'travel_japanese'): string {
+const firstTitle = exercises[0]?.title?.trim();
+if (firstTitle) {
+return firstTitle;
+}
+const firstContext = exercises[0]?.englishContext?.trim();
+if (firstContext) {
+return firstContext;
+}
+return fallback;
+}
+
+function deriveKeyPhrasesFromExercises(exercises: Exercise[]): string[] {
+const seen = new Set<string>();
+for (const exercise of exercises) {
+const romaji = exercise.romaji?.trim();
+if (romaji) {
+seen.add(romaji);
+}
+if (seen.size >= 8) {
+break;
+}
+}
+return Array.from(seen);
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 try {
-const body = (await request.json()) as CompleteRequest;
-const userId = String(body.userId ?? '').trim();
-const sessionId = String(body.sessionId ?? '').trim();
-const results = Array.isArray(body.results) ? body.results : [];
+		const body = (await request.json()) as CompleteRequest;
+		const userId = String(body.userId ?? '').trim();
+		const sessionId = String(body.sessionId ?? '').trim();
+		const results = Array.isArray(body.results) ? body.results : [];
 
 if (!userId || !sessionId) {
 return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 });
@@ -67,7 +102,10 @@ isCorrect: result.isCorrect
 		const user = await getUserById(userId);
 		const sessionExercises = await getSessionExercises(sessionId);
 		const exercises = sessionExercises.map((item) => item.exercise);
-		const lessonTopic = exercises[0]?.englishContext;
+		const lessonTopic = String(body.lessonTopic ?? '').trim() || inferLessonTopic(exercises);
+		const requestKeyPhrases = toStringList(body.keyPhrases);
+		const keyPhrases = requestKeyPhrases.length > 0 ? requestKeyPhrases.slice(0, 10) : deriveKeyPhrasesFromExercises(exercises);
+		const exerciseTypes = Array.from(new Set(exercises.map((exercise) => exercise.type)));
 
 		let summary: SessionSummary;
 		let summaryTokenInput = 0;
@@ -102,7 +140,16 @@ summary = buildFallbackSummary(userId, sessionId, results);
 		}
 
 		await completeSessionRecord(sessionId, {
-			summary: summary.summary,
+			summary: JSON.stringify({
+				summaryText: summary.summary,
+				topic: lessonTopic,
+				accuracy: summary.accuracy,
+				strengths: summary.strengths,
+				weaknesses: summary.weaknesses,
+				nextSteps: summary.nextSteps,
+				exerciseTypes,
+				keyPhrases
+			} satisfies SessionMeta),
 			tokenInput: summaryTokenInput,
 			tokenOutput: summaryTokenOutput
 		});

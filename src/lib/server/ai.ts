@@ -291,11 +291,32 @@ userId: string;
 userName: string;
 userLevel: UserLevel;
 exerciseCount?: number;
-priorSummaries?: string[];
+sessionHistory?: Array<{
+date: string;
+topic: string;
+accuracy: number;
+strengths: string[];
+weaknesses: string[];
+nextSteps: string[];
+keyPhrases: string[];
+}>;
+recentAccuracy?: number;
+coveredTopics?: string[];
+totalSessionCount?: number;
+performanceInsights?: {
+overallAccuracy: number;
+weakExerciseIds: string[];
+strongExerciseIds: string[];
+recentWrongAnswers: string[];
+};
 }): Promise<SessionPlan> {
 const client = getOpenAiClient();
 const targetExerciseCount = Math.min(12, Math.max(4, Math.round(input.exerciseCount ?? 6)));
-const priorSummaries = (input.priorSummaries ?? []).map((item) => item.trim()).filter(Boolean).slice(-5);
+const sessionHistory = (input.sessionHistory ?? []).slice(0, 10);
+const recentTopics = sessionHistory
+.slice(0, 5)
+.map((item) => item.topic.trim())
+.filter(Boolean);
 
 const response = await client.responses.create({
 model: SESSION_MODEL,
@@ -304,16 +325,24 @@ input: [
 {
 role: 'system',
 content: [
-'You are a Japanese teacher creating a single travel-focused TEACHING SESSION.',
-'Your output must be valid JSON only with keys: lesson, exercises, focus.',
-'The session must teach ONE topic first, then quiz only what was taught.',
-'Topics must be travel-focused: ordering food, directions, trains, hotels, shopping, politeness.',
-'Lesson must include: topic, explanation, culturalNote, keyPhrases (3-5 items).',
+'You are a Japanese tutor that adapts each session based on learner history.',
+'Output valid JSON only with top-level keys: lesson, exercises, focus.',
+'Tutor evolution rules:',
+'1) Never repeat a lesson topic from the learner\'s last 5 sessions.',
+'2) Address recent weaknesses directly in lesson explanation and exercise selection.',
+'3) Follow prior next-steps whenever possible.',
+'4) Progression threshold: if recentAccuracy > 80, increase challenge slightly; if recentAccuracy < 50, reinforce fundamentals.',
+'5) Staged curriculum by totalSessionCount: 0-10 travel survival only; 10-20 include daily life; 20+ broaden to practical social and work-adjacent situations.',
+'6) Personalize by connecting to previously studied phrases and mistakes.',
+'7) Vary exercise types inside one session (within level constraints).',
+'The session must teach one topic first, then quiz only what was taught.',
+'Lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).',
 'Each key phrase item must include japanese, romaji, english, usage.',
 'Every exercise must include japanese, romaji, englishContext, tags, difficulty, and type-specific fields.',
 levelInstructions(input.userLevel),
 'For absolute_beginner, never ask learner to type Japanese script.',
 'Use practical language the learner can immediately use in Japan.',
+`Do not use these recent topics: ${recentTopics.length ? recentTopics.join(', ') : 'none'}.`,
 'Keep content coherent around the same lesson topic.'
 ].join(' ')
 },
@@ -323,10 +352,19 @@ content: JSON.stringify({
 user: {
 id: input.userId,
 name: input.userName,
-level: input.userLevel
+level: input.userLevel,
+sessionHistory,
+recentAccuracy: input.recentAccuracy ?? null,
+coveredTopics: input.coveredTopics ?? [],
+totalSessionCount: input.totalSessionCount ?? 0,
+performanceInsights: input.performanceInsights ?? {
+overallAccuracy: 0,
+weakExerciseIds: [],
+strongExerciseIds: [],
+recentWrongAnswers: []
+}
 },
 targetExerciseCount,
-priorSummaries,
 requiredOutputExample: {
 lesson: {
 topic: 'Ordering at a restaurant',
@@ -449,9 +487,10 @@ input: [
 {
 role: 'system',
 content: [
-'You are a Japanese tutor giving specific feedback based on actual answers.',
+'You are a Japanese tutor giving specific, actionable feedback based on actual answers.',
 'Return JSON only with keys: summary, strengths, weaknesses, nextSteps.',
-'Reference concrete patterns from the completed exercises.',
+'Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.',
+'Make recommendations for the next session topic and include difficulty guidance (whether to reinforce or increase challenge).',
 'Keep feedback encouraging, practical, and travel-focused.'
 ].join(' ')
 },

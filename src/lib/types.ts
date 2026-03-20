@@ -161,6 +161,17 @@ accuracy: number;
 generatedAt: string;
 }
 
+export interface SessionMeta {
+summaryText: string;
+topic: string;
+accuracy: number;
+strengths: string[];
+weaknesses: string[];
+nextSteps: string[];
+exerciseTypes: string[];
+keyPhrases: string[];
+}
+
 export type ExerciseAnswerPayload = {
 exerciseId: string;
 answerText: string;
