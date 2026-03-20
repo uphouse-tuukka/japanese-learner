@@ -362,9 +362,9 @@ temperature: 0.3,
 input: [
 {
 role: 'system',
-content: [
-'You are a Japanese tutor that adapts each session based on learner history.',
-'Output valid JSON only with top-level keys: lesson, exercises, focus.',
+	content: [
+	'You are a Japanese tutor that adapts each session based on learner history.',
+	'Output valid JSON only with top-level keys: lesson, exercises, focus.',
 'Tutor evolution rules:',
 '1) Never repeat a lesson topic from the learner\'s last 5 sessions.',
 '2) Address recent weaknesses directly in lesson explanation and exercise selection.',
@@ -373,13 +373,41 @@ content: [
 '5) Staged curriculum by totalSessionCount: 0-10 travel survival only; 10-20 include daily life; 20+ broaden to practical social and work-adjacent situations.',
 '6) Personalize by connecting to previously studied phrases and mistakes.',
 '7) Vary exercise types inside one session (within level constraints).',
-'The session must teach one topic first, then quiz only what was taught.',
-'Lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).',
-'Each key phrase item must include japanese, romaji, english, usage.',
-'Every exercise must include japanese, romaji, englishContext, tags, difficulty, and type-specific fields.',
-levelInstructions(input.userLevel),
-'For absolute_beginner, never ask learner to type Japanese script.',
-'Use practical language the learner can immediately use in Japan.',
+	'The session must teach one topic first, then quiz only what was taught.',
+	'Lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).',
+	'Each key phrase item must include japanese, romaji, english, usage.',
+	'Every exercise must include japanese, romaji, englishContext, tags, difficulty, and type-specific fields.',
+	'Exercise type schemas:',
+	'multiple_choice requires: question (string), choices (array of 4 strings), correctAnswer (string matching one choice).',
+	'translation requires: direction ("ja_to_en" or "en_to_ja"), prompt (string to translate), expectedAnswer (correct translation string), acceptedAnswers (array of alternative correct strings).',
+	'fill_blank requires: sentence (with ___ for blank), sentenceRomaji, sentenceEnglish, blank (the missing word), answer, answerRomaji.',
+	'reorder requires: prompt (string), tokens (array of words to arrange), correctOrder (array in correct sequence).',
+	'reading requires: passage, passageRomaji, passageEnglish, question, answer.',
+	'listening requires: prompt, audioText, choices (array of strings), correctAnswer.',
+	'Exercise type field requirements:',
+	...(input.userLevel === 'absolute_beginner'
+		? [
+				'- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).',
+				'- translation: direction ("ja_to_en" only), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+				'For absolute_beginner, translation direction must always be "ja_to_en".'
+			]
+		: input.userLevel === 'beginner'
+			? [
+					'- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).',
+					'- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+					'- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).'
+				]
+			: [
+					'- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).',
+					'- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+					'- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.',
+					'- reorder: prompt, tokens (string array), correctOrder (string array).',
+					'- reading: passage, passageRomaji, passageEnglish, question, answer.',
+					'- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).'
+				]),
+	levelInstructions(input.userLevel),
+	'For absolute_beginner, never ask learner to type Japanese script.',
+	'Use practical language the learner can immediately use in Japan.',
 `Do not use these recent topics: ${recentTopics.length ? recentTopics.join(', ') : 'none'}.`,
 'Keep content coherent around the same lesson topic.'
 ].join(' ')
@@ -414,13 +442,39 @@ japanese: 'すみません',
 romaji: 'sumimasen',
 english: 'Excuse me',
 usage: "Use to politely call the server's attention"
-}
-]
-},
-exercises: [],
-focus: 'restaurant_ordering'
-}
-})
+		}
+		]
+	},
+	exercises: [
+		{
+			type: 'multiple_choice',
+			title: 'Choose the greeting',
+			japanese: 'こんにちは',
+			romaji: 'konnichiwa',
+			englishContext: 'A common daytime greeting',
+			tags: ['greetings'],
+			difficulty: 1,
+			question: 'What does こんにちは (konnichiwa) mean?',
+			choices: ['Good morning', 'Hello / Good afternoon', 'Good evening', 'Goodbye'],
+			correctAnswer: 'Hello / Good afternoon'
+		},
+		{
+			type: 'translation',
+			title: 'Translate the phrase',
+			japanese: 'ありがとうございます',
+			romaji: 'arigatou gozaimasu',
+			englishContext: 'A polite expression of gratitude',
+			tags: ['polite_expressions'],
+			difficulty: 1,
+			direction: 'ja_to_en',
+			prompt: 'ありがとうございます (arigatou gozaimasu)',
+			expectedAnswer: 'Thank you very much',
+			acceptedAnswers: ['Thank you very much', 'Thank you']
+		}
+	],
+	focus: 'restaurant_ordering'
+	}
+	})
 }
 ],
 text: {
@@ -455,8 +509,9 @@ if (validExercises.length === 0) {
 }
 const exercises = validateExerciseSet(validExercises, input.userLevel);
 
-if (exercises.length !== targetExerciseCount) {
-throw new Error(`[ai] expected ${targetExerciseCount} exercises, received ${exercises.length}`);
+const minExercises = Math.ceil(targetExerciseCount / 2);
+if (exercises.length < minExercises) {
+throw new Error(`[ai] expected at least ${minExercises} exercises, received ${exercises.length}`);
 }
 
 const usage = getUsageFromResponse(response);
