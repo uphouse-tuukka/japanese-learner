@@ -69,16 +69,63 @@ function toStringArray(
   fieldName: string,
   fallback: string[] = [],
 ): string[] {
-  if (!Array.isArray(value)) {
-    return fallback;
+  const normalizeItem = (item: unknown): string => {
+    if (item == null) {
+      return "";
+    }
+    if (typeof item === "string") {
+      return item.trim();
+    }
+    if (
+      typeof item === "number" ||
+      typeof item === "boolean" ||
+      typeof item === "bigint"
+    ) {
+      return String(item).trim();
+    }
+    if (typeof item === "symbol") {
+      return (item.description ?? "").trim();
+    }
+    if (typeof item === "object") {
+      const row = item as Record<string, unknown>;
+      const semanticText =
+        (typeof row.text === "string" && row.text) ||
+        (typeof row.value === "string" && row.value) ||
+        (typeof row.label === "string" && row.label) ||
+        (typeof row.message === "string" && row.message) ||
+        "";
+      if (semanticText.trim()) {
+        return semanticText.trim();
+      }
+      try {
+        const serialized = JSON.stringify(item);
+        if (!serialized || serialized === "{}" || serialized === "[]") {
+          return "";
+        }
+        return serialized.trim();
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  };
+
+  const source = Array.isArray(value) ? value : value == null ? [] : [value];
+  const normalized = source
+    .flatMap((item) => (Array.isArray(item) ? item : [item]))
+    .map((item) => normalizeItem(item))
+    .filter(Boolean);
+
+  if (normalized.length > 0) {
+    return normalized;
   }
-  const normalized = value.map((item) => String(item).trim()).filter(Boolean);
-  if (normalized.length === 0 && fallback.length === 0) {
-    throw new Error(
-      `[ai] Invalid field "${fieldName}". Expected non-empty string array.`,
-    );
+
+  if (fallback.length === 0) {
+    return [];
   }
-  return normalized.length > 0 ? normalized : fallback;
+  return fallback
+    .map((item) => normalizeItem(item))
+    .filter(Boolean);
 }
 
 function isExerciseType(value: unknown): value is ExerciseType {
@@ -759,10 +806,11 @@ export async function generateSessionSummary(input: {
           "Return JSON only with keys: summary, strengths, weaknesses, nextSteps.",
           "CRITICAL RULES for accuracy:",
           "1) Only reference exercises and answers that actually appear in the results data. Never fabricate or assume exercises that were not in the session.",
-          "2) 'weaknesses' must only describe mistakes the learner actually made during this session. Do not list topics that were not covered — those belong in nextSteps instead.",
+          "2) If accuracy is below 100, 'weaknesses' must describe mistakes the learner actually made during this session. If accuracy is 100, provide 1-2 'weaknesses' phrased as areas to deepen (e.g., speed, nuance, alternative phrasing) based only on covered content.",
           "3) 'nextSteps' should suggest what to learn next, including topics not yet covered.",
           "4) 'strengths' must reference specific correct answers from the session data.",
           "5) All Japanese text must include romaji in parentheses, e.g. こんにちは (konnichiwa). Never output Japanese without romaji.",
+          "6) Never leave 'weaknesses' empty.",
           "Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.",
           "Keep feedback encouraging, practical, and travel-focused.",
         ].join(" "),
@@ -801,26 +849,77 @@ export async function generateSessionSummary(input: {
     );
   }
 
-  const parsed = JSON.parse(response.output_text) as {
-    summary: string;
-    strengths: string[];
-    weaknesses: string[];
-    nextSteps: string[];
+  console.info("[ai] raw session summary response", {
+    sessionId: input.sessionId,
+    responseId: response.id,
+    status: response.status,
+  });
+  console.debug("[ai] raw session summary output_text", {
+    sessionId: input.sessionId,
+    outputText: response.output_text,
+  });
+
+  const parsed = JSON.parse(response.output_text) as Record<string, unknown>;
+  const pickFirst = (keys: string[]): unknown => {
+    for (const key of keys) {
+      if (key in parsed) {
+        return parsed[key];
+      }
+    }
+    return undefined;
   };
+
+  const summaryText = String(
+    pickFirst(["summary", "sessionSummary", "session_summary", "overview"]) ??
+      "",
+  ).trim();
 
   const summary: SessionSummary = {
     sessionId: input.sessionId,
     userId: input.userId,
-    summary: assertString(parsed.summary, "summary"),
-    strengths: toStringArray(parsed.strengths, "strengths", [
+    summary: assertString(summaryText, "summary"),
+    strengths: toStringArray(
+      pickFirst([
+        "strengths",
+        "strength",
+        "strongPoints",
+        "strong_points",
+        "positives",
+      ]),
+      "strengths",
+      [
       "You completed the session.",
-    ]),
-    weaknesses: toStringArray(parsed.weaknesses, "weaknesses", [
+      ],
+    ),
+    weaknesses: toStringArray(
+      pickFirst([
+        "weaknesses",
+        "weakness",
+        "areasToDeepen",
+        "areas_to_deepen",
+        "improvementAreas",
+        "improvement_areas",
+      ]),
+      "weaknesses",
+      [
       "Review any missed phrases once more.",
-    ]),
-    nextSteps: toStringArray(parsed.nextSteps, "nextSteps", [
+      ],
+    ),
+    nextSteps: toStringArray(
+      pickFirst([
+        "nextSteps",
+        "nextStep",
+        "next_steps",
+        "next_step",
+        "recommendations",
+        "actionItems",
+        "action_items",
+      ]),
+      "nextSteps",
+      [
       "Complete one more short session tomorrow.",
-    ]),
+      ],
+    ),
     accuracy,
     generatedAt: nowIso(),
   };
