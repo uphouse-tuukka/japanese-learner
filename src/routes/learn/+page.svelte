@@ -71,14 +71,17 @@ headers: { 'content-type': 'application/json' },
 body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 6 })
 });
 
-const payload = (await response.json()) as GenerateResponse;
-if (payload.state === 'budget_exhausted' || !payload.session) {
-uiState = 'budget_exhausted';
-return;
-}
-if (!response.ok || !payload.ok || !payload.lesson) {
-throw new Error(payload.error ?? 'Failed to generate session');
-}
+	const payload = (await response.json()) as GenerateResponse;
+	if (payload.state === 'budget_exhausted') {
+		uiState = 'budget_exhausted';
+		return;
+	}
+	if (!response.ok || !payload.ok) {
+		throw new Error(payload.error ?? 'Failed to generate session');
+	}
+	if (!payload.session || !payload.lesson) {
+		throw new Error('Failed to generate session');
+	}
 
 lesson = payload.lesson;
 startSession(payload.session, payload.exercises);
@@ -146,7 +149,12 @@ uiState = 'error';
 {:else if uiState === 'loading'}
 <section class="card"><p>Generating your teaching session...</p></section>
 {:else if uiState === 'budget_exhausted'}
-<section class="card"><p>Daily token budget exhausted. Try again tomorrow.</p></section>
+<section class="card">
+<p>
+You've reached today's AI practice budget. Please try again tomorrow, and your learning session
+will be ready.
+</p>
+</section>
 {:else if uiState === 'lesson' && lesson}
 <section class="card lesson-card">
 <p class="lesson-label">Today's lesson</p>
@@ -180,7 +188,7 @@ uiState = 'error';
 <SessionSummary summary={$summary} />
 {:else if uiState === 'error'}
 <section class="card">
-<p>{errorMessage}</p>
+<p>{errorMessage || 'Failed to generate session'}</p>
 <button class="btn btn-secondary" onclick={startLearning}>Try again</button>
 </section>
 {/if}

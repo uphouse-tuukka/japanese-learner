@@ -86,20 +86,22 @@ usage: assertString(row.usage, `keyPhrases[${index}].usage`)
 }
 
 function normalizeLesson(raw: unknown): Lesson {
-if (!raw || typeof raw !== 'object') {
-throw new Error('[ai] Missing lesson object in model output');
-}
-const row = raw as Record<string, unknown>;
-const keyPhrasesRaw = Array.isArray(row.keyPhrases) ? row.keyPhrases : [];
-if (keyPhrasesRaw.length < 3 || keyPhrasesRaw.length > 5) {
-throw new Error('[ai] lesson.keyPhrases must contain 3-5 entries');
-}
-return {
-topic: assertString(row.topic, 'lesson.topic'),
-explanation: assertString(row.explanation, 'lesson.explanation'),
-culturalNote: assertString(row.culturalNote, 'lesson.culturalNote'),
-keyPhrases: keyPhrasesRaw.map((phrase, index) => normalizeKeyPhrase(phrase, index))
-};
+	if (!raw || typeof raw !== 'object') {
+		throw new Error('[ai] Missing lesson object in model output');
+	}
+	const row = raw as Record<string, unknown>;
+	const keyPhrasesRaw = Array.isArray(row.keyPhrases) ? row.keyPhrases : [];
+	if (keyPhrasesRaw.length > 8) {
+		throw new Error('[ai] lesson.keyPhrases must contain 1-8 entries');
+	}
+	const keyPhrases = keyPhrasesRaw.slice(0, 5);
+	if (keyPhrases.length === 0) throw new Error('[ai] lesson.keyPhrases must contain at least 1 entry');
+	return {
+		topic: assertString(row.topic, 'lesson.topic'),
+		explanation: assertString(row.explanation, 'lesson.explanation'),
+		culturalNote: assertString(row.culturalNote, 'lesson.culturalNote'),
+		keyPhrases: keyPhrases.map((phrase, index) => normalizeKeyPhrase(phrase, index))
+	};
 }
 
 function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exercise {
@@ -113,16 +115,19 @@ if (!isExerciseType(typeRaw)) {
 throw new Error(`[ai] Exercise at index ${index} has unsupported type: ${String(typeRaw)}`);
 }
 
-const base = {
-id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : `ai-${randomUUID()}`,
-type: typeRaw,
-title: assertString(row.title, 'title'),
-japanese: assertString(row.japanese, 'japanese'),
-romaji: assertString(row.romaji, 'romaji'),
-englishContext: assertString(row.englishContext, 'englishContext'),
-tags: toStringArray(row.tags, 'tags', ['travel', 'teaching-session']),
-difficulty: normalizeDifficulty(row.difficulty, level)
-};
+	const base = {
+		id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : `ai-${randomUUID()}`,
+		type: typeRaw,
+		title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : `Exercise ${index + 1}`,
+		japanese: assertString(row.japanese, 'japanese'),
+		romaji: assertString(row.romaji, 'romaji'),
+		englishContext:
+			typeof row.englishContext === 'string' && row.englishContext.trim()
+				? row.englishContext.trim()
+				: '',
+		tags: toStringArray(row.tags, 'tags', ['travel', 'teaching-session']),
+		difficulty: normalizeDifficulty(row.difficulty, level)
+	};
 
 if (typeRaw === 'multiple_choice') {
 const choices = toStringArray(row.choices, 'choices');
