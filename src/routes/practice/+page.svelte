@@ -25,6 +25,39 @@ let { data } = $props<{ data: PageData }>();
 let uiState = $state<UiState>('idle');
 let errorMessage = $state('');
 
+/* — Loading animation state — */
+const loadingMessages = [
+  'Selecting exercises for review\u2026',
+  'Prioritizing your weak spots\u2026',
+  'Preparing practice questions\u2026',
+  'Almost ready\u2026'
+];
+let loadingMsgIndex = $state(0);
+let loadingMsgVisible = $state(true);
+
+$effect(() => {
+  if (uiState !== 'loading') return;
+  loadingMsgIndex = 0;
+  loadingMsgVisible = true;
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const intervalId = setInterval(() => {
+    loadingMsgVisible = false;
+    timeoutId = setTimeout(() => {
+      loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+      loadingMsgVisible = true;
+    }, 400);
+  }, 2800);
+  return () => {
+    clearInterval(intervalId);
+    clearTimeout(timeoutId);
+  };
+});
+
+/* Reset shared session store on mount to clear stale state from other modes */
+$effect(() => {
+  resetSession();
+});
+
 const totalExercises = $derived($exercises.length);
 const currentExercise = $derived($exercises[$currentIndex] ?? null);
 const progressCurrent = $derived(Math.min($currentIndex + 1, Math.max($exercises.length, 1)));
@@ -100,7 +133,10 @@ async function finalizePractice(): Promise<void> {
         </svg>
         <span class="enso-kanji" aria-hidden="true">練</span>
       </div>
-      <p class="loading-text">Preparing your practice session…</p>
+      <p class="loading-text" style:opacity={loadingMsgVisible ? 1 : 0}>
+        {loadingMessages[loadingMsgIndex]}
+      </p>
+      <p class="sr-only">Generating your practice session, please wait.</p>
     </section>
   {:else if uiState === 'active'}
     <section class="card"><ProgressBar current={progressCurrent} total={totalExercises} label="Practice progress" /></section>
@@ -216,6 +252,7 @@ async function finalizePractice(): Promise<void> {
     color: var(--text-bokashi);
     font-size: var(--text-base);
     text-align: center;
+    transition: opacity 0.4s var(--ease-in-out);
     min-height: 1.6em;
     margin: 0;
   }
