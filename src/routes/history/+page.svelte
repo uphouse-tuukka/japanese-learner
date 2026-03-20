@@ -168,7 +168,6 @@ border: 1px solid currentColor;
 display: inline-flex;
 align-items: center;
 gap: var(--space-2);
-font-size: var(--text-sm);
 text-transform: capitalize;
 }
 
@@ -181,11 +180,16 @@ background: var(--text-usuzumi);
 
 .status-completed .dot {
 background: var(--state-success);
-box-shadow: 0 0 6px var(--state-success);
 }
 
 .status-completed {
-color: var(--text-sumi);
+background-color: #fff;
+color: var(--state-success);
+border: 1px solid var(--state-success);
+padding: var(--space-1) var(--space-3);
+border-radius: 999px;
+font-weight: var(--weight-medium);
+box-shadow: var(--shadow-sm);
 }
 
 .status-planned .dot {

@@ -5,29 +5,50 @@ import { isSpeaking, speak, stop } from '$lib/utils/tts';
 let { exercise, onAnswer }: { exercise: ListeningExercise; onAnswer: OnAnswer } = $props();
 let selected = $state('');
 let speaking = $state(false);
+let loading = $state(false);
 
 async function playAudio(): Promise<void> {
-speaking = true;
-try {
-await speak(exercise.audioText, { rate: 1, pitch: 1 });
-} finally {
-speaking = isSpeaking();
+	loading = true;
+	speaking = false;
+	const playback = speak(exercise.audioText, { rate: 0.9, pitch: 1, serverVoice: 'nova' });
+	try {
+		while (!isSpeaking()) {
+			const completed = await Promise.race([
+				playback.then(() => true),
+				new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), 50))
+			]);
+			if (completed) break;
+		}
+		speaking = isSpeaking();
+		loading = false;
+		await playback;
+	} finally {
+		speaking = isSpeaking();
+		loading = false;
+	}
 }
+
+function handleStop(): void {
+	stop();
+	speaking = false;
+	loading = false;
 }
 
 function submit(): void {
-if (!selected) return;
-onAnswer({ exerciseId: exercise.id, answerText: selected, isCorrect: selected === exercise.correctAnswer });
+	if (!selected) return;
+	onAnswer({ exerciseId: exercise.id, answerText: selected, isCorrect: selected === exercise.correctAnswer });
 }
 </script>
 
 <section class="card">
-<h2>{exercise.title}</h2>
-<p>{exercise.prompt}</p>
-<div class="audio-actions">
-<button type="button" class="btn btn-secondary" onclick={playAudio}>{speaking ? 'Playing…' : 'Play audio'}</button>
-<button type="button" class="btn btn-ghost" onclick={stop}>Stop</button>
-</div>
+	<h2>{exercise.title}</h2>
+	<p>{exercise.prompt}</p>
+	<div class="audio-actions">
+		<button type="button" class="btn btn-secondary" onclick={playAudio}>
+			{loading ? 'Loading…' : speaking ? 'Playing…' : 'Play audio'}
+		</button>
+		<button type="button" class="btn btn-ghost" onclick={handleStop}>Stop</button>
+	</div>
 <div class="choices">
 {#each exercise.choices as choice}
 <button type="button" class:selected={selected === choice} onclick={() => (selected = choice)}>{choice}</button>

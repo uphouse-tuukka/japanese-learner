@@ -2,6 +2,17 @@ import OpenAI from "openai";
 import { config } from "$lib/config";
 
 let openaiClient: OpenAI | null = null;
+const ALLOWED_VOICES = new Set([
+  "alloy",
+  "ash",
+  "coral",
+  "echo",
+  "fable",
+  "onyx",
+  "nova",
+  "sage",
+  "shimmer",
+]);
 
 function getOpenAiClient(): OpenAI {
   const apiKey = config.openai.apiKey.trim();
@@ -26,31 +37,49 @@ function validateText(text: string): string {
 }
 
 function validateVoice(voice: string): string {
-  const normalized = voice.trim();
-  if (!normalized) {
-    throw new Error("[tts] voice is required");
+  const normalized = voice.trim().toLowerCase();
+  if (!normalized || !ALLOWED_VOICES.has(normalized)) {
+    throw new Error(`[tts] unsupported voice "${voice}"`);
   }
   return normalized;
 }
 
-export async function generateSpeech(
-  text: string,
-  voice = "alloy",
-): Promise<Buffer> {
-  const content = validateText(text);
-  const selectedVoice = validateVoice(voice);
+function validateSpeed(speed: number): number {
+  if (!Number.isFinite(speed)) {
+    throw new Error("[tts] speed must be a finite number");
+  }
+  if (speed < 0.25 || speed > 4) {
+    throw new Error("[tts] speed must be between 0.25 and 4");
+  }
+  return speed;
+}
+
+type GenerateSpeechInput = {
+  text: string;
+  voice?: string;
+  speed?: number;
+};
+
+export async function generateSpeech(input: GenerateSpeechInput | string, voice = "nova"): Promise<Buffer> {
+  const payload = typeof input === "string" ? { text: input, voice } : input;
+  const content = validateText(payload.text);
+  const selectedVoice = validateVoice(payload.voice ?? "nova");
+  const selectedSpeed = validateSpeed(payload.speed ?? 0.9);
   const client = getOpenAiClient();
 
   console.info("[tts] generating speech", {
+    model: "tts-1-hd",
     voice: selectedVoice,
+    speed: selectedSpeed,
     textLength: content.length,
   });
 
   const response = await client.audio.speech.create({
-    model: "tts-1",
+    model: "tts-1-hd",
     voice: selectedVoice,
     input: content,
     response_format: "mp3",
+    speed: selectedSpeed,
   });
 
   const arrayBuffer = await response.arrayBuffer();

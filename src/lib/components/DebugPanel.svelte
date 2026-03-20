@@ -27,20 +27,21 @@ function selectType(type: ExerciseType): void {
 function triggerGenerate(): void {
   onGenerateDebug(selectedType);
 }
+
+function portal(node: HTMLElement) {
+  document.body.appendChild(node);
+  return {
+    destroy() {
+      if (node.parentNode) {
+        node.parentNode.removeChild(node);
+      }
+    }
+  };
+}
 </script>
 
 {#if dev}
-  <div class="debug-root">
-    <button
-      class="debug-toggle"
-      type="button"
-      aria-expanded={isOpen}
-      aria-controls="debug-panel"
-      onclick={toggleOpen}
-    >
-      🔧
-    </button>
-
+  <div class="debug-root" use:portal>
     {#if isOpen}
       <section id="debug-panel" class="debug-panel" aria-label="Debug panel">
         <h2>Debug Panel</h2>
@@ -61,6 +62,17 @@ function triggerGenerate(): void {
         </button>
       </section>
     {/if}
+
+    <button
+      class="debug-toggle"
+      type="button"
+      aria-expanded={isOpen}
+      aria-controls="debug-panel"
+      onclick={toggleOpen}
+      aria-label="Toggle debug panel"
+    >
+      🔧
+    </button>
   </div>
 {/if}
 
@@ -69,10 +81,11 @@ function triggerGenerate(): void {
     position: fixed;
     right: var(--space-4);
     bottom: var(--space-4);
-    z-index: var(--z-overlay);
-    display: grid;
-    justify-items: end;
-    gap: var(--space-2);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-3);
     pointer-events: none;
   }
 
@@ -84,29 +97,44 @@ function triggerGenerate(): void {
   }
 
   .debug-toggle {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 3rem;
+    height: 3rem;
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--border-mid) 70%, transparent);
-    background: color-mix(in srgb, var(--bg-kinu) 82%, transparent);
-    backdrop-filter: blur(8px);
-    color: var(--text-bokashi);
-    font-size: var(--text-base);
+    border: 2px solid var(--accent-shu);
+    background: var(--bg-shoji);
+    color: var(--accent-shu);
+    font-size: var(--text-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     line-height: 1;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .debug-toggle:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-lg);
+    background: var(--bg-kinu);
+  }
+
+  .debug-toggle:active {
+    transform: scale(0.95);
   }
 
   .debug-panel {
     width: min(20rem, calc(100vw - var(--space-8)));
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
     display: grid;
     gap: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid color-mix(in srgb, var(--border-mid) 70%, transparent);
+    padding: var(--space-4);
+    border: 1px solid var(--border-mid);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--bg-washi) 86%, transparent);
-    backdrop-filter: blur(8px);
-    box-shadow: var(--shadow-md);
+    background: rgba(250, 248, 244, 0.98);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(44, 42, 38, 0.15);
   }
 
   .debug-panel h2 {
@@ -115,6 +143,8 @@ function triggerGenerate(): void {
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
     color: var(--text-bokashi);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-light);
   }
 
   .type-grid {
@@ -126,29 +156,42 @@ function triggerGenerate(): void {
   .type-button {
     border: 1px solid var(--border-light);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--bg-shoji) 85%, transparent);
+    background: var(--bg-shoji);
     color: var(--text-bokashi);
     font-size: var(--text-xs);
     text-transform: lowercase;
     padding: var(--space-2);
     cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .type-button:hover {
+    background: var(--bg-kinu);
+    border-color: var(--border-focus);
   }
 
   .type-button.selected {
-    border-color: color-mix(in srgb, var(--accent-matcha) 65%, var(--border-mid));
-    background: color-mix(in srgb, var(--accent-matcha-wash) 80%, transparent);
+    border-color: var(--accent-matcha);
+    background: var(--accent-matcha-wash);
     color: var(--text-sumi);
+    font-weight: var(--weight-medium);
   }
 
   .generate-button {
-    border: 1px solid color-mix(in srgb, var(--accent-shu) 65%, var(--border-mid));
+    border: 1px solid var(--accent-shu);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--accent-shu-wash) 88%, transparent);
+    background: var(--accent-shu-wash);
     color: var(--accent-shu-deep);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     padding: var(--space-2) var(--space-3);
     cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .generate-button:hover {
+    background: var(--accent-shu);
+    color: #fff;
   }
 
   @media (max-width: 640px) {

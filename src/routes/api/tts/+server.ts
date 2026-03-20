@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { generateSpeech } from '$lib/server/tts';
 import type { RequestHandler } from './$types';
 
 type RateLimitEntry = {
@@ -51,8 +52,20 @@ rateLimitByUser.set(userKey, existing);
 return true;
 }
 
-function buildETag(text: string, voice: string): string {
-const content = `${voice}:${text}`;
+function parseSpeed(rawSpeed: string | null): number {
+if (rawSpeed === null || rawSpeed.trim() === '') {
+return 0.9;
+}
+
+const speed = Number(rawSpeed);
+if (!Number.isFinite(speed) || speed < 0.25 || speed > 4) {
+throw error(400, 'Query parameter "speed" must be a number between 0.25 and 4.');
+}
+return speed;
+}
+
+function buildETag(text: string, voice: string, speed: number): string {
+const content = `${voice}:${speed}:${text}`;
 let hash = 0;
 for (let index = 0; index < content.length; index += 1) {
 hash = (hash * 31 + content.charCodeAt(index)) >>> 0;
@@ -86,30 +99,10 @@ return data.arrayBuffer();
 throw new Error('Unsupported audio data returned from generateSpeech.');
 }
 
-async function generateAudio(text: string, voice: string): Promise<ArrayBuffer> {
-const modulePath = '$lib/server/' + 'tts';
-const ttsModule = (await import(modulePath).catch(() => null)) as
-| {
-generateSpeech?: (...args: unknown[]) => Promise<unknown>;
-  }
-| null;
-
-if (!ttsModule || typeof ttsModule.generateSpeech !== 'function') {
-throw error(500, 'Server TTS module is not available.');
-}
-
-try {
-const result = await ttsModule.generateSpeech({ text, voice });
-return toArrayBuffer(result);
-} catch {
-const result = await ttsModule.generateSpeech(text, voice);
-return toArrayBuffer(result);
-}
-}
-
 export const GET: RequestHandler = async (event) => {
 const text = event.url.searchParams.get('text')?.trim() ?? '';
-const voice = event.url.searchParams.get('voice')?.trim() || 'alloy';
+const voice = event.url.searchParams.get('voice')?.trim() || 'nova';
+const speed = parseSpeed(event.url.searchParams.get('speed'));
 
 if (!text) {
 throw error(400, 'Query parameter "text" is required.');
@@ -120,7 +113,7 @@ if (!checkAndConsumeRateLimit(userKey)) {
 throw error(429, 'Daily TTS request limit reached (100 requests/day).');
 }
 
-const etag = buildETag(text, voice);
+const etag = buildETag(text, voice, speed);
 if (event.request.headers.get('if-none-match') === etag) {
 return new Response(null, {
 status: 304,
@@ -131,7 +124,7 @@ ETag: etag,
 });
 }
 
-const audioBuffer = await generateAudio(text, voice);
+const audioBuffer = await toArrayBuffer(await generateSpeech({ text, voice, speed }));
 
 return new Response(audioBuffer, {
 headers: {

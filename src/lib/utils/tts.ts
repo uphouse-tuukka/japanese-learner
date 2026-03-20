@@ -1,37 +1,63 @@
-import { playFromUrl, stopAudio, isPlaying } from '$lib/utils/audio';
+import { playAudio, stopAudio, isPlaying } from '$lib/utils/audio';
 
 export interface SpeakOptions {
 rate?: number;
 pitch?: number;
 volume?: number;
+serverVoice?: string;
 voice?: string;
 fallbackVoice?: string;
 }
 
 let cachedJapaneseVoice: SpeechSynthesisVoice | null | undefined;
 let voiceLookupPromise: Promise<SpeechSynthesisVoice | null> | null = null;
+const serverAudioCache = new Map<string, ArrayBuffer>();
+const pendingServerAudio = new Map<string, Promise<ArrayBuffer>>();
 
-function chooseBestJapaneseVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+function scoreJapaneseVoice(voice: SpeechSynthesisVoice): number {
+const lang = voice.lang.toLowerCase();
+const name = voice.name.toLowerCase();
+let score = 0;
+
+if (lang === 'ja-jp') score += 100;
+else if (lang.startsWith('ja')) score += 70;
+
+if (voice.localService) score += 12;
+if (voice.default) score += 8;
+if (name.includes('kyoko') || name.includes('otoya')) score += 10;
+if (name.includes('haruka') || name.includes('sayaka')) score += 8;
+if (name.includes('japanese') || name.includes('japan')) score += 6;
+if (name.includes('google')) score += 3;
+
+return score;
+}
+
+function chooseBestJapaneseVoice(
+voices: SpeechSynthesisVoice[],
+preferredVoiceName?: string
+): SpeechSynthesisVoice | null {
 if (voices.length === 0) {
 return null;
 }
 
-const exactLocale = voices.find((voice) => voice.lang.toLowerCase() === 'ja-jp');
-if (exactLocale) {
-return exactLocale;
+if (preferredVoiceName) {
+const preferred = voices.find(
+(voice) => voice.name.toLowerCase() === preferredVoiceName.toLowerCase()
+);
+if (preferred) {
+return preferred;
+}
 }
 
-const japaneseLocale = voices.find((voice) => voice.lang.toLowerCase().startsWith('ja'));
-if (japaneseLocale) {
-return japaneseLocale;
-}
-
-const japaneseName = voices.find((voice) => voice.name.toLowerCase().includes('japanese'));
-if (japaneseName) {
-return japaneseName;
-}
-
+const japaneseVoices = voices.filter(
+(voice) => voice.lang.toLowerCase().startsWith('ja') || voice.name.toLowerCase().includes('japanese')
+);
+if (japaneseVoices.length === 0) {
 return null;
+}
+
+japaneseVoices.sort((left, right) => scoreJapaneseVoice(right) - scoreJapaneseVoice(left));
+return japaneseVoices[0] ?? null;
 }
 
 function getSpeechSynthesis(): SpeechSynthesis | null {
@@ -77,10 +103,15 @@ typeof SpeechSynthesisUtterance !== 'undefined'
 );
 }
 
-export async function getJapaneseVoice(): Promise<SpeechSynthesisVoice | null> {
+export async function getJapaneseVoice(preferredVoiceName?: string): Promise<SpeechSynthesisVoice | null> {
 if (!isSupported()) {
 cachedJapaneseVoice = null;
 return null;
+}
+
+if (preferredVoiceName) {
+const voices = await getVoicesWithAsyncLoadHandling();
+return chooseBestJapaneseVoice(voices, preferredVoiceName);
 }
 
 if (cachedJapaneseVoice !== undefined) {
@@ -102,9 +133,37 @@ voiceLookupPromise = null;
 }
 }
 
-async function speakViaServerFallback(text: string, fallbackVoice: string): Promise<void> {
-const params = new URLSearchParams({ text, voice: fallbackVoice });
-await playFromUrl(`/api/tts?${params.toString()}`);
+async function fetchServerAudio(text: string, voice: string, speed: number): Promise<ArrayBuffer> {
+const cacheKey = `${voice}:${speed}:${text}`;
+const cached = serverAudioCache.get(cacheKey);
+if (cached) {
+return cached;
+}
+
+const pending = pendingServerAudio.get(cacheKey);
+if (pending) {
+return pending;
+}
+
+const params = new URLSearchParams({ text, voice, speed: String(speed) });
+const request = fetch(`/api/tts?${params.toString()}`).then(async (response) => {
+if (!response.ok) {
+throw new Error(`Audio request failed with status ${response.status}.`);
+}
+const data = await response.arrayBuffer();
+serverAudioCache.set(cacheKey, data);
+return data;
+}).finally(() => {
+pendingServerAudio.delete(cacheKey);
+});
+
+pendingServerAudio.set(cacheKey, request);
+return request;
+}
+
+async function speakViaServer(text: string, voice: string, speed: number): Promise<void> {
+const data = await fetchServerAudio(text, voice, speed);
+await playAudio(data.slice(0));
 }
 
 export async function speak(text: string, options: SpeakOptions = {}): Promise<void> {
@@ -113,29 +172,37 @@ if (!trimmedText) {
 return;
 }
 
-const rate = options.rate ?? 1;
-const pitch = options.pitch ?? 1;
+const rate = options.rate ?? 0.9;
+const pitch = options.pitch ?? 1.02;
 const volume = options.volume ?? 1;
-const fallbackVoice = options.fallbackVoice ?? options.voice ?? 'alloy';
+const serverVoice = options.serverVoice ?? options.voice ?? 'nova';
+const browserFallbackVoiceName = options.fallbackVoice;
+
+stop();
+
+try {
+await speakViaServer(trimmedText, serverVoice, rate);
+return;
+} catch (serverError) {
+console.warn('[tts] server speech failed, falling back to browser synthesis', {
+voice: serverVoice,
+rate,
+error: serverError
+});
 
 if (!isSupported()) {
-await speakViaServerFallback(trimmedText, fallbackVoice);
-return;
+throw serverError;
 }
 
 const synth = getSpeechSynthesis();
 if (!synth) {
-await speakViaServerFallback(trimmedText, fallbackVoice);
-return;
+throw serverError;
 }
 
-const japaneseVoice = await getJapaneseVoice();
+const japaneseVoice = await getJapaneseVoice(browserFallbackVoiceName);
 if (!japaneseVoice) {
-await speakViaServerFallback(trimmedText, fallbackVoice);
-return;
+throw serverError;
 }
-
-stop();
 
 await new Promise<void>((resolve, reject) => {
 const utterance = new SpeechSynthesisUtterance(trimmedText);
@@ -149,17 +216,13 @@ utterance.onend = () => {
 resolve();
 };
 
-utterance.onerror = async () => {
-try {
-await speakViaServerFallback(trimmedText, fallbackVoice);
-resolve();
-} catch (error) {
-reject(error);
-}
+utterance.onerror = (speechError) => {
+reject(speechError.error || speechError);
 };
 
 synth.speak(utterance);
 });
+}
 }
 
 export function stop(): void {
