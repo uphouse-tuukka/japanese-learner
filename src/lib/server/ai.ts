@@ -38,6 +38,24 @@ throw new Error(`[ai] Invalid field "${fieldName}" in model output`);
 return value.trim();
 }
 
+function flexString(row: Record<string, unknown>, ...keys: string[]): string {
+	for (const key of keys) {
+		const value = row[key];
+		if (typeof value === 'string' && value.trim()) {
+			return value.trim();
+		}
+	}
+	return '';
+}
+
+function requireString(row: Record<string, unknown>, fieldLabel: string, ...keys: string[]): string {
+	const value = flexString(row, ...keys);
+	if (!value) {
+		throw new Error(`[ai] Missing required field "${fieldLabel}" in model output`);
+	}
+	return value;
+}
+
 function toStringArray(value: unknown, fieldName: string, fallback: string[] = []): string[] {
 if (!Array.isArray(value)) {
 return fallback;
@@ -78,10 +96,10 @@ throw new Error(`[ai] keyPhrases[${index}] is not an object`);
 }
 const row = raw as Record<string, unknown>;
 return {
-japanese: assertString(row.japanese, `keyPhrases[${index}].japanese`),
-romaji: assertString(row.romaji, `keyPhrases[${index}].romaji`),
-english: assertString(row.english, `keyPhrases[${index}].english`),
-usage: assertString(row.usage, `keyPhrases[${index}].usage`)
+	japanese: requireString(row, `keyPhrases[${index}].japanese`, 'japanese', 'jp', 'ja', 'text'),
+	romaji: requireString(row, `keyPhrases[${index}].romaji`, 'romaji', 'romanji'),
+	english: requireString(row, `keyPhrases[${index}].english`, 'english', 'en', 'meaning', 'translation'),
+	usage: flexString(row, 'usage', 'context', 'example', 'note')
 };
 }
 
@@ -97,9 +115,9 @@ function normalizeLesson(raw: unknown): Lesson {
 	const keyPhrases = keyPhrasesRaw.slice(0, 5);
 	if (keyPhrases.length === 0) throw new Error('[ai] lesson.keyPhrases must contain at least 1 entry');
 	return {
-		topic: assertString(row.topic, 'lesson.topic'),
-		explanation: assertString(row.explanation, 'lesson.explanation'),
-		culturalNote: assertString(row.culturalNote, 'lesson.culturalNote'),
+		topic: requireString(row, 'lesson.topic', 'topic', 'title', 'subject'),
+		explanation: requireString(row, 'lesson.explanation', 'explanation', 'description', 'content', 'text'),
+		culturalNote: flexString(row, 'culturalNote', 'cultural_note', 'culture', 'note'),
 		keyPhrases: keyPhrases.map((phrase, index) => normalizeKeyPhrase(phrase, index))
 	};
 }
@@ -119,39 +137,47 @@ throw new Error(`[ai] Exercise at index ${index} has unsupported type: ${String(
 		id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : `ai-${randomUUID()}`,
 		type: typeRaw,
 		title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : `Exercise ${index + 1}`,
-		japanese: assertString(row.japanese, 'japanese'),
-		romaji: assertString(row.romaji, 'romaji'),
-		englishContext:
-			typeof row.englishContext === 'string' && row.englishContext.trim()
-				? row.englishContext.trim()
-				: '',
+		japanese: requireString(row, 'japanese', 'japanese', 'jp', 'ja', 'text_ja'),
+		romaji: requireString(row, 'romaji', 'romaji', 'romanji', 'romanization'),
+		englishContext: flexString(row, 'englishContext', 'english_context', 'english', 'context', 'meaning'),
 		tags: toStringArray(row.tags, 'tags', ['travel', 'teaching-session']),
 		difficulty: normalizeDifficulty(row.difficulty, level)
 	};
 
 if (typeRaw === 'multiple_choice') {
-const choices = toStringArray(row.choices, 'choices');
+const choices = toStringArray(row.choices ?? row.options ?? row.answers, 'choices');
 return {
 ...base,
 type: 'multiple_choice',
-question: assertString(row.question, 'question'),
+question: requireString(row, 'question', 'question', 'prompt', 'title', 'text'),
 choices,
-correctAnswer: assertString(row.correctAnswer, 'correctAnswer'),
+correctAnswer: requireString(row, 'correctAnswer', 'correctAnswer', 'correct_answer', 'answer', 'correct'),
 explanation: typeof row.explanation === 'string' ? row.explanation : undefined
 };
 }
 
 if (typeRaw === 'translation') {
 const direction = row.direction === 'ja_to_en' ? 'ja_to_en' : 'en_to_ja';
-const expectedAnswer = assertString(row.expectedAnswer, 'expectedAnswer');
+const expectedAnswer = requireString(
+	row,
+	'expectedAnswer',
+	'expectedAnswer',
+	'expected_answer',
+	'answer',
+	'correct'
+);
 return {
 ...base,
 type: 'translation',
 direction,
-prompt: assertString(row.prompt, 'prompt'),
+prompt: requireString(row, 'prompt', 'prompt', 'text', 'sentence', 'question'),
 expectedAnswer,
-expectedRomaji: typeof row.expectedRomaji === 'string' ? row.expectedRomaji : undefined,
-acceptedAnswers: toStringArray(row.acceptedAnswers, 'acceptedAnswers', [expectedAnswer])
+expectedRomaji: flexString(row, 'expectedRomaji', 'expected_romaji', 'romaji_answer') || undefined,
+acceptedAnswers: toStringArray(
+	row.acceptedAnswers ?? row.accepted_answers ?? row.alternatives,
+	'acceptedAnswers',
+	[expectedAnswer]
+)
 };
 }
 
@@ -159,12 +185,19 @@ if (typeRaw === 'fill_blank') {
 return {
 ...base,
 type: 'fill_blank',
-sentence: assertString(row.sentence, 'sentence'),
-sentenceRomaji: assertString(row.sentenceRomaji, 'sentenceRomaji'),
-sentenceEnglish: assertString(row.sentenceEnglish, 'sentenceEnglish'),
-blank: assertString(row.blank, 'blank'),
-answer: assertString(row.answer, 'answer'),
-answerRomaji: assertString(row.answerRomaji, 'answerRomaji')
+sentence: requireString(row, 'sentence', 'sentence', 'text', 'prompt'),
+sentenceRomaji: requireString(row, 'sentenceRomaji', 'sentenceRomaji', 'sentence_romaji', 'romaji'),
+sentenceEnglish: requireString(
+	row,
+	'sentenceEnglish',
+	'sentenceEnglish',
+	'sentence_english',
+	'english',
+	'translation'
+),
+blank: requireString(row, 'blank', 'blank', 'gap', 'missing'),
+answer: requireString(row, 'answer', 'answer', 'correctAnswer', 'correct_answer'),
+answerRomaji: requireString(row, 'answerRomaji', 'answerRomaji', 'answer_romaji')
 };
 }
 
@@ -408,10 +441,19 @@ focus: string;
 };
 
 const lesson = normalizeLesson(parsed.lesson);
-const exercises = validateExerciseSet(
-(parsed.exercises ?? []).map((exercise, index) => normalizeExercise(exercise, index, input.userLevel)),
-input.userLevel
-);
+const validExercises: Exercise[] = [];
+const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+for (let i = 0; i < rawExercises.length; i += 1) {
+	try {
+		validExercises.push(normalizeExercise(rawExercises[i], i, input.userLevel));
+	} catch (err) {
+		console.warn(`[ai] Skipping exercise ${i}: ${(err as Error).message}`);
+	}
+}
+if (validExercises.length === 0) {
+	throw new Error('[ai] No valid exercises could be parsed from model output');
+}
+const exercises = validateExerciseSet(validExercises, input.userLevel);
 
 if (exercises.length !== targetExerciseCount) {
 throw new Error(`[ai] expected ${targetExerciseCount} exercises, received ${exercises.length}`);
