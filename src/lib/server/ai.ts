@@ -12,7 +12,7 @@ import type {
   UserLevel,
 } from "$lib/types";
 
-const SESSION_MODEL = "gpt-4.1-mini";
+const SESSION_MODEL = "gpt-4.1";
 
 let openaiClient: OpenAI | null = null;
 
@@ -522,29 +522,31 @@ export async function generateSessionPlan(input: {
           "reading requires: passage, passageRomaji, passageEnglish, question, answer.",
           "listening requires: prompt, audioText, choices (array of strings), correctAnswer.",
           "Exercise type field requirements:",
-           ...(input.userLevel === "absolute_beginner"
-             ? [
-                 "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                 '- translation: direction ("ja_to_en" only), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                 'For absolute_beginner, translation direction must always be "ja_to_en".',
-               ]
-             : input.userLevel === "beginner"
-               ? [
-                   "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                   '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                   "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
-                 ]
-               : [
-                   "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                   '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                   "- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.",
-                   "- reorder: prompt, tokens (string array), correctOrder (string array).",
-                   "- reading: passage, passageRomaji, passageEnglish, question, answer.",
-                   "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
-                 ]),
-          "For translation exercises, acceptedAnswers must include at least 3 natural alternative translations. Include common synonyms, informal variants, and shorter forms (e.g. for \"Thank you very much\" also accept \"Thank you\", \"Thanks a lot\").",
-          "All Japanese text in exercises must always have a romaji equivalent available. The prompt field for ja_to_en translation must include both Japanese and romaji (e.g. \"ありがとうございます (arigatou gozaimasu)\").",
+          ...(input.userLevel === "absolute_beginner"
+            ? [
+                "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
+                '- translation: direction ("ja_to_en" only), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+                'For absolute_beginner, translation direction must always be "ja_to_en".',
+              ]
+            : input.userLevel === "beginner"
+              ? [
+                  "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
+                  '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+                  "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
+                ]
+              : [
+                  "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
+                  '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+                  "- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.",
+                  "- reorder: prompt, tokens (string array), correctOrder (string array).",
+                  "- reading: passage, passageRomaji, passageEnglish, question, answer.",
+                  "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
+                ]),
+          'For translation exercises, acceptedAnswers must include at least 3 natural alternative translations. Include common synonyms, informal variants, and shorter forms (e.g. for "Thank you very much" also accept "Thank you", "Thanks a lot").',
+          'CRITICAL: All Japanese text everywhere — in exercises, lesson explanations, cultural notes, key phrases, and any other output — must always include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without its romaji reading. This is essential because beginners cannot read Japanese script.',
           'Exercise titles must be generic and must not reveal the answer. Use titles like "Translate the phrase", "Choose the meaning", "Fill in the blank" — never include the answer or topic-specific hint in the title.',
+          'When generating exercises for a session, ensure variety: cover at least 5 distinct phrases or concepts even if the topic is narrow. Do not repeat the same phrase across more than 2 exercises.',
+          'Exercise questions must be clear and direct. Instead of "What is the most natural English greeting for X in this situation?", write "What is the best English translation for X?" or "What does X mean?". Avoid vague phrasing like "in this situation" unless the situation is explicitly described.',
           levelInstructions(input.userLevel),
           "For absolute_beginner, never ask learner to type Japanese script.",
           "Use practical language the learner can immediately use in Japan.",
@@ -756,8 +758,13 @@ export async function generateSessionSummary(input: {
         content: [
           "You are a Japanese tutor giving specific, actionable feedback based on actual answers.",
           "Return JSON only with keys: summary, strengths, weaknesses, nextSteps.",
+          "CRITICAL RULES for accuracy:",
+          "1) Only reference exercises and answers that actually appear in the results data. Never fabricate or assume exercises that were not in the session.",
+          "2) 'weaknesses' must only describe mistakes the learner actually made during this session. Do not list topics that were not covered — those belong in nextSteps instead.",
+          "3) 'nextSteps' should suggest what to learn next, including topics not yet covered.",
+          "4) 'strengths' must reference specific correct answers from the session data.",
+          "5) All Japanese text must include romaji in parentheses, e.g. こんにちは (konnichiwa). Never output Japanese without romaji.",
           "Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.",
-          "Make recommendations for the next session topic and include difficulty guidance (whether to reinforce or increase challenge).",
           "Keep feedback encouraging, practical, and travel-focused.",
         ].join(" "),
       },

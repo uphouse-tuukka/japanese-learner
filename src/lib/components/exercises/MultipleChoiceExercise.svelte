@@ -28,16 +28,15 @@ isCorrect
 }
 </script>
 
-<section class="card mc-exercise">
+<section class="card">
+<h2>{exercise.title}</h2>
 <p class="text-japanese text-japanese-lg">{exercise.japanese}</p>
 <p class="romaji">{exercise.romaji}</p>
-<p class="question">{exercise.question}</p>
-
+<p>{exercise.question}</p>
 <div class="choices">
 {#each exercise.choices as choice}
 <button
 type="button"
-class="choice-btn"
 class:selected={!answered && selected === choice}
 class:correct={answered && choice === exercise.correctAnswer}
 class:incorrect={answered && selected === choice && choice !== exercise.correctAnswer}
@@ -70,40 +69,10 @@ disabled={answered}
 </section>
 
 <style>
-.mc-exercise {
-display: grid;
-gap: var(--space-3);
-}
-
-.question {
-margin: 0;
-}
-
 .choices {
 display: grid;
 gap: var(--space-2);
 margin-bottom: var(--space-3);
-}
-
-.choice-btn {
-text-align: left;
-padding: var(--space-3) var(--space-4);
-border: 1.5px solid var(--border-light);
-border-radius: var(--radius-md);
-background: var(--bg-shoji);
-cursor: pointer;
-font: inherit;
-color: var(--text-sumi);
-transition: all var(--duration-fast, 150ms) var(--ease-out, ease-out);
-}
-
-.choice-btn:hover:not(:disabled):not(.correct):not(.incorrect):not(.dimmed) {
-border-color: var(--border-mid);
-background: var(--bg-washi);
-}
-
-.choice-btn:disabled {
-cursor: default;
 }
 
 .selected {
@@ -158,6 +127,11 @@ margin: 0;
 margin-top: var(--space-2);
 font-size: var(--text-sm);
 color: var(--text-bokashi);
+}
+
+.btn {
+  width: 100%;
+  margin-top: var(--space-4);
 }
 
 @keyframes resultReveal {

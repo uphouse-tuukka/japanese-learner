@@ -270,7 +270,11 @@ background: var(--bg-washi);
 border-radius: var(--radius-md);
 }
 
-.key-phrases {
+.lesson-card h3 {
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .key-phrases {
 display: grid;
 gap: var(--space-3);
 }

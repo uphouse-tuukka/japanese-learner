@@ -100,7 +100,7 @@ $effect(() => {
     gap: var(--space-4, 1rem);
     padding: var(--space-5, 1.25rem);
     border-radius: var(--radius-lg, 1rem);
-    background: var(--bg-shoji, #ffffff);
+    background: #fff;
     border: 1px solid var(--border-light, #d9d9de);
     box-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
   }
@@ -145,7 +145,7 @@ $effect(() => {
     padding: 0.625rem 0.875rem;
     border-radius: var(--radius-md, 0.65rem);
     border: 1.5px solid var(--border-light, #cfd6e0);
-    background: var(--bg-shoji, #ffffff);
+    background: #fff;
     color: var(--text-sumi, #1a1a1a);
     transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
                 box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
