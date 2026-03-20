@@ -15,7 +15,8 @@
   let startTime = $state(Date.now());
   let announcement = $state('');
   let resultRef: HTMLElement | undefined = $state();
-  let reportTimer: ReturnType<typeof setTimeout> | null = null;
+  let submittedAnswer = $state('');
+  let submittedCorrect = $state(false);
 
   const hintText = $derived(
     hintLevel === 0
@@ -51,6 +52,8 @@
 
     answered = true;
     isCorrect = correct;
+    submittedAnswer = trimmed;
+    submittedCorrect = correct;
 
     announcement = correct
       ? 'Correct!'
@@ -59,14 +62,14 @@
     setTimeout(() => {
       resultRef?.focus();
     }, 100);
+  }
 
-    reportTimer = setTimeout(() => {
-      onAnswer({
-        exerciseId: exercise.id,
-        answerText: trimmed,
-        isCorrect: correct
-      });
-    }, 800);
+  function continueToNext(): void {
+    onAnswer({
+      exerciseId: exercise.id,
+      answerText: submittedAnswer,
+      isCorrect: submittedCorrect
+    });
   }
 
   $effect(() => {
@@ -78,19 +81,8 @@
     hintLevel = 0;
     startTime = Date.now();
     announcement = '';
-
-    if (reportTimer) {
-      clearTimeout(reportTimer);
-      reportTimer = null;
-    }
-  });
-
-  $effect(() => {
-    return () => {
-      if (reportTimer) {
-        clearTimeout(reportTimer);
-      }
-    };
+    submittedAnswer = '';
+    submittedCorrect = false;
   });
 </script>
 
@@ -204,6 +196,10 @@
           {/each}
         </div>
       </div>
+
+      <button type="button" class="continue-btn" onclick={continueToNext}>
+        Continue
+      </button>
     </section>
   {/if}
 
@@ -364,6 +360,25 @@
   .check-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .continue-btn {
+    width: 100%;
+    margin-top: var(--space-4);
+    background: var(--accent-shu);
+    color: var(--bg-shoji);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+
+  .continue-btn:hover {
+    background: var(--accent-shu-deep);
   }
 
   .hint-area {

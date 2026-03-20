@@ -97,7 +97,7 @@ try {
 const response = await fetch('/api/session/generate', {
 method: 'POST',
 headers: { 'content-type': 'application/json' },
-body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 6 })
+body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 10 })
 });
 
 	const payload = (await response.json()) as GenerateResponse;
@@ -219,11 +219,22 @@ will be ready.
 </div>
 <button class="btn btn-primary" onclick={beginExercises}>I'm ready for questions</button>
 </section>
-{:else if uiState === 'active' || uiState === 'completing'}
+{:else if uiState === 'active'}
 <section class="card"><ProgressBar current={progressCurrent} total={totalExercises} label="Session progress" /></section>
 {#if currentExercise}
 <SessionRenderer exercise={currentExercise} onAnswer={onAnswer} />
 {/if}
+{:else if uiState === 'completing'}
+<section class="card loading-card" aria-live="polite" aria-busy="true">
+  <div class="loading-visual">
+    <svg class="enso" viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="enso-stroke" cx="50" cy="50" r="38" />
+    </svg>
+    <span class="enso-kanji" aria-hidden="true">完</span>
+  </div>
+  <p class="loading-text">Preparing your session summary…</p>
+  <p class="sr-only">Generating your session summary, please wait.</p>
+</section>
 {:else if uiState === 'done' && $summary}
 <SessionSummary summary={$summary} />
 {:else if uiState === 'error'}

@@ -97,62 +97,96 @@ $effect(() => {
 <style>
   .selector-card {
     display: grid;
-    gap: 1rem;
-    padding: 1.25rem;
-    border-radius: 1rem;
-    background: var(--surface-1, #ffffff);
-    border: 1px solid var(--border-subtle, #d9d9de);
+    gap: var(--space-4, 1rem);
+    padding: var(--space-5, 1.25rem);
+    border-radius: var(--radius-lg, 1rem);
+    background: var(--bg-shoji, #ffffff);
+    border: 1px solid var(--border-light, #d9d9de);
     box-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
   }
 
   .selector-header h2 {
     margin: 0;
-    font-size: 1.2rem;
+    font-size: var(--text-lg, 1.2rem);
   }
 
   .selector-header p {
     margin: 0.35rem 0 0;
-    color: var(--text-muted, #5f6570);
-    font-size: 0.9rem;
+    color: var(--text-usuzumi, #5f6570);
+    font-size: var(--text-sm, 0.9rem);
   }
 
   .selector-form,
   .create-form {
     display: grid;
-    gap: 0.6rem;
+    gap: var(--space-3, 0.75rem);
   }
 
   h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-base, 1rem);
   }
 
   label {
-    font-size: 0.88rem;
-    color: var(--text-muted, #5f6570);
+    font-size: var(--text-sm, 0.88rem);
+    color: var(--text-usuzumi, #5f6570);
+    font-weight: var(--weight-medium, 500);
   }
 
   input,
   select,
   button {
     font: inherit;
+    line-height: 1.5;
   }
 
   input,
   select {
-    padding: 0.6rem 0.75rem;
-    border-radius: 0.65rem;
-    border: 1px solid var(--border-subtle, #cfd6e0);
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-md, 0.65rem);
+    border: 1.5px solid var(--border-light, #cfd6e0);
+    background: var(--bg-shoji, #ffffff);
+    color: var(--text-sumi, #1a1a1a);
+    transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
+                box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
+  }
+
+  input:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--accent-shu, #c1440e);
+    box-shadow: 0 0 0 3px var(--accent-shu-wash, rgba(193, 68, 14, 0.1));
+  }
+
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235f6570' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    cursor: pointer;
   }
 
   button {
-    padding: 0.62rem 0.9rem;
+    padding: 0.625rem 1rem;
     border: none;
-    border-radius: 0.7rem;
+    border-radius: var(--radius-md, 0.7rem);
     cursor: pointer;
-    background: var(--accent, #2f5be7);
-    color: white;
-    font-weight: 600;
+    background: var(--accent-shu, #c1440e);
+    color: var(--bg-shoji, white);
+    font-weight: var(--weight-medium, 600);
+    transition: background var(--duration-fast, 150ms) var(--ease-out, ease-out),
+                transform var(--duration-fast, 150ms) var(--ease-out, ease-out);
+  }
+
+  button:hover:not([disabled]) {
+    background: var(--accent-shu-deep, #a33b0c);
+  }
+
+  button:active:not([disabled]) {
+    transform: scale(0.98);
   }
 
   button[disabled] {
@@ -162,9 +196,9 @@ $effect(() => {
 
   .alert {
     margin: 0;
-    padding: 0.55rem 0.65rem;
-    border-radius: 0.6rem;
-    font-size: 0.9rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-md, 0.6rem);
+    font-size: var(--text-sm, 0.9rem);
   }
 
   .alert.error {
@@ -179,7 +213,7 @@ $effect(() => {
 
   .limit-text {
     margin: 0;
-    font-size: 0.84rem;
-    color: var(--text-muted, #5f6570);
+    font-size: var(--text-xs, 0.84rem);
+    color: var(--text-usuzumi, #5f6570);
   }
 </style>
