@@ -22,7 +22,7 @@ function requireUserId(userId: string): string {
   return normalized;
 }
 
-function toExerciseCount(requested?: number): number {
+export function toExerciseCount(requested?: number): number {
   const fallback = 6;
   if (typeof requested !== "number" || !Number.isFinite(requested)) {
     return fallback;
@@ -30,7 +30,7 @@ function toExerciseCount(requested?: number): number {
   return Math.min(12, Math.max(4, Math.round(requested)));
 }
 
-function scoreCandidate(item: CandidateExercise): number {
+export function scoreCandidate(item: CandidateExercise): number {
   let score = 1;
   score += item.wrongCount * 5;
   score += Math.max(0, 3 - item.correctCount);
@@ -38,7 +38,7 @@ function scoreCandidate(item: CandidateExercise): number {
   return score;
 }
 
-function pickTopExercises(
+export function pickTopExercises(
   candidates: CandidateExercise[],
   target: number,
 ): Exercise[] {

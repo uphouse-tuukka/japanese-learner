@@ -566,6 +566,40 @@ export async function getSessionsForUser(
   );
 }
 
+export async function deleteStaleGhostSessions(userId: string): Promise<void> {
+  const db = await getDb();
+  const staleWhereClause =
+    "user_id = ? AND status = 'planned' AND datetime(created_at) < datetime('now', '-60 minutes')";
+
+  await db.execute({
+    sql: `
+DELETE FROM session_exercises
+WHERE session_id IN (
+  SELECT id FROM sessions WHERE ${staleWhereClause}
+)
+`,
+    args: [userId],
+  });
+
+  await db.execute({
+    sql: `
+DELETE FROM token_usage
+WHERE session_id IN (
+  SELECT id FROM sessions WHERE ${staleWhereClause}
+)
+`,
+    args: [userId],
+  });
+
+  await db.execute({
+    sql: `
+DELETE FROM sessions
+WHERE ${staleWhereClause}
+`,
+    args: [userId],
+  });
+}
+
 export async function getExerciseResultsForUser(userId: string): Promise<
   Array<{
     exerciseId: string;
@@ -607,7 +641,7 @@ export async function getHistoryByUser(userId: string): Promise<
     sql: `
 		SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
 		FROM sessions
-		WHERE user_id = ?
+    WHERE user_id = ? AND status IN ('completed', 'error')
 		ORDER BY datetime(created_at) DESC
 		`,
     args: [userId],

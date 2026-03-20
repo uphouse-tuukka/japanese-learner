@@ -40,6 +40,6 @@ overflow: hidden;
 .progress-fill {
 height: 100%;
 background-color: var(--accent-matcha);
-transition: width var(--duration-normal) var(--ease-out);
+transition: width var(--duration-slow) var(--ease-out);
 }
 </style>

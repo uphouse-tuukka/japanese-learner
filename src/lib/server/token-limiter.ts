@@ -30,7 +30,7 @@ function requireUserId(userId: string): string {
   return normalized;
 }
 
-function dayWindow(now: Date): { start: string; end: string } {
+export function dayWindow(now: Date): { start: string; end: string } {
   const start = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
@@ -39,7 +39,7 @@ function dayWindow(now: Date): { start: string; end: string } {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function monthWindow(now: Date): { start: string; end: string } {
+export function monthWindow(now: Date): { start: string; end: string } {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
@@ -47,17 +47,17 @@ function monthWindow(now: Date): { start: string; end: string } {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function sumTokens(usages: TokenUsage[]): number {
+export function sumTokens(usages: TokenUsage[]): number {
   return usages.reduce((sum, usage) => sum + usage.tokensTotal, 0);
 }
 
-function resolveBypass(bypassKey?: string): boolean {
+export function resolveBypass(bypassKey?: string): boolean {
   const configuredBypassKey = config.limits.bypassKey.trim();
   if (!configuredBypassKey) return false;
   return typeof bypassKey === "string" && bypassKey === configuredBypassKey;
 }
 
-function monthlyTokenLimit(): number {
+export function monthlyTokenLimit(): number {
   const dailyLimit = Math.max(0, config.limits.dailyTokenLimit);
   if (dailyLimit === 0) return 0;
   return dailyLimit * 31;

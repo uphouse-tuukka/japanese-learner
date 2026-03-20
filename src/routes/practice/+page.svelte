@@ -2,6 +2,7 @@
 import ProgressBar from '$lib/components/ProgressBar.svelte';
 import SessionRenderer from '$lib/components/SessionRenderer.svelte';
 import SessionSummary from '$lib/components/SessionSummary.svelte';
+import DebugPanel from '$lib/components/DebugPanel.svelte';
 import {
   session,
   exercises,
@@ -14,7 +15,7 @@ import {
   completeSession,
   resetSession
 } from '$lib/stores/session.svelte';
-import type { Exercise, ExerciseAnswerPayload, Session } from '$lib/types';
+import type { Exercise, ExerciseAnswerPayload, ExerciseType, Session } from '$lib/types';
 import type { PageData } from './$types';
 
 type UiState = 'idle' | 'loading' | 'active' | 'completing' | 'done' | 'error';
@@ -75,6 +76,26 @@ async function startPractice(): Promise<void> {
     const payload = (await response.json()) as GenerateResponse;
     if (!response.ok || !payload.ok || !payload.session) throw new Error(payload.error ?? 'Failed to generate practice session');
     if (!payload.exercises || payload.exercises.length === 0) throw new Error('No practice exercises available. Complete a learning session first to build your review pool.');
+    startSession(payload.session, payload.exercises);
+    uiState = 'active';
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    uiState = 'error';
+  }
+}
+
+async function startDebugPractice(type: ExerciseType): Promise<void> {
+  uiState = 'loading';
+  errorMessage = '';
+  resetSession();
+  try {
+    const response = await fetch('/api/practice/generate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 6, debugExerciseType: type })
+    });
+    const payload = (await response.json()) as GenerateResponse;
+    if (!response.ok || !payload.ok || !payload.session) throw new Error(payload.error ?? 'Failed to generate debug session');
     startSession(payload.session, payload.exercises);
     uiState = 'active';
   } catch (error) {
@@ -163,20 +184,7 @@ async function finalizePractice(): Promise<void> {
     </section>
   {/if}
 
-  {#if uiState === 'idle' || uiState === 'done'}
-    <section class="card">
-      <h2>Recent practice history</h2>
-      {#if data.history.length === 0}
-        <p>No completed practice sessions yet.</p>
-      {:else}
-        <ul>
-          {#each data.history as item}
-            <li><strong>{new Date(item.session.createdAt).toLocaleString()}</strong> — {item.correctCount}/{item.exerciseCount} correct ({item.accuracy}%)</li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-  {/if}
+  <DebugPanel onGenerateDebug={startDebugPractice} />
 </main>
 
 <style>

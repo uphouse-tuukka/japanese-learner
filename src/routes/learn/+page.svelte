@@ -2,6 +2,7 @@
 import ProgressBar from '$lib/components/ProgressBar.svelte';
 import SessionRenderer from '$lib/components/SessionRenderer.svelte';
 import SessionSummary from '$lib/components/SessionSummary.svelte';
+import DebugPanel from '$lib/components/DebugPanel.svelte';
 import {
 session,
 exercises,
@@ -14,7 +15,7 @@ nextExercise,
 completeSession,
 resetSession
 } from '$lib/stores/session.svelte';
-import type { Exercise, ExerciseAnswerPayload, Lesson, Session } from '$lib/types';
+import type { Exercise, ExerciseAnswerPayload, ExerciseType, Lesson, Session } from '$lib/types';
 import type { PageData } from './$types';
 
 type UiState =
@@ -115,6 +116,32 @@ body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 10 })
 lesson = payload.lesson;
 startSession(payload.session, payload.exercises);
 uiState = 'lesson';
+} catch (error) {
+errorMessage = error instanceof Error ? error.message : 'Unknown error';
+uiState = 'error';
+}
+}
+
+async function startDebugPractice(type: ExerciseType): Promise<void> {
+uiState = 'loading';
+errorMessage = '';
+lesson = null;
+resetSession();
+
+try {
+const response = await fetch('/api/practice/generate', {
+method: 'POST',
+headers: { 'content-type': 'application/json' },
+body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 6, debugExerciseType: type })
+});
+
+const payload = (await response.json()) as GenerateResponse;
+if (!response.ok || !payload.ok || !payload.session) {
+throw new Error(payload.error ?? 'Failed to generate debug session');
+}
+
+startSession(payload.session, payload.exercises);
+uiState = 'active';
 } catch (error) {
 errorMessage = error instanceof Error ? error.message : 'Unknown error';
 uiState = 'error';
@@ -243,6 +270,8 @@ will be ready.
 <button class="btn btn-secondary" onclick={startLearning}>Try again</button>
 </section>
 {/if}
+
+<DebugPanel onGenerateDebug={startDebugPractice} />
 </main>
 
 <style>
