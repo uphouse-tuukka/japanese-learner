@@ -12,6 +12,8 @@ import type {
   UserLevel,
 } from "$lib/types";
 
+function shuffleArray<T>(arr: T[]): T[] { const shuffled = [...arr]; for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; } return shuffled; }
+
 const SESSION_MODEL = "gpt-4.1";
 
 let openaiClient: OpenAI | null = null;
@@ -214,10 +216,7 @@ function normalizeExercise(
   };
 
   if (typeRaw === "multiple_choice") {
-    const choices = toStringArray(
-      row.choices ?? row.options ?? row.answers,
-      "choices",
-    );
+    const choices = shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, "choices"));
     return {
       ...base,
       type: "multiple_choice",
@@ -342,7 +341,7 @@ function normalizeExercise(
     type: "listening",
     prompt: assertString(row.prompt, "prompt"),
     audioText: assertString(row.audioText, "audioText"),
-    choices: toStringArray(row.choices, "choices"),
+    choices: shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, "choices")),
     correctAnswer: assertString(row.correctAnswer, "correctAnswer"),
   };
 }
@@ -507,7 +506,7 @@ export async function generateSessionPlan(input: {
           "2) Address recent weaknesses directly in lesson explanation and exercise selection.",
           "3) Follow prior next-steps whenever possible.",
           "4) Progression threshold: if recentAccuracy > 80, increase challenge slightly; if recentAccuracy < 50, reinforce fundamentals.",
-          "5) Staged curriculum by totalSessionCount: 0-10 travel survival only; 10-20 include daily life; 20+ broaden to practical social and work-adjacent situations.",
+          "5) Staged curriculum by totalSessionCount: 0-20 travel survival only; 20-40 include daily life; 40+ broaden to practical social and work-adjacent situations.",
           "6) Personalize by connecting to previously studied phrases and mistakes.",
           "7) Vary exercise types inside one session (within level constraints).",
           "The session must teach one topic first, then quiz only what was taught.",
@@ -543,9 +542,9 @@ export async function generateSessionPlan(input: {
                   "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
                 ]),
           'For translation exercises, acceptedAnswers must include at least 3 natural alternative translations. Include common synonyms, informal variants, and shorter forms (e.g. for "Thank you very much" also accept "Thank you", "Thanks a lot").',
-          'CRITICAL: All Japanese text everywhere — in exercises, lesson explanations, cultural notes, key phrases, and any other output — must always include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without its romaji reading. This is essential because beginners cannot read Japanese script.',
+          "CRITICAL: All Japanese text everywhere — in exercises, lesson explanations, cultural notes, key phrases, and any other output — must always include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without its romaji reading. This is essential because beginners cannot read Japanese script.",
           'Exercise titles must be generic and must not reveal the answer. Use titles like "Translate the phrase", "Choose the meaning", "Fill in the blank" — never include the answer or topic-specific hint in the title.',
-          'When generating exercises for a session, ensure variety: cover at least 5 distinct phrases or concepts even if the topic is narrow. Do not repeat the same phrase across more than 2 exercises.',
+          "When generating exercises for a session, ensure variety: cover at least 5 distinct phrases or concepts even if the topic is narrow. Do not repeat the same phrase across more than 2 exercises.",
           'Exercise questions must be clear and direct. Instead of "What is the most natural English greeting for X in this situation?", write "What is the best English translation for X?" or "What does X mean?". Avoid vague phrasing like "in this situation" unless the situation is explicitly described.',
           levelInstructions(input.userLevel),
           "For absolute_beginner, never ask learner to type Japanese script.",
@@ -600,8 +599,8 @@ export async function generateSessionPlan(input: {
                 question: "What does こんにちは (konnichiwa) mean?",
                 choices: [
                   "Good morning",
-                  "Hello / Good afternoon",
                   "Good evening",
+                  "Hello / Good afternoon",
                   "Goodbye",
                 ],
                 correctAnswer: "Hello / Good afternoon",

@@ -15,123 +15,123 @@
   /* — Color: Backgrounds —
      Warm paper tones, not sterile white.
      Named after traditional Japanese paper types. */
-  --bg-shoji:    #faf8f4;   /* shōji screen — primary background */
-  --bg-washi:    #f5f1ea;   /* washi paper — slightly warmer */
-  --bg-kinu:     #eee9df;   /* silk — cards, elevated surfaces */
-  --bg-suna:     #e6e0d4;   /* sand — deeper surface, hover states */
+  --bg-shoji: #faf8f4; /* shōji screen — primary background */
+  --bg-washi: #f5f1ea; /* washi paper — slightly warmer */
+  --bg-kinu: #eee9df; /* silk — cards, elevated surfaces */
+  --bg-suna: #e6e0d4; /* sand — deeper surface, hover states */
 
   /* — Color: Text —
      Sumi ink tones — deep but not harsh. */
-  --text-sumi:      #2c2a26;  /* primary text — dense ink */
-  --text-bokashi:   #5c5750;  /* secondary text — diluted ink */
-  --text-usuzumi:   #8a847a;  /* tertiary / placeholder — faint ink */
+  --text-sumi: #2c2a26; /* primary text — dense ink */
+  --text-bokashi: #5c5750; /* secondary text — diluted ink */
+  --text-usuzumi: #8a847a; /* tertiary / placeholder — faint ink */
 
   /* — Color: Accent — Vermillion (朱色 shu-iro) —
      The red of torii gates and hanko stamps. */
-  --accent-shu:       #c23b22;  /* primary vermillion */
-  --accent-shu-soft:  #d4604c;  /* lighter, for hover */
-  --accent-shu-deep:  #a3301b;  /* darker, for active/pressed */
-  --accent-shu-wash:  #fdf0ee;  /* tinted background */
+  --accent-shu: #c23b22; /* primary vermillion */
+  --accent-shu-soft: #d4604c; /* lighter, for hover */
+  --accent-shu-deep: #a3301b; /* darker, for active/pressed */
+  --accent-shu-wash: #fdf0ee; /* tinted background */
 
   /* — Color: Secondary — Matcha / Moss —
      The green of temple moss and tea ceremony. */
-  --accent-matcha:      #5b7a5e;  /* secondary accent */
-  --accent-matcha-soft: #7a9a7d;  /* lighter variant */
-  --accent-matcha-wash: #f0f5f0;  /* tinted background */
+  --accent-matcha: #5b7a5e; /* secondary accent */
+  --accent-matcha-soft: #7a9a7d; /* lighter variant */
+  --accent-matcha-wash: #f0f5f0; /* tinted background */
 
   /* — Color: Neutral borders & surfaces — */
-  --border-light:   #ddd8ce;  /* subtle dividers */
-  --border-mid:     #c5bfb3;  /* more visible borders */
-  --border-focus:   #a09888;  /* focused element ring */
+  --border-light: #ddd8ce; /* subtle dividers */
+  --border-mid: #c5bfb3; /* more visible borders */
+  --border-focus: #a09888; /* focused element ring */
 
   /* — Color: States — */
-  --state-success:  #5b7a5e;
-  --state-error:    #c23b22;
-  --state-warning:  #c49a2a;
-  --state-info:     #4a6e8a;
+  --state-success: #5b7a5e;
+  --state-error: #c23b22;
+  --state-warning: #c49a2a;
+  --state-info: #4a6e8a;
   --state-disabled: #c5bfb3;
 
   /* — Typography — */
-  --font-sans: 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
-               'Yu Gothic', system-ui, -apple-system, sans-serif;
+  --font-sans:
+    "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    system-ui, -apple-system, sans-serif;
 
-  --text-xs:   0.75rem;    /* 12px */
-  --text-sm:   0.8125rem;  /* 13px */
-  --text-base: 0.9375rem;  /* 15px — slightly larger for readability */
-  --text-md:   1.0625rem;  /* 17px */
-  --text-lg:   1.25rem;    /* 20px */
-  --text-xl:   1.5rem;     /* 24px */
-  --text-2xl:  1.875rem;   /* 30px */
-  --text-3xl:  2.25rem;    /* 36px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.8125rem; /* 13px */
+  --text-base: 0.9375rem; /* 15px — slightly larger for readability */
+  --text-md: 1.0625rem; /* 17px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.5rem; /* 24px */
+  --text-2xl: 1.875rem; /* 30px */
+  --text-3xl: 2.25rem; /* 36px */
 
-  --weight-light:    300;
-  --weight-regular:  400;
-  --weight-medium:   500;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
   --weight-semibold: 600;
-  --weight-bold:     700;
+  --weight-bold: 700;
 
-  --leading-tight:  1.3;
+  --leading-tight: 1.3;
   --leading-normal: 1.6;
-  --leading-loose:  1.8;
+  --leading-loose: 1.8;
 
-  --tracking-tight:  -0.01em;
-  --tracking-normal:  0;
-  --tracking-wide:    0.04em;
-  --tracking-wider:   0.08em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
 
   /* — Spacing —
      Based on 4px grid, with Japanese aesthetic
      preference for generous negative space (ma 間). */
-  --space-1:  0.25rem;   /* 4px */
-  --space-2:  0.5rem;    /* 8px */
-  --space-3:  0.75rem;   /* 12px */
-  --space-4:  1rem;      /* 16px */
-  --space-5:  1.25rem;   /* 20px */
-  --space-6:  1.5rem;    /* 24px */
-  --space-8:  2rem;      /* 32px */
-  --space-10: 2.5rem;    /* 40px */
-  --space-12: 3rem;      /* 48px */
-  --space-16: 4rem;      /* 64px */
-  --space-20: 5rem;      /* 80px */
-  --space-24: 6rem;      /* 96px */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+  --space-20: 5rem; /* 80px */
+  --space-24: 6rem; /* 96px */
 
   /* — Layout — */
-  --content-width:   52rem;    /* 832px — comfortable reading */
-  --content-wide:    68rem;    /* 1088px — wider layouts */
-  --nav-height:      3.5rem;   /* 56px */
+  --content-width: 52rem; /* 832px — comfortable reading */
+  --content-wide: 68rem; /* 1088px — wider layouts */
+  --nav-height: 3.5rem; /* 56px */
 
   /* — Border Radius —
      Minimal — Japanese design favors clean edges,
      with only subtle softening. */
-  --radius-sm:   3px;
-  --radius-md:   5px;
-  --radius-lg:   8px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
 
   /* — Shadows —
      Soft, diffused — like paper casting shadow
      on a wooden surface. */
-  --shadow-sm:   0 1px 2px rgba(44, 42, 38, 0.06);
-  --shadow-md:   0 2px 8px rgba(44, 42, 38, 0.08);
-  --shadow-lg:   0 4px 16px rgba(44, 42, 38, 0.10);
-  --shadow-card: 0 1px 3px rgba(44, 42, 38, 0.04),
-                 0 4px 12px rgba(44, 42, 38, 0.06);
+  --shadow-sm: 0 1px 2px rgba(44, 42, 38, 0.06);
+  --shadow-md: 0 2px 8px rgba(44, 42, 38, 0.08);
+  --shadow-lg: 0 4px 16px rgba(44, 42, 38, 0.1);
+  --shadow-card:
+    0 1px 3px rgba(44, 42, 38, 0.04), 0 4px 12px rgba(44, 42, 38, 0.06);
 
   /* — Transitions —
      Gentle, unhurried — like ink spreading on paper. */
-  --ease-out:    cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
-  --duration-fast:   120ms;
+  --duration-fast: 120ms;
   --duration-normal: 200ms;
-  --duration-slow:   350ms;
+  --duration-slow: 350ms;
 
   /* — Z-index scale — */
-  --z-base:    0;
-  --z-above:   10;
-  --z-nav:     100;
+  --z-base: 0;
+  --z-above: 10;
+  --z-nav: 100;
   --z-overlay: 200;
-  --z-modal:   300;
+  --z-modal: 300;
 }
-
 
 /* ------------------------------------------------------------
    Reset & Base
@@ -162,11 +162,15 @@ body {
   min-height: 100dvh;
 }
 
-
 /* ------------------------------------------------------------
    Typography
    ------------------------------------------------------------ */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
@@ -209,7 +213,6 @@ small {
   color: var(--text-bokashi);
 }
 
-
 /* ------------------------------------------------------------
    Links
    ------------------------------------------------------------ */
@@ -244,7 +247,6 @@ a.btn-ghost:hover,
 a.btn:hover {
   text-decoration: none;
 }
-
 
 /* ------------------------------------------------------------
    Buttons
@@ -363,7 +365,6 @@ button:disabled,
   transform: scale(0.98);
 }
 
-
 /* ------------------------------------------------------------
    Form Elements
    ------------------------------------------------------------ */
@@ -405,7 +406,6 @@ label {
   letter-spacing: var(--tracking-wide);
 }
 
-
 /* ------------------------------------------------------------
    Cards
    ------------------------------------------------------------ */
@@ -416,7 +416,6 @@ label {
   padding: var(--space-6);
   box-shadow: var(--shadow-card);
 }
-
 
 /* ------------------------------------------------------------
    Focus styles — visible but tasteful
@@ -430,7 +429,6 @@ label {
 :focus:not(:focus-visible) {
   outline: none;
 }
-
 
 /* ------------------------------------------------------------
    Scrollbar — subtle, blends with paper aesthetic
@@ -461,7 +459,6 @@ label {
   scrollbar-color: var(--border-mid) transparent;
 }
 
-
 /* ------------------------------------------------------------
    Selection — ink on paper
    ------------------------------------------------------------ */
@@ -469,7 +466,6 @@ label {
   background-color: var(--accent-shu-wash);
   color: var(--accent-shu-deep);
 }
-
 
 /* ------------------------------------------------------------
    Utilities
@@ -490,7 +486,7 @@ label {
 
 /* Japanese text helpers */
 .text-japanese {
-  font-feature-settings: 'palt';  /* proportional alternates for JP */
+  font-feature-settings: "palt"; /* proportional alternates for JP */
   line-height: var(--leading-loose);
 }
 
@@ -499,7 +495,6 @@ label {
   font-weight: var(--weight-regular);
   letter-spacing: var(--tracking-wider);
 }
-
 
 /* ------------------------------------------------------------
    Page transition (used by layout)
