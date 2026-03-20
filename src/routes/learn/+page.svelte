@@ -48,6 +48,35 @@ let uiState = $state<UiState>('idle');
 let errorMessage = $state('');
 let lesson = $state<Lesson | null>(null);
 
+/* — Loading animation state — */
+const loadingMessages = [
+'Your sensei is preparing today\u2019s lesson\u2026',
+'Brewing green tea for the session\u2026 \uD83C\uDF75',
+'Arranging the study materials\u2026',
+'Writing today\u2019s lesson plan\u2026',
+'Almost ready\u2026'
+];
+let loadingMsgIndex = $state(0);
+let loadingMsgVisible = $state(true);
+
+$effect(() => {
+if (uiState !== 'loading') return;
+loadingMsgIndex = 0;
+loadingMsgVisible = true;
+let timeoutId: ReturnType<typeof setTimeout>;
+const intervalId = setInterval(() => {
+loadingMsgVisible = false;
+timeoutId = setTimeout(() => {
+loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+loadingMsgVisible = true;
+}, 400);
+}, 2800);
+return () => {
+clearInterval(intervalId);
+clearTimeout(timeoutId);
+};
+});
+
 $effect(() => {
 if (!data.budget.allowed && uiState === 'idle') {
 uiState = 'budget_exhausted';
@@ -147,7 +176,18 @@ uiState = 'error';
 <button class="btn btn-primary" onclick={startLearning}>Start learning</button>
 </section>
 {:else if uiState === 'loading'}
-<section class="card"><p>Generating your teaching session...</p></section>
+<section class="card loading-card" aria-live="polite" aria-busy="true">
+<div class="loading-visual">
+<svg class="enso" viewBox="0 0 100 100" aria-hidden="true">
+<circle class="enso-stroke" cx="50" cy="50" r="38" />
+</svg>
+<span class="enso-kanji" aria-hidden="true">学</span>
+</div>
+<p class="loading-text" style:opacity={loadingMsgVisible ? 1 : 0}>
+{loadingMessages[loadingMsgIndex]}
+</p>
+<p class="sr-only">Generating your teaching session, please wait.</p>
+</section>
 {:else if uiState === 'budget_exhausted'}
 <section class="card">
 <p>
@@ -249,5 +289,74 @@ color: var(--text-usuzumi);
 
 .usage {
 font-size: var(--text-sm);
+}
+
+/* ── Loading animation: Ensō (禅円) ── */
+.loading-card {
+display: flex;
+flex-direction: column;
+align-items: center;
+padding: var(--space-12) var(--space-6);
+gap: var(--space-6);
+}
+
+.loading-visual {
+position: relative;
+width: 120px;
+height: 120px;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.enso {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+transform: rotate(-120deg);
+overflow: visible;
+}
+
+.enso-stroke {
+fill: none;
+stroke: var(--text-sumi);
+stroke-width: 2.5;
+stroke-linecap: round;
+stroke-dasharray: 239;
+stroke-dashoffset: 239;
+animation: draw-enso 4s ease-in-out infinite;
+}
+
+@keyframes draw-enso {
+0% { stroke-dashoffset: 239; opacity: 0; }
+6% { stroke-dashoffset: 224; opacity: 0.6; }
+50% { stroke-dashoffset: 20; opacity: 0.6; }
+65% { stroke-dashoffset: 20; opacity: 0.6; }
+92% { stroke-dashoffset: 20; opacity: 0; }
+100% { stroke-dashoffset: 20; opacity: 0; }
+}
+
+.enso-kanji {
+position: relative;
+font-size: var(--text-3xl);
+color: var(--accent-shu);
+font-weight: var(--weight-light);
+animation: kanji-breathe 4s ease-in-out infinite;
+user-select: none;
+}
+
+@keyframes kanji-breathe {
+0%, 100% { opacity: 0.4; transform: scale(0.96); }
+50% { opacity: 0.9; transform: scale(1.04); }
+}
+
+.loading-text {
+color: var(--text-bokashi);
+font-size: var(--text-base);
+text-align: center;
+transition: opacity 0.4s var(--ease-in-out);
+min-height: 1.6em;
+margin: 0;
 }
 </style>
