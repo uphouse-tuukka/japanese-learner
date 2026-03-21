@@ -1,16 +1,17 @@
-import { createClient, type Client, type InStatement } from "@libsql/client";
-import { randomUUID } from "node:crypto";
-import { config } from "$lib/config";
+import { createClient, type Client, type InStatement } from '@libsql/client';
+import { randomUUID } from 'node:crypto';
+import { config } from '$lib/config';
 import type {
   Exercise,
   Session,
   SessionExercise,
+  SessionMeta,
   SessionMode,
   SessionStatus,
   TokenUsage,
   User,
   UserLevel,
-} from "$lib/types";
+} from '$lib/types';
 
 let dbClient: Client | null = null;
 let databaseInitPromise: Promise<void> | null = null;
@@ -27,14 +28,14 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function asString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
 }
 
 function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string') {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
@@ -42,7 +43,7 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function asIso(value: unknown): string {
-  if (typeof value === "string" && value.trim()) {
+  if (typeof value === 'string' && value.trim()) {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
@@ -50,8 +51,8 @@ function asIso(value: unknown): string {
 }
 
 function parseExercise(contentJson: unknown): Exercise {
-  if (typeof contentJson !== "string" || !contentJson.trim()) {
-    throw new Error("[db] Missing exercise content_json");
+  if (typeof contentJson !== 'string' || !contentJson.trim()) {
+    throw new Error('[db] Missing exercise content_json');
   }
   return JSON.parse(contentJson) as Exercise;
 }
@@ -61,9 +62,12 @@ function mapUserRow(row: Record<string, unknown>): User {
     id: asString(row.id),
     name: asString(row.name),
     level: asString(row.level) as UserLevel,
+    japaneseWritingEnabled:
+      row.japanese_writing_enabled === 1 || row.japanese_writing_enabled === '1',
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
     lastActiveAt: row.last_active_at ? asIso(row.last_active_at) : null,
+    progressJournal: row.progress_journal ? asString(row.progress_journal) : null,
   };
 }
 
@@ -98,11 +102,8 @@ function mapTokenUsageRow(row: Record<string, unknown>): TokenUsage {
 function getClient(): Client {
   if (!dbClient) {
     dbClient = createClient({
-      url: requiredValue("config.turso.databaseUrl", config.turso.databaseUrl),
-      authToken: requiredValue(
-        "config.turso.authToken",
-        config.turso.authToken,
-      ),
+      url: requiredValue('config.turso.databaseUrl', config.turso.databaseUrl),
+      authToken: requiredValue('config.turso.authToken', config.turso.authToken),
     });
   }
   return dbClient;
@@ -118,6 +119,8 @@ export async function initializeDatabase(): Promise<void> {
 id TEXT PRIMARY KEY,
 name TEXT NOT NULL,
 level TEXT NOT NULL,
+progress_journal TEXT DEFAULT NULL,
+japanese_writing_enabled INTEGER NOT NULL DEFAULT 0,
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );`,
@@ -186,7 +189,21 @@ FOREIGN KEY (session_id) REFERENCES sessions(id)
       ];
 
       await db.batch(schemaStatements);
-      console.info("[db] schema initialized");
+      try {
+        await db.execute(`ALTER TABLE users ADD COLUMN progress_journal TEXT DEFAULT NULL`);
+      } catch (error) {
+        console.warn('[db] users.progress_journal already exists or skipped', {
+          error,
+        });
+      }
+      try {
+        await db.execute(
+          `ALTER TABLE users ADD COLUMN japanese_writing_enabled INTEGER NOT NULL DEFAULT 0`,
+        );
+      } catch {
+        /* column already exists */
+      }
+      console.warn('[db] schema initialized');
     })();
   }
 
@@ -206,6 +223,8 @@ SELECT
 u.id,
 u.name,
 u.level,
+u.progress_journal,
+u.japanese_writing_enabled,
 u.created_at,
 u.updated_at,
 (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = u.id) AS last_active_at
@@ -224,6 +243,8 @@ SELECT
 u.id,
 u.name,
 u.level,
+u.progress_journal,
+u.japanese_writing_enabled,
 u.created_at,
 u.updated_at,
 (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = u.id) AS last_active_at
@@ -246,30 +267,26 @@ export async function insertUser(input: {
   const id = input.id ?? `user-${randomUUID()}`;
   const timestamp = nowIso();
   await db.execute({
-    sql: `INSERT INTO users (id, name, level, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-    args: [id, input.name, input.level, timestamp, timestamp],
+    sql: `INSERT INTO users (id, name, level, japanese_writing_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, input.name, input.level, 0, timestamp, timestamp],
   });
   return {
     id,
     name: input.name,
     level: input.level,
+    japaneseWritingEnabled: false,
     createdAt: timestamp,
     updatedAt: timestamp,
     lastActiveAt: null,
+    progressJournal: null,
   };
 }
 
-export async function createUser(
-  name: string,
-  level: UserLevel,
-): Promise<User> {
+export async function createUser(name: string, level: UserLevel): Promise<User> {
   return insertUser({ name, level });
 }
 
-export async function updateUserLevel(
-  userId: string,
-  level: UserLevel,
-): Promise<void> {
+export async function updateUserLevel(userId: string, level: UserLevel): Promise<void> {
   const db = await getDb();
   await db.execute({
     sql: `UPDATE users SET level = ?, updated_at = ? WHERE id = ?`,
@@ -277,15 +294,77 @@ export async function updateUserLevel(
   });
 }
 
+export async function getProgressJournal(userId: string): Promise<string | null> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT progress_journal FROM users WHERE id = ? LIMIT 1`,
+    args: [userId],
+  });
+  const row = result.rows[0] as Record<string, unknown> | undefined;
+  if (!row?.progress_journal) {
+    return null;
+  }
+  return asString(row.progress_journal) || null;
+}
+
+export async function updateProgressJournal(userId: string, journal: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE users SET progress_journal = ?, updated_at = ? WHERE id = ?`,
+    args: [journal, nowIso(), userId],
+  });
+}
+
+export async function updateJapaneseWritingSetting(
+  userId: string,
+  enabled: boolean,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE users SET japanese_writing_enabled = ?, updated_at = ? WHERE id = ?`,
+    args: [enabled ? 1 : 0, nowIso(), userId],
+  });
+}
+
+export async function getRecentSessionSummaries(userId: string, limit = 5): Promise<SessionMeta[]> {
+  const db = await getDb();
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const result = await db.execute({
+    sql: `
+SELECT summary
+FROM sessions
+WHERE user_id = ? AND status = 'completed' AND summary IS NOT NULL
+ORDER BY datetime(completed_at) DESC, datetime(created_at) DESC
+LIMIT ?
+`,
+    args: [userId, safeLimit],
+  });
+
+  const summaries: SessionMeta[] = [];
+  for (const row of result.rows as Array<Record<string, unknown>>) {
+    const raw = row.summary;
+    if (typeof raw !== 'string' || !raw.trim()) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(raw) as SessionMeta;
+      if (parsed && typeof parsed === 'object' && typeof parsed.summaryText === 'string') {
+        summaries.push(parsed);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return summaries;
+}
+
 export async function countSeedExercises(): Promise<number> {
   const db = await getDb();
   const result = await db.execute({
     sql: `SELECT COUNT(*) AS total FROM exercises WHERE is_seed = 1`,
   });
-  return asNumber(
-    (result.rows[0] as Record<string, unknown> | undefined)?.total,
-    0,
-  );
+  return asNumber((result.rows[0] as Record<string, unknown> | undefined)?.total, 0);
 }
 
 export async function upsertExercise(
@@ -321,9 +400,7 @@ export async function listSeedExercises(): Promise<Exercise[]> {
   const result = await db.execute({
     sql: `SELECT content_json FROM exercises WHERE is_seed = 1 ORDER BY id ASC`,
   });
-  return result.rows.map((row) =>
-    parseExercise((row as Record<string, unknown>).content_json),
-  );
+  return result.rows.map((row) => parseExercise((row as Record<string, unknown>).content_json));
 }
 
 export async function createSession(input: {
@@ -342,7 +419,7 @@ export async function createSession(input: {
     id: input.id ?? `session-${randomUUID()}`,
     userId: input.userId,
     mode: input.mode,
-    status: input.status ?? "planned",
+    status: input.status ?? 'planned',
     model: input.model ?? null,
     tokenInput: Math.max(0, Math.floor(input.tokenInput ?? 0)),
     tokenOutput: Math.max(0, Math.floor(input.tokenOutput ?? 0)),
@@ -382,7 +459,7 @@ export async function createSessionExercises(
 ): Promise<void> {
   const db = await getDb();
   const normalized = exercises.map((row, index) => {
-    if ("exercise" in row) {
+    if ('exercise' in row) {
       return row;
     }
     return {
@@ -422,9 +499,7 @@ FROM sessions WHERE id = ? LIMIT 1
   return mapSessionRow(result.rows[0] as Record<string, unknown>);
 }
 
-export async function getSessionExercises(
-  sessionId: string,
-): Promise<SessionExercise[]> {
+export async function getSessionExercises(sessionId: string): Promise<SessionExercise[]> {
   const db = await getDb();
   const result = await db.execute({
     sql: `
@@ -499,7 +574,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         input.userId,
         input.sessionId,
         result.exerciseId,
-        result.mode ?? input.mode ?? "ai",
+        result.mode ?? input.mode ?? 'ai',
         result.isCorrect ? 1 : 0,
         result.answerText,
         result.createdAt ?? nowIso(),
@@ -529,7 +604,7 @@ SET status = ?, completed_at = ?, summary = COALESCE(?, summary), token_input = 
 WHERE id = ?
 `,
     args: [
-      input.status ?? "completed",
+      input.status ?? 'completed',
       input.completedAt ?? nowIso(),
       input.summary ?? null,
       Math.max(0, Math.floor(input.tokenInput ?? 0)),
@@ -545,10 +620,7 @@ export const completeSessionRecord = completeSession;
 export const createSessionRecord = createSession;
 export const attachExercisesToSession = createSessionExercises;
 
-export async function getSessionsForUser(
-  userId: string,
-  limit = 20,
-): Promise<Session[]> {
+export async function getSessionsForUser(userId: string, limit = 20): Promise<Session[]> {
   const db = await getDb();
   const safeLimit = Math.max(1, Math.floor(limit));
   const result = await db.execute({
@@ -561,9 +633,7 @@ export async function getSessionsForUser(
 		`,
     args: [userId, safeLimit],
   });
-  return result.rows.map((row) =>
-    mapSessionRow(row as Record<string, unknown>),
-  );
+  return result.rows.map((row) => mapSessionRow(row as Record<string, unknown>));
 }
 
 export async function deleteStaleGhostSessions(userId: string): Promise<void> {
@@ -679,8 +749,7 @@ export async function getHistoryByUser(userId: string): Promise<
       (scoreRow.rows[0] as Record<string, unknown> | undefined)?.correct,
       0,
     );
-    const accuracy =
-      answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+    const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
 
     history.push({
       session: mapSessionRow(row),
@@ -698,9 +767,7 @@ export async function createSessionSummary(input: {
   summary: { summary?: string; [key: string]: unknown } | string;
 }): Promise<void> {
   const summaryText =
-    typeof input.summary === "string"
-      ? input.summary
-      : JSON.stringify(input.summary);
+    typeof input.summary === 'string' ? input.summary : JSON.stringify(input.summary);
   await completeSession(input.sessionId, { summary: summaryText });
 }
 
@@ -724,9 +791,7 @@ export async function recordTokenUsage(input: {
     model: input.model,
     tokensIn: Math.max(0, Math.floor(input.tokensIn)),
     tokensOut: Math.max(0, Math.floor(input.tokensOut)),
-    tokensTotal:
-      Math.max(0, Math.floor(input.tokensIn)) +
-      Math.max(0, Math.floor(input.tokensOut)),
+    tokensTotal: Math.max(0, Math.floor(input.tokensIn)) + Math.max(0, Math.floor(input.tokensOut)),
     createdAt: input.createdAt ?? nowIso(),
   };
 
@@ -775,7 +840,5 @@ ORDER BY datetime(created_at) DESC
 `,
     args: userId ? [userId, startIso, endIso] : [startIso, endIso],
   });
-  return result.rows.map((row) =>
-    mapTokenUsageRow(row as Record<string, unknown>),
-  );
+  return result.rows.map((row) => mapTokenUsageRow(row as Record<string, unknown>));
 }

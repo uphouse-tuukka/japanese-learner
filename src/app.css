@@ -53,8 +53,8 @@
 
   /* — Typography — */
   --font-sans:
-    "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
-    system-ui, -apple-system, sans-serif;
+    'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui,
+    -apple-system, sans-serif;
 
   --text-xs: 0.75rem; /* 12px */
   --text-sm: 0.8125rem; /* 13px */
@@ -114,8 +114,7 @@
   --shadow-sm: 0 1px 2px rgba(44, 42, 38, 0.06);
   --shadow-md: 0 2px 8px rgba(44, 42, 38, 0.08);
   --shadow-lg: 0 4px 16px rgba(44, 42, 38, 0.1);
-  --shadow-card:
-    0 1px 3px rgba(44, 42, 38, 0.04), 0 4px 12px rgba(44, 42, 38, 0.06);
+  --shadow-card: 0 1px 3px rgba(44, 42, 38, 0.04), 0 4px 12px rgba(44, 42, 38, 0.06);
 
   /* — Transitions —
      Gentle, unhurried — like ink spreading on paper. */
@@ -486,7 +485,7 @@ label {
 
 /* Japanese text helpers */
 .text-japanese {
-  font-feature-settings: "palt"; /* proportional alternates for JP */
+  font-feature-settings: 'palt'; /* proportional alternates for JP */
   line-height: var(--leading-loose);
 }
 

@@ -1,42 +1,42 @@
 <script lang="ts">
-type UserLevel = 'absolute_beginner' | 'beginner' | 'lower_intermediate';
+  type UserLevel = 'absolute_beginner' | 'beginner' | 'pre_intermediate';
 
-type UserOption = {
-  id: string;
-  name: string;
-  level: UserLevel;
-};
+  type UserOption = {
+    id: string;
+    name: string;
+    level: UserLevel;
+  };
 
-let {
-  users,
-  selectedUserId = null,
-  maxUsers,
-  errorMessage = null,
-  successMessage = null,
-  showCreateForm = true,
-  title = 'Choose learner profile'
-}: {
-  users: UserOption[];
-  selectedUserId?: string | null;
-  maxUsers: number;
-  errorMessage?: string | null;
-  successMessage?: string | null;
-  showCreateForm?: boolean;
-  title?: string;
-} = $props();
+  let {
+    users,
+    selectedUserId = null,
+    maxUsers,
+    errorMessage = null,
+    successMessage = null,
+    showCreateForm = true,
+    title = 'Choose learner profile',
+  }: {
+    users: UserOption[];
+    selectedUserId?: string | null;
+    maxUsers: number;
+    errorMessage?: string | null;
+    successMessage?: string | null;
+    showCreateForm?: boolean;
+    title?: string;
+  } = $props();
 
-const levelOptions: Array<{ value: UserLevel; label: string }> = [
-  { value: 'absolute_beginner', label: 'Absolute beginner' },
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'lower_intermediate', label: 'Lower intermediate' }
-];
+  const levelOptions: Array<{ value: UserLevel; label: string }> = [
+    { value: 'absolute_beginner', label: 'Absolute beginner' },
+    { value: 'beginner', label: 'Beginner' },
+    { value: 'pre_intermediate', label: 'Lower intermediate' },
+  ];
 
-let selectedId = $state('');
-let canCreateMore = $derived(users.length < maxUsers);
+  let selectedId = $state('');
+  let canCreateMore = $derived(users.length < maxUsers);
 
-$effect(() => {
-  selectedId = selectedUserId ?? users[0]?.id ?? '';
-});
+  $effect(() => {
+    selectedId = selectedUserId ?? users[0]?.id ?? '';
+  });
 </script>
 
 <section class="selector-card">
@@ -147,8 +147,9 @@ $effect(() => {
     border: 1.5px solid var(--border-light, #cfd6e0);
     background: #fff;
     color: var(--text-sumi, #1a1a1a);
-    transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
-                box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
+    transition:
+      border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
+      box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
   }
 
   input:focus,
@@ -177,8 +178,9 @@ $effect(() => {
     background: var(--accent-shu, #c1440e);
     color: var(--bg-shoji, white);
     font-weight: var(--weight-medium, 600);
-    transition: background var(--duration-fast, 150ms) var(--ease-out, ease-out),
-                transform var(--duration-fast, 150ms) var(--ease-out, ease-out);
+    transition:
+      background var(--duration-fast, 150ms) var(--ease-out, ease-out),
+      transform var(--duration-fast, 150ms) var(--ease-out, ease-out);
   }
 
   button:hover:not([disabled]) {

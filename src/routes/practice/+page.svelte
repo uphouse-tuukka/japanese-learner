@@ -1,149 +1,177 @@
 <script lang="ts">
-import ProgressBar from '$lib/components/ProgressBar.svelte';
-import SessionRenderer from '$lib/components/SessionRenderer.svelte';
-import SessionSummary from '$lib/components/SessionSummary.svelte';
-import DebugPanel from '$lib/components/DebugPanel.svelte';
-import {
-  session,
-  exercises,
-  answers,
-  currentIndex,
-  summary,
-  startSession,
-  answerExercise,
-  nextExercise,
-  completeSession,
-  resetSession
-} from '$lib/stores/session.svelte';
-import type { Exercise, ExerciseAnswerPayload, ExerciseType, Session } from '$lib/types';
-import type { PageData } from './$types';
+  import ProgressBar from '$lib/components/ProgressBar.svelte';
+  import SessionRenderer from '$lib/components/SessionRenderer.svelte';
+  import SessionSummary from '$lib/components/SessionSummary.svelte';
+  import DebugPanel from '$lib/components/DebugPanel.svelte';
+  import {
+    session,
+    exercises,
+    answers,
+    currentIndex,
+    summary,
+    startSession,
+    answerExercise,
+    nextExercise,
+    completeSession,
+    resetSession,
+  } from '$lib/stores/session.svelte';
+  import type { Exercise, ExerciseAnswerPayload, ExerciseType, Session } from '$lib/types';
+  import type { PageData } from './$types';
 
-type UiState = 'idle' | 'loading' | 'active' | 'completing' | 'done' | 'error';
-type GenerateResponse = { ok: boolean; state: 'active'; session: Session | null; exercises: Exercise[]; error?: string };
-type CompleteResponse = { ok: boolean; state: 'done'; summary: import('$lib/types').SessionSummary; error?: string };
-
-let { data } = $props<{ data: PageData }>();
-let uiState = $state<UiState>('idle');
-let errorMessage = $state('');
-
-/* — Loading animation state — */
-const loadingMessages = [
-  'Selecting exercises for review\u2026',
-  'Prioritizing your weak spots\u2026',
-  'Preparing practice questions\u2026',
-  'Almost ready\u2026'
-];
-let loadingMsgIndex = $state(0);
-let loadingMsgVisible = $state(true);
-
-$effect(() => {
-  if (uiState !== 'loading') return;
-  loadingMsgIndex = 0;
-  loadingMsgVisible = true;
-  let timeoutId: ReturnType<typeof setTimeout>;
-  const intervalId = setInterval(() => {
-    loadingMsgVisible = false;
-    timeoutId = setTimeout(() => {
-      loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
-      loadingMsgVisible = true;
-    }, 400);
-  }, 2800);
-  return () => {
-    clearInterval(intervalId);
-    clearTimeout(timeoutId);
+  type UiState = 'idle' | 'loading' | 'active' | 'completing' | 'done' | 'error';
+  type GenerateResponse = {
+    ok: boolean;
+    state: 'active';
+    session: Session | null;
+    exercises: Exercise[];
+    error?: string;
   };
-});
+  type CompleteResponse = {
+    ok: boolean;
+    state: 'done';
+    summary: import('$lib/types').SessionSummary;
+    error?: string;
+  };
 
-/* Reset shared session store on mount to clear stale state from other modes */
-$effect(() => {
-  resetSession();
-});
+  let { data } = $props<{ data: PageData }>();
+  let uiState = $state<UiState>('idle');
+  let errorMessage = $state('');
 
-const totalExercises = $derived($exercises.length);
-const currentExercise = $derived($exercises[$currentIndex] ?? null);
-const progressCurrent = $derived(Math.min($currentIndex + 1, Math.max($exercises.length, 1)));
+  /* — Loading animation state — */
+  const loadingMessages = [
+    'Selecting exercises for review\u2026',
+    'Prioritizing your weak spots\u2026',
+    'Preparing practice questions\u2026',
+    'Almost ready\u2026',
+  ];
+  let loadingMsgIndex = $state(0);
+  let loadingMsgVisible = $state(true);
 
-async function startPractice(): Promise<void> {
-  uiState = 'loading';
-  errorMessage = '';
-  resetSession();
-  try {
-    const response = await fetch('/api/practice/generate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 10 })
-    });
-    const payload = (await response.json()) as GenerateResponse;
-    if (!response.ok || !payload.ok || !payload.session) throw new Error(payload.error ?? 'Failed to generate practice session');
-    if (!payload.exercises || payload.exercises.length === 0) throw new Error('No practice exercises available. Complete a learning session first to build your review pool.');
-    startSession(payload.session, payload.exercises);
-    uiState = 'active';
-  } catch (error) {
-    errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    uiState = 'error';
+  $effect(() => {
+    if (uiState !== 'loading') return;
+    loadingMsgIndex = 0;
+    loadingMsgVisible = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const intervalId = setInterval(() => {
+      loadingMsgVisible = false;
+      timeoutId = setTimeout(() => {
+        loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+        loadingMsgVisible = true;
+      }, 400);
+    }, 2800);
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  });
+
+  /* Reset shared session store on mount to clear stale state from other modes */
+  $effect(() => {
+    resetSession();
+  });
+
+  const totalExercises = $derived($exercises.length);
+  const currentExercise = $derived($exercises[$currentIndex] ?? null);
+  const progressCurrent = $derived(Math.min($currentIndex + 1, Math.max($exercises.length, 1)));
+
+  async function startPractice(): Promise<void> {
+    uiState = 'loading';
+    errorMessage = '';
+    resetSession();
+    try {
+      const response = await fetch('/api/practice/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 10 }),
+      });
+      const payload = (await response.json()) as GenerateResponse;
+      if (!response.ok || !payload.ok || !payload.session)
+        throw new Error(payload.error ?? 'Failed to generate practice session');
+      if (!payload.exercises || payload.exercises.length === 0)
+        throw new Error(
+          'No practice exercises available. Complete a learning session first to build your review pool.',
+        );
+      startSession(payload.session, payload.exercises);
+      uiState = 'active';
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      uiState = 'error';
+    }
   }
-}
 
-async function startDebugPractice(type: ExerciseType): Promise<void> {
-  uiState = 'loading';
-  errorMessage = '';
-  resetSession();
-  try {
-    const response = await fetch('/api/practice/generate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 6, debugExerciseType: type })
-    });
-    const payload = (await response.json()) as GenerateResponse;
-    if (!response.ok || !payload.ok || !payload.session) throw new Error(payload.error ?? 'Failed to generate debug session');
-    startSession(payload.session, payload.exercises);
-    uiState = 'active';
-  } catch (error) {
-    errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    uiState = 'error';
+  async function startDebugPractice(type: ExerciseType): Promise<void> {
+    uiState = 'loading';
+    errorMessage = '';
+    resetSession();
+    try {
+      const response = await fetch('/api/practice/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: data.selectedUserId,
+          exerciseCount: 6,
+          debugExerciseType: type,
+        }),
+      });
+      const payload = (await response.json()) as GenerateResponse;
+      if (!response.ok || !payload.ok || !payload.session)
+        throw new Error(payload.error ?? 'Failed to generate debug session');
+      startSession(payload.session, payload.exercises);
+      uiState = 'active';
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      uiState = 'error';
+    }
   }
-}
 
-async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
-  if (!currentExercise) return;
-  answerExercise($currentIndex, payload);
-  const isLast = $currentIndex >= $exercises.length - 1;
-  if (!isLast) {
-    nextExercise();
-    return;
+  async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
+    if (!currentExercise) return;
+    answerExercise($currentIndex, payload);
+    const isLast = $currentIndex >= $exercises.length - 1;
+    if (!isLast) {
+      nextExercise();
+      return;
+    }
+    await finalizePractice();
   }
-  await finalizePractice();
-}
 
-async function finalizePractice(): Promise<void> {
-  if (!$session) {
-    errorMessage = 'Session missing. Start again.';
-    uiState = 'error';
-    return;
+  async function finalizePractice(): Promise<void> {
+    if (!$session) {
+      errorMessage = 'Session missing. Start again.';
+      uiState = 'error';
+      return;
+    }
+    uiState = 'completing';
+    try {
+      const response = await fetch('/api/practice/complete', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: data.selectedUserId,
+          sessionId: $session.id,
+          results: $answers,
+        }),
+      });
+      const payload = (await response.json()) as CompleteResponse;
+      if (!response.ok || !payload.ok)
+        throw new Error(payload.error ?? 'Failed to complete practice session');
+      completeSession(payload.summary);
+      uiState = 'done';
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      uiState = 'error';
+    }
   }
-  uiState = 'completing';
-  try {
-    const response = await fetch('/api/practice/complete', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userId: data.selectedUserId, sessionId: $session.id, results: $answers })
-    });
-    const payload = (await response.json()) as CompleteResponse;
-    if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Failed to complete practice session');
-    completeSession(payload.summary);
-    uiState = 'done';
-  } catch (error) {
-    errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    uiState = 'error';
-  }
-}
 </script>
 
 <main class="practice-page page-transition">
   {#if uiState === 'idle'}
     <section class="card">
       <h1>Practice</h1>
-      <p>Run a focused review session with weighted practice exercises drawn from your past learning sessions.</p>
+      <p>
+        Run a focused review session with weighted practice exercises drawn from your past learning
+        sessions.
+      </p>
       <button class="btn btn-primary" onclick={startPractice}>Start practice</button>
     </section>
   {:else if uiState === 'loading'}
@@ -160,9 +188,11 @@ async function finalizePractice(): Promise<void> {
       <p class="sr-only">Generating your practice session, please wait.</p>
     </section>
   {:else if uiState === 'active'}
-    <section class="card"><ProgressBar current={progressCurrent} total={totalExercises} label="Practice progress" /></section>
+    <section class="card">
+      <ProgressBar current={progressCurrent} total={totalExercises} label="Practice progress" />
+    </section>
     {#if currentExercise}
-      <SessionRenderer exercise={currentExercise} onAnswer={onAnswer} />
+      <SessionRenderer exercise={currentExercise} {onAnswer} />
     {/if}
   {:else if uiState === 'completing'}
     <section class="card loading-card" aria-live="polite" aria-busy="true">
@@ -180,7 +210,12 @@ async function finalizePractice(): Promise<void> {
     <section class="card">
       <h1>Practice</h1>
       <p class="error-text">{errorMessage}</p>
-      <button class="btn btn-primary" onclick={() => { uiState = 'idle'; }}>Back to practice</button>
+      <button
+        class="btn btn-primary"
+        onclick={() => {
+          uiState = 'idle';
+        }}>Back to practice</button
+      >
     </section>
   {/if}
 
@@ -234,12 +269,30 @@ async function finalizePractice(): Promise<void> {
   }
 
   @keyframes draw-enso {
-    0% { stroke-dashoffset: 239; opacity: 0; }
-    6% { stroke-dashoffset: 224; opacity: 0.6; }
-    50% { stroke-dashoffset: 20; opacity: 0.6; }
-    65% { stroke-dashoffset: 20; opacity: 0.6; }
-    92% { stroke-dashoffset: 20; opacity: 0; }
-    100% { stroke-dashoffset: 20; opacity: 0; }
+    0% {
+      stroke-dashoffset: 239;
+      opacity: 0;
+    }
+    6% {
+      stroke-dashoffset: 224;
+      opacity: 0.6;
+    }
+    50% {
+      stroke-dashoffset: 20;
+      opacity: 0.6;
+    }
+    65% {
+      stroke-dashoffset: 20;
+      opacity: 0.6;
+    }
+    92% {
+      stroke-dashoffset: 20;
+      opacity: 0;
+    }
+    100% {
+      stroke-dashoffset: 20;
+      opacity: 0;
+    }
   }
 
   .enso-kanji {
@@ -252,8 +305,15 @@ async function finalizePractice(): Promise<void> {
   }
 
   @keyframes kanji-breathe {
-    0%, 100% { opacity: 0.4; transform: scale(0.96); }
-    50% { opacity: 0.9; transform: scale(1.04); }
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(0.96);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.04);
+    }
   }
 
   .loading-text {

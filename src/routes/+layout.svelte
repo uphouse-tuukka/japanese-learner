@@ -1,15 +1,15 @@
 <script lang="ts">
-import { page } from '$app/stores';
-import '../app.css';
+  import { page } from '$app/stores';
+  import '../app.css';
 
-let { children } = $props();
+  let { children } = $props();
 
-const pathname = $derived($page.url.pathname);
+  const pathname = $derived($page.url.pathname);
 
-function isActive(path: string): boolean {
-  if (path === '/') return pathname === '/';
-  return pathname === path || pathname.startsWith(`${path}/`);
-}
+  function isActive(path: string): boolean {
+    if (path === '/') return pathname === '/';
+    return pathname === path || pathname.startsWith(`${path}/`);
+  }
 </script>
 
 <div class="shell">
@@ -97,7 +97,8 @@ function isActive(path: string): boolean {
     color: var(--text-bokashi);
     text-decoration: none;
     line-height: 1.2;
-    transition: background-color var(--duration-fast) var(--ease-out),
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
       color var(--duration-fast) var(--ease-out);
   }
 

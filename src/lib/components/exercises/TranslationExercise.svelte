@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { OnAnswer, TranslationExercise as TranslationExerciseData } from '$lib/types';
+  import { normalizeForComparison } from '$lib/utils/text';
 
   interface Props {
     exercise: TranslationExerciseData;
@@ -12,7 +13,6 @@
   let answered = $state(false);
   let isCorrect = $state(false);
   let hintLevel = $state(0); // 0 = no hint, 1 = first char, 2 = first 3 chars
-  let startTime = $state(Date.now());
   let announcement = $state('');
   let resultRef: HTMLElement | undefined = $state();
   let submittedAnswer = $state('');
@@ -23,12 +23,12 @@
       ? ''
       : hintLevel === 1
         ? exercise.expectedAnswer.charAt(0) + '...'
-        : exercise.expectedAnswer.slice(0, 3) + '...'
+        : exercise.expectedAnswer.slice(0, 3) + '...',
   );
 
-  const allAcceptedAnswers = $derived(
-    [...new Set([exercise.expectedAnswer, ...exercise.acceptedAnswers])]
-  );
+  const allAcceptedAnswers = $derived([
+    ...new Set([exercise.expectedAnswer, ...exercise.acceptedAnswers]),
+  ]);
 
   function showHint(): void {
     if (answered) return;
@@ -41,23 +41,21 @@
     if (answered || !userInput.trim()) return;
 
     const trimmed = userInput.trim();
-    const lower = trimmed.toLowerCase();
+    const normalizedInput = normalizeForComparison(trimmed);
 
     const allAnswers = [exercise.expectedAnswer, ...exercise.acceptedAnswers];
     if (exercise.expectedRomaji) {
       allAnswers.push(exercise.expectedRomaji);
     }
 
-    const correct = allAnswers.some((answer) => answer.trim().toLowerCase() === lower);
+    const correct = allAnswers.some((answer) => normalizeForComparison(answer) === normalizedInput);
 
     answered = true;
     isCorrect = correct;
     submittedAnswer = trimmed;
     submittedCorrect = correct;
 
-    announcement = correct
-      ? 'Correct!'
-      : `Incorrect. Expected: ${exercise.expectedAnswer}`;
+    announcement = correct ? 'Correct!' : `Incorrect. Expected: ${exercise.expectedAnswer}`;
 
     setTimeout(() => {
       resultRef?.focus();
@@ -68,7 +66,7 @@
     onAnswer({
       exerciseId: exercise.id,
       answerText: submittedAnswer,
-      isCorrect: submittedCorrect
+      isCorrect: submittedCorrect,
     });
   }
 
@@ -79,7 +77,6 @@
     answered = false;
     isCorrect = false;
     hintLevel = 0;
-    startTime = Date.now();
     announcement = '';
     submittedAnswer = '';
     submittedCorrect = false;
@@ -128,22 +125,11 @@
 
     {#if !answered}
       <div class="button-row">
-        <button
-          type="button"
-          class="hint-btn"
-          onclick={showHint}
-          disabled={hintLevel >= 2}
-        >
+        <button type="button" class="hint-btn" onclick={showHint} disabled={hintLevel >= 2}>
           {hintLevel === 0 ? 'Show Hint' : 'More Hint'}
         </button>
 
-        <button
-          type="submit"
-          class="check-btn"
-          disabled={!userInput.trim()}
-        >
-          Check
-        </button>
+        <button type="submit" class="check-btn" disabled={!userInput.trim()}> Check </button>
       </div>
     {/if}
   </form>
@@ -156,12 +142,7 @@
   {/if}
 
   {#if answered}
-    <section
-      class="result-panel"
-      bind:this={resultRef}
-      tabindex="-1"
-      aria-live="polite"
-    >
+    <section class="result-panel" bind:this={resultRef} tabindex="-1" aria-live="polite">
       {#if isCorrect}
         <div class="result-header correct">
           <span class="result-icon">✓</span>
@@ -197,9 +178,7 @@
         </div>
       </div>
 
-      <button type="button" class="continue-btn" onclick={continueToNext}>
-        Continue
-      </button>
+      <button type="button" class="continue-btn" onclick={continueToNext}> Continue </button>
     </section>
   {/if}
 

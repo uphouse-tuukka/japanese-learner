@@ -1,5 +1,5 @@
-import { toStore } from "svelte/store";
-import type { Exercise, Session, SessionSummary } from "$lib/types";
+import { toStore } from 'svelte/store';
+import type { Exercise, Session, SessionSummary } from '$lib/types';
 
 export type ExerciseAnswer = {
   exerciseId: string;
@@ -69,10 +69,7 @@ export function resetSession(): void {
   stateInternal.summary = null;
 }
 
-export function startSession(
-  nextSession: Session,
-  nextExercises: Exercise[],
-): void {
+export function startSession(nextSession: Session, nextExercises: Exercise[]): void {
   stateInternal.session = nextSession;
   stateInternal.exercises = nextExercises;
   stateInternal.answers = [];
@@ -82,7 +79,7 @@ export function startSession(
 
 export function answerExercise(
   index: number,
-  payload: Omit<ExerciseAnswer, "createdAt"> & { createdAt?: string },
+  payload: Omit<ExerciseAnswer, 'createdAt'> & { createdAt?: string },
 ): void {
   const next = [...stateInternal.answers];
   next[index] = {

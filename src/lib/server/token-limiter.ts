@@ -1,12 +1,8 @@
-import { config } from "$lib/config";
-import { listTokenUsageForRange, recordTokenUsage } from "$lib/server/db";
-import type { TokenUsage } from "$lib/types";
+import { config } from '$lib/config';
+import { listTokenUsageForRange, recordTokenUsage } from '$lib/server/db';
+import type { TokenUsage } from '$lib/types';
 
-type BudgetReason =
-  | "ok"
-  | "bypass"
-  | "daily_limit_exceeded"
-  | "monthly_limit_exceeded";
+type BudgetReason = 'ok' | 'bypass' | 'daily_limit_exceeded' | 'monthly_limit_exceeded';
 
 export type BudgetCheckResult = {
   allowed: boolean;
@@ -25,15 +21,13 @@ export type BudgetCheckResult = {
 function requireUserId(userId: string): string {
   const normalized = userId.trim();
   if (!normalized) {
-    throw new Error("[token-limiter] userId is required");
+    throw new Error('[token-limiter] userId is required');
   }
   return normalized;
 }
 
 export function dayWindow(now: Date): { start: string; end: string } {
-  const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
   return { start: start.toISOString(), end: end.toISOString() };
@@ -41,9 +35,7 @@ export function dayWindow(now: Date): { start: string; end: string } {
 
 export function monthWindow(now: Date): { start: string; end: string } {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
-  );
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
@@ -54,7 +46,7 @@ export function sumTokens(usages: TokenUsage[]): number {
 export function resolveBypass(bypassKey?: string): boolean {
   const configuredBypassKey = config.limits.bypassKey.trim();
   if (!configuredBypassKey) return false;
-  return typeof bypassKey === "string" && bypassKey === configuredBypassKey;
+  return typeof bypassKey === 'string' && bypassKey === configuredBypassKey;
 }
 
 export function monthlyTokenLimit(): number {
@@ -63,10 +55,7 @@ export function monthlyTokenLimit(): number {
   return dailyLimit * 31;
 }
 
-export async function checkBudget(
-  userId: string,
-  bypassKey?: string,
-): Promise<BudgetCheckResult> {
+export async function checkBudget(userId: string, bypassKey?: string): Promise<BudgetCheckResult> {
   const normalizedUserId = requireUserId(userId);
   const now = new Date();
   const bypass = resolveBypass(bypassKey);
@@ -75,11 +64,7 @@ export async function checkBudget(
   const monthlyCostLimitUsd = Math.max(0, config.limits.monthlyCostLimit);
 
   const [dailyUsageRows, monthlyUsageRows] = await Promise.all([
-    listTokenUsageForRange(
-      dayWindow(now).start,
-      dayWindow(now).end,
-      normalizedUserId,
-    ),
+    listTokenUsageForRange(dayWindow(now).start, dayWindow(now).end, normalizedUserId),
     listTokenUsageForRange(monthWindow(now).start, monthWindow(now).end),
   ]);
 
@@ -91,7 +76,7 @@ export async function checkBudget(
   if (bypass) {
     return {
       allowed: true,
-      reason: "bypass",
+      reason: 'bypass',
       dailyUsed,
       dailyLimit,
       dailyRemaining,
@@ -107,7 +92,7 @@ export async function checkBudget(
   if (dailyLimit > 0 && dailyUsed >= dailyLimit) {
     return {
       allowed: false,
-      reason: "daily_limit_exceeded",
+      reason: 'daily_limit_exceeded',
       dailyUsed,
       dailyLimit,
       dailyRemaining,
@@ -123,7 +108,7 @@ export async function checkBudget(
   if (monthlyLimit > 0 && monthlyUsed >= monthlyLimit) {
     return {
       allowed: false,
-      reason: "monthly_limit_exceeded",
+      reason: 'monthly_limit_exceeded',
       dailyUsed,
       dailyLimit,
       dailyRemaining,
@@ -138,7 +123,7 @@ export async function checkBudget(
 
   return {
     allowed: true,
-    reason: "ok",
+    reason: 'ok',
     dailyUsed,
     dailyLimit,
     dailyRemaining,
@@ -171,7 +156,7 @@ export async function recordUsageEvent(input: {
   const userId = requireUserId(input.userId);
   const model = input.model.trim();
   if (!model) {
-    throw new Error("[token-limiter] model is required");
+    throw new Error('[token-limiter] model is required');
   }
 
   const usage = await recordTokenUsage({
@@ -183,7 +168,7 @@ export async function recordUsageEvent(input: {
     createdAt: input.createdAt,
   });
 
-  console.info("[token-limiter] recorded usage", {
+  console.warn('[token-limiter] recorded usage', {
     userId,
     sessionId: usage.sessionId,
     model,

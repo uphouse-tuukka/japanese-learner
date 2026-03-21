@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { getDb } from "$lib/server/db";
-import type { Exercise, SessionPlan } from "$lib/types";
+import { randomUUID } from 'node:crypto';
+import { getDb } from '$lib/server/db';
+import type { Exercise, SessionPlan } from '$lib/types';
 
 type PracticeOptions = {
   exerciseCount?: number;
@@ -17,14 +17,14 @@ type CandidateExercise = {
 function requireUserId(userId: string): string {
   const normalized = userId.trim();
   if (!normalized) {
-    throw new Error("[practice] userId is required");
+    throw new Error('[practice] userId is required');
   }
   return normalized;
 }
 
 export function toExerciseCount(requested?: number): number {
   const fallback = 6;
-  if (typeof requested !== "number" || !Number.isFinite(requested)) {
+  if (typeof requested !== 'number' || !Number.isFinite(requested)) {
     return fallback;
   }
   return Math.min(12, Math.max(4, Math.round(requested)));
@@ -38,10 +38,7 @@ export function scoreCandidate(item: CandidateExercise): number {
   return score;
 }
 
-export function pickTopExercises(
-  candidates: CandidateExercise[],
-  target: number,
-): Exercise[] {
+export function pickTopExercises(candidates: CandidateExercise[], target: number): Exercise[] {
   return candidates
     .slice()
     .sort((a, b) => {
@@ -55,9 +52,7 @@ export function pickTopExercises(
     .map((item) => item.exercise);
 }
 
-async function getPracticeCandidates(
-  userId: string,
-): Promise<CandidateExercise[]> {
+async function getPracticeCandidates(userId: string): Promise<CandidateExercise[]> {
   const db = await getDb();
   const result = await db.execute({
     sql: `
@@ -108,50 +103,45 @@ export async function buildPracticeSession(
   const candidates = await getPracticeCandidates(validatedUserId);
   if (candidates.length === 0) {
     throw new Error(
-      "No completed AI sessions found yet. Finish at least one AI learning session before practice mode.",
+      'No completed AI sessions found yet. Finish at least one AI learning session before practice mode.',
     );
   }
 
-  const exercises = pickTopExercises(
-    candidates,
-    Math.min(targetCount, candidates.length),
-  );
+  const exercises = pickTopExercises(candidates, Math.min(targetCount, candidates.length));
   if (exercises.length === 0) {
-    throw new Error(
-      "No practice exercises available from your completed AI sessions yet.",
-    );
+    throw new Error('No practice exercises available from your completed AI sessions yet.');
   }
 
   const plan: SessionPlan = {
     id: `practice-${randomUUID()}`,
     userId: validatedUserId,
-    mode: "practice",
+    mode: 'practice',
     createdAt: now.toISOString(),
-    model: "practice-review",
+    model: 'practice-review',
     lesson: {
-      topic: "Review from your previous AI sessions",
+      topic: 'Review from your previous AI sessions',
       explanation:
-        "This practice session reuses exercises from your completed AI lessons. We prioritize items you previously answered incorrectly so you can improve weak spots.",
+        'This practice session reuses exercises from your completed AI lessons. We prioritize items you previously answered incorrectly so you can improve weak spots.',
       culturalNote:
-        "Repetition and correction are important in Japanese learning. Short, frequent review sessions are more effective than cramming.",
+        'Repetition and correction are important in Japanese learning. Short, frequent review sessions are more effective than cramming.',
       keyPhrases: [
         {
-          japanese: "復習",
-          romaji: "fukushuu",
-          english: "review",
-          usage: "Used for studying material again to improve retention.",
+          japanese: '復習',
+          romaji: 'fukushuu',
+          english: 'review',
+          usage: 'Used for studying material again to improve retention.',
         },
         {
-          japanese: "もう一度",
-          romaji: "mou ichido",
-          english: "one more time",
-          usage: "Use when you want to repeat an exercise or phrase.",
+          japanese: 'もう一度',
+          romaji: 'mou ichido',
+          english: 'one more time',
+          usage: 'Use when you want to repeat an exercise or phrase.',
         },
         {
-          japanese: "大丈夫です",
-          romaji: "daijoubu desu",
-          english: "It is okay / I am fine",
-          usage: "Common reassuring phrase useful in travel conversations.",
+          japanese: '大丈夫です',
+          romaji: 'daijoubu desu',
+          english: 'It is okay / I am fine',
+          usage: 'Common reassuring phrase useful in travel conversations.',
         },
       ],
     },
@@ -161,14 +151,14 @@ export async function buildPracticeSession(
       output: 0,
     },
     metadata: {
-      focus: "review_past_ai_session_exercises",
+      focus: 'review_past_ai_session_exercises',
       exerciseCount: exercises.length,
-      selectionStrategy: "prioritize_incorrect_then_least_recent",
+      selectionStrategy: 'prioritize_incorrect_then_least_recent',
       candidateCount: candidates.length,
     },
   };
 
-  console.info("[practice] built practice session", {
+  console.warn('[practice] built practice session', {
     userId: validatedUserId,
     sessionId: plan.id,
     exerciseCount: exercises.length,

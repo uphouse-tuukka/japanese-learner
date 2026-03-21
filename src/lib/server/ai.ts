@@ -1,6 +1,7 @@
-import OpenAI from "openai";
-import { randomUUID } from "node:crypto";
-import { config } from "$lib/config";
+import OpenAI from 'openai';
+import { randomUUID } from 'node:crypto';
+import { config } from '$lib/config';
+import { LEVEL_ORDER } from '$lib/types';
 import type {
   Exercise,
   ExerciseType,
@@ -10,11 +11,112 @@ import type {
   SessionSummary,
   TokenUsage,
   UserLevel,
-} from "$lib/types";
+} from '$lib/types';
 
-function shuffleArray<T>(arr: T[]): T[] { const shuffled = [...arr]; for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; } return shuffled; }
+const LEVEL_RULES: Record<
+  UserLevel,
+  {
+    minDifficulty: 1 | 2 | 3;
+    maxDifficulty: 2 | 3 | 4 | 5;
+    allowedTypes: ExerciseType[];
+    translationDirections: Array<'ja_to_en' | 'en_to_ja'>;
+  }
+> = {
+  absolute_beginner: {
+    minDifficulty: 1,
+    maxDifficulty: 2,
+    allowedTypes: ['multiple_choice', 'translation'],
+    translationDirections: ['ja_to_en'],
+  },
+  beginner: {
+    minDifficulty: 1,
+    maxDifficulty: 3,
+    allowedTypes: ['multiple_choice', 'translation', 'listening'],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  elementary: {
+    minDifficulty: 1,
+    maxDifficulty: 3,
+    allowedTypes: ['multiple_choice', 'translation', 'listening', 'fill_blank'],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  pre_intermediate: {
+    minDifficulty: 2,
+    maxDifficulty: 4,
+    allowedTypes: [
+      'multiple_choice',
+      'translation',
+      'listening',
+      'fill_blank',
+      'reorder',
+      'reading',
+    ],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  intermediate: {
+    minDifficulty: 2,
+    maxDifficulty: 5,
+    allowedTypes: [
+      'multiple_choice',
+      'translation',
+      'listening',
+      'fill_blank',
+      'reorder',
+      'reading',
+    ],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  upper_intermediate: {
+    minDifficulty: 3,
+    maxDifficulty: 5,
+    allowedTypes: [
+      'multiple_choice',
+      'translation',
+      'listening',
+      'fill_blank',
+      'reorder',
+      'reading',
+    ],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  advanced: {
+    minDifficulty: 3,
+    maxDifficulty: 5,
+    allowedTypes: [
+      'multiple_choice',
+      'translation',
+      'listening',
+      'fill_blank',
+      'reorder',
+      'reading',
+    ],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+  ready_for_japan: {
+    minDifficulty: 3,
+    maxDifficulty: 5,
+    allowedTypes: [
+      'multiple_choice',
+      'translation',
+      'listening',
+      'fill_blank',
+      'reorder',
+      'reading',
+    ],
+    translationDirections: ['ja_to_en', 'en_to_ja'],
+  },
+};
 
-const SESSION_MODEL = "gpt-4.1";
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+const SESSION_MODEL = 'gpt-4.1';
 
 let openaiClient: OpenAI | null = null;
 
@@ -25,7 +127,7 @@ function nowIso(): string {
 function getOpenAiClient(): OpenAI {
   const apiKey = config.openai.apiKey.trim();
   if (!apiKey) {
-    throw new Error("[ai] Missing OpenAI API key in config.openai.apiKey");
+    throw new Error('[ai] Missing OpenAI API key in config.openai.apiKey');
   }
   if (!openaiClient) {
     openaiClient = new OpenAI({ apiKey });
@@ -34,7 +136,7 @@ function getOpenAiClient(): OpenAI {
 }
 
 function assertString(value: unknown, fieldName: string): string {
-  if (typeof value !== "string" || !value.trim()) {
+  if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`[ai] Invalid field "${fieldName}" in model output`);
   }
   return value.trim();
@@ -43,11 +145,11 @@ function assertString(value: unknown, fieldName: string): string {
 function flexString(row: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) {
     const value = row[key];
-    if (typeof value === "string" && value.trim()) {
+    if (typeof value === 'string' && value.trim()) {
       return value.trim();
     }
   }
-  return "";
+  return '';
 }
 
 function requireString(
@@ -57,57 +159,47 @@ function requireString(
 ): string {
   const value = flexString(row, ...keys);
   if (!value) {
-    throw new Error(
-      `[ai] Missing required field "${fieldLabel}" in model output`,
-    );
+    throw new Error(`[ai] Missing required field "${fieldLabel}" in model output`);
   }
   return value;
 }
 
-function toStringArray(
-  value: unknown,
-  fieldName: string,
-  fallback: string[] = [],
-): string[] {
+function toStringArray(value: unknown, fieldName: string, fallback: string[] = []): string[] {
   const normalizeItem = (item: unknown): string => {
     if (item == null) {
-      return "";
+      return '';
     }
-    if (typeof item === "string") {
+    if (typeof item === 'string') {
       return item.trim();
     }
-    if (
-      typeof item === "number" ||
-      typeof item === "boolean" ||
-      typeof item === "bigint"
-    ) {
+    if (typeof item === 'number' || typeof item === 'boolean' || typeof item === 'bigint') {
       return String(item).trim();
     }
-    if (typeof item === "symbol") {
-      return (item.description ?? "").trim();
+    if (typeof item === 'symbol') {
+      return (item.description ?? '').trim();
     }
-    if (typeof item === "object") {
+    if (typeof item === 'object') {
       const row = item as Record<string, unknown>;
       const semanticText =
-        (typeof row.text === "string" && row.text) ||
-        (typeof row.value === "string" && row.value) ||
-        (typeof row.label === "string" && row.label) ||
-        (typeof row.message === "string" && row.message) ||
-        "";
+        (typeof row.text === 'string' && row.text) ||
+        (typeof row.value === 'string' && row.value) ||
+        (typeof row.label === 'string' && row.label) ||
+        (typeof row.message === 'string' && row.message) ||
+        '';
       if (semanticText.trim()) {
         return semanticText.trim();
       }
       try {
         const serialized = JSON.stringify(item);
-        if (!serialized || serialized === "{}" || serialized === "[]") {
-          return "";
+        if (!serialized || serialized === '{}' || serialized === '[]') {
+          return '';
         }
         return serialized.trim();
       } catch {
-        return "";
+        return '';
       }
     }
-    return "";
+    return '';
   };
 
   const source = Array.isArray(value) ? value : value == null ? [] : [value];
@@ -123,332 +215,233 @@ function toStringArray(
   if (fallback.length === 0) {
     return [];
   }
-  return fallback
-    .map((item) => normalizeItem(item))
-    .filter(Boolean);
+  return fallback.map((item) => normalizeItem(item)).filter(Boolean);
 }
 
 function isExerciseType(value: unknown): value is ExerciseType {
   return (
-    value === "multiple_choice" ||
-    value === "translation" ||
-    value === "fill_blank" ||
-    value === "reorder" ||
-    value === "reading" ||
-    value === "listening"
+    value === 'multiple_choice' ||
+    value === 'translation' ||
+    value === 'fill_blank' ||
+    value === 'reorder' ||
+    value === 'reading' ||
+    value === 'listening'
   );
 }
 
-function normalizeDifficulty(
-  value: unknown,
-  level: UserLevel,
-): 1 | 2 | 3 | 4 | 5 {
+function normalizeDifficulty(value: unknown, level: UserLevel): 1 | 2 | 3 | 4 | 5 {
   const parsed = Number(value);
   const rounded = Number.isFinite(parsed) ? Math.round(parsed) : 1;
-  if (level === "absolute_beginner") {
-    return Math.min(2, Math.max(1, rounded)) as 1 | 2;
-  }
-  if (level === "beginner") {
-    return Math.min(3, Math.max(1, rounded)) as 1 | 2 | 3;
-  }
-  return Math.min(4, Math.max(2, rounded)) as 2 | 3 | 4;
+  const rules = LEVEL_RULES[level];
+  return Math.min(rules.maxDifficulty, Math.max(rules.minDifficulty, rounded)) as 1 | 2 | 3 | 4 | 5;
 }
 
 function normalizeKeyPhrase(raw: unknown, index: number): KeyPhrase {
-  if (!raw || typeof raw !== "object") {
+  if (!raw || typeof raw !== 'object') {
     throw new Error(`[ai] keyPhrases[${index}] is not an object`);
   }
   const row = raw as Record<string, unknown>;
   return {
-    japanese: requireString(
-      row,
-      `keyPhrases[${index}].japanese`,
-      "japanese",
-      "jp",
-      "ja",
-      "text",
-    ),
-    romaji: requireString(
-      row,
-      `keyPhrases[${index}].romaji`,
-      "romaji",
-      "romanji",
-    ),
+    japanese: requireString(row, `keyPhrases[${index}].japanese`, 'japanese', 'jp', 'ja', 'text'),
+    romaji: requireString(row, `keyPhrases[${index}].romaji`, 'romaji', 'romanji'),
     english: requireString(
       row,
       `keyPhrases[${index}].english`,
-      "english",
-      "en",
-      "meaning",
-      "translation",
+      'english',
+      'en',
+      'meaning',
+      'translation',
     ),
-    usage: flexString(row, "usage", "context", "example", "note"),
+    usage: flexString(row, 'usage', 'context', 'example', 'note'),
   };
 }
 
 function normalizeLesson(raw: unknown): Lesson {
-  if (!raw || typeof raw !== "object") {
-    throw new Error("[ai] Missing lesson object in model output");
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('[ai] Missing lesson object in model output');
   }
   const row = raw as Record<string, unknown>;
   const keyPhrasesRaw = Array.isArray(row.keyPhrases) ? row.keyPhrases : [];
   if (keyPhrasesRaw.length > 8) {
-    throw new Error("[ai] lesson.keyPhrases must contain 1-8 entries");
+    throw new Error('[ai] lesson.keyPhrases must contain 1-8 entries');
   }
   const keyPhrases = keyPhrasesRaw.slice(0, 5);
   if (keyPhrases.length === 0)
-    throw new Error("[ai] lesson.keyPhrases must contain at least 1 entry");
+    throw new Error('[ai] lesson.keyPhrases must contain at least 1 entry');
   return {
-    topic: requireString(row, "lesson.topic", "topic", "title", "subject"),
+    topic: requireString(row, 'lesson.topic', 'topic', 'title', 'subject'),
     explanation: requireString(
       row,
-      "lesson.explanation",
-      "explanation",
-      "description",
-      "content",
-      "text",
+      'lesson.explanation',
+      'explanation',
+      'description',
+      'content',
+      'text',
     ),
-    culturalNote: flexString(
-      row,
-      "culturalNote",
-      "cultural_note",
-      "culture",
-      "note",
-    ),
-    keyPhrases: keyPhrases.map((phrase, index) =>
-      normalizeKeyPhrase(phrase, index),
-    ),
+    culturalNote: flexString(row, 'culturalNote', 'cultural_note', 'culture', 'note'),
+    keyPhrases: keyPhrases.map((phrase, index) => normalizeKeyPhrase(phrase, index)),
   };
 }
 
-function normalizeExercise(
-  raw: unknown,
-  index: number,
-  level: UserLevel,
-): Exercise {
-  if (!raw || typeof raw !== "object") {
+function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exercise {
+  if (!raw || typeof raw !== 'object') {
     throw new Error(`[ai] Exercise at index ${index} is not an object`);
   }
 
   const row = raw as Record<string, unknown>;
   const typeRaw = row.type;
   if (!isExerciseType(typeRaw)) {
-    throw new Error(
-      `[ai] Exercise at index ${index} has unsupported type: ${String(typeRaw)}`,
-    );
+    throw new Error(`[ai] Exercise at index ${index} has unsupported type: ${String(typeRaw)}`);
   }
 
   const base = {
-    id:
-      typeof row.id === "string" && row.id.trim()
-        ? row.id.trim()
-        : `ai-${randomUUID()}`,
+    id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : `ai-${randomUUID()}`,
     type: typeRaw,
     title:
-      typeof row.title === "string" && row.title.trim()
+      typeof row.title === 'string' && row.title.trim()
         ? row.title.trim()
         : `Exercise ${index + 1}`,
-    japanese: requireString(row, "japanese", "japanese", "jp", "ja", "text_ja"),
-    romaji: requireString(row, "romaji", "romaji", "romanji", "romanization"),
+    japanese: requireString(row, 'japanese', 'japanese', 'jp', 'ja', 'text_ja'),
+    romaji: requireString(row, 'romaji', 'romaji', 'romanji', 'romanization'),
     englishContext: flexString(
       row,
-      "englishContext",
-      "english_context",
-      "english",
-      "context",
-      "meaning",
+      'englishContext',
+      'english_context',
+      'english',
+      'context',
+      'meaning',
     ),
-    tags: toStringArray(row.tags, "tags", ["travel", "teaching-session"]),
+    tags: toStringArray(row.tags, 'tags', ['travel', 'teaching-session']),
     difficulty: normalizeDifficulty(row.difficulty, level),
   };
 
-  if (typeRaw === "multiple_choice") {
-    const choices = shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, "choices"));
-    return {
-      ...base,
-      type: "multiple_choice",
-      question: requireString(
-        row,
-        "question",
-        "question",
-        "prompt",
-        "title",
-        "text",
-      ),
-      choices,
-      correctAnswer: requireString(
-        row,
-        "correctAnswer",
-        "correctAnswer",
-        "correct_answer",
-        "answer",
-        "correct",
-      ),
-      explanation:
-        typeof row.explanation === "string" ? row.explanation : undefined,
-    };
-  }
-
-  if (typeRaw === "translation") {
-    const direction = row.direction === "ja_to_en" ? "ja_to_en" : "en_to_ja";
-    const expectedAnswer = requireString(
-      row,
-      "expectedAnswer",
-      "expectedAnswer",
-      "expected_answer",
-      "answer",
-      "correct",
+  if (typeRaw === 'multiple_choice') {
+    const choices = shuffleArray(
+      toStringArray(row.choices ?? row.options ?? row.answers, 'choices'),
     );
     return {
       ...base,
-      type: "translation",
-      direction,
-      prompt: requireString(
+      type: 'multiple_choice',
+      question: requireString(row, 'question', 'question', 'prompt', 'title', 'text'),
+      choices,
+      correctAnswer: requireString(
         row,
-        "prompt",
-        "prompt",
-        "text",
-        "sentence",
-        "question",
+        'correctAnswer',
+        'correctAnswer',
+        'correct_answer',
+        'answer',
+        'correct',
       ),
+      explanation: typeof row.explanation === 'string' ? row.explanation : undefined,
+    };
+  }
+
+  if (typeRaw === 'translation') {
+    const direction = row.direction === 'ja_to_en' ? 'ja_to_en' : 'en_to_ja';
+    const expectedAnswer = requireString(
+      row,
+      'expectedAnswer',
+      'expectedAnswer',
+      'expected_answer',
+      'answer',
+      'correct',
+    );
+    return {
+      ...base,
+      type: 'translation',
+      direction,
+      prompt: requireString(row, 'prompt', 'prompt', 'text', 'sentence', 'question'),
       expectedAnswer,
       expectedRomaji:
-        flexString(row, "expectedRomaji", "expected_romaji", "romaji_answer") ||
-        undefined,
+        flexString(row, 'expectedRomaji', 'expected_romaji', 'romaji_answer') || undefined,
       acceptedAnswers: toStringArray(
         row.acceptedAnswers ?? row.accepted_answers ?? row.alternatives,
-        "acceptedAnswers",
+        'acceptedAnswers',
         [expectedAnswer],
       ),
     };
   }
 
-  if (typeRaw === "fill_blank") {
+  if (typeRaw === 'fill_blank') {
     return {
       ...base,
-      type: "fill_blank",
-      sentence: requireString(row, "sentence", "sentence", "text", "prompt"),
+      type: 'fill_blank',
+      sentence: requireString(row, 'sentence', 'sentence', 'text', 'prompt'),
       sentenceRomaji: requireString(
         row,
-        "sentenceRomaji",
-        "sentenceRomaji",
-        "sentence_romaji",
-        "romaji",
+        'sentenceRomaji',
+        'sentenceRomaji',
+        'sentence_romaji',
+        'romaji',
       ),
       sentenceEnglish: requireString(
         row,
-        "sentenceEnglish",
-        "sentenceEnglish",
-        "sentence_english",
-        "english",
-        "translation",
+        'sentenceEnglish',
+        'sentenceEnglish',
+        'sentence_english',
+        'english',
+        'translation',
       ),
-      blank: requireString(row, "blank", "blank", "gap", "missing"),
-      answer: requireString(
-        row,
-        "answer",
-        "answer",
-        "correctAnswer",
-        "correct_answer",
-      ),
-      answerRomaji: requireString(
-        row,
-        "answerRomaji",
-        "answerRomaji",
-        "answer_romaji",
-      ),
+      blank: requireString(row, 'blank', 'blank', 'gap', 'missing'),
+      answer: requireString(row, 'answer', 'answer', 'correctAnswer', 'correct_answer'),
+      answerRomaji: requireString(row, 'answerRomaji', 'answerRomaji', 'answer_romaji'),
     };
   }
 
-  if (typeRaw === "reorder") {
-    const tokens = toStringArray(row.tokens, "tokens");
+  if (typeRaw === 'reorder') {
+    const tokens = toStringArray(row.tokens, 'tokens');
     return {
       ...base,
-      type: "reorder",
-      prompt: assertString(row.prompt, "prompt"),
+      type: 'reorder',
+      prompt: assertString(row.prompt, 'prompt'),
       tokens,
-      correctOrder: toStringArray(row.correctOrder, "correctOrder", tokens),
+      correctOrder: toStringArray(row.correctOrder, 'correctOrder', tokens),
     };
   }
 
-  if (typeRaw === "reading") {
+  if (typeRaw === 'reading') {
     return {
       ...base,
-      type: "reading",
-      passage: assertString(row.passage, "passage"),
-      passageRomaji: assertString(row.passageRomaji, "passageRomaji"),
-      passageEnglish: assertString(row.passageEnglish, "passageEnglish"),
-      question: assertString(row.question, "question"),
-      answer: assertString(row.answer, "answer"),
+      type: 'reading',
+      passage: assertString(row.passage, 'passage'),
+      passageRomaji: assertString(row.passageRomaji, 'passageRomaji'),
+      passageEnglish: assertString(row.passageEnglish, 'passageEnglish'),
+      question: assertString(row.question, 'question'),
+      answer: assertString(row.answer, 'answer'),
     };
   }
 
   return {
     ...base,
-    type: "listening",
-    prompt: assertString(row.prompt, "prompt"),
-    audioText: assertString(row.audioText, "audioText"),
-    choices: shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, "choices")),
-    correctAnswer: assertString(row.correctAnswer, "correctAnswer"),
+    type: 'listening',
+    prompt: assertString(row.prompt, 'prompt'),
+    audioText: assertString(row.audioText, 'audioText'),
+    choices: shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, 'choices')),
+    correctAnswer: assertString(row.correctAnswer, 'correctAnswer'),
   };
 }
 
-function validateExerciseSet(
-  exercises: Exercise[],
-  level: UserLevel,
-): Exercise[] {
+function validateExerciseSet(exercises: Exercise[], level: UserLevel): Exercise[] {
   if (exercises.length === 0) {
-    throw new Error("[ai] exercises must not be empty");
+    throw new Error('[ai] exercises must not be empty');
   }
-
-  if (level === "absolute_beginner") {
-    for (const exercise of exercises) {
-      if (
-        exercise.type !== "multiple_choice" &&
-        exercise.type !== "translation"
-      ) {
-        throw new Error(
-          `[ai] Invalid exercise type for absolute beginner: ${exercise.type}`,
-        );
-      }
-      if (exercise.difficulty > 2) {
-        throw new Error("[ai] absolute_beginner received difficulty above 2");
-      }
-      if (
-        exercise.type === "translation" &&
-        exercise.direction !== "ja_to_en"
-      ) {
-        throw new Error(
-          "[ai] absolute_beginner translation direction must be ja_to_en",
-        );
-      }
+  const rules = LEVEL_RULES[level];
+  for (const exercise of exercises) {
+    if (!rules.allowedTypes.includes(exercise.type)) {
+      throw new Error(`[ai] Invalid exercise type for ${level}: ${exercise.type}`);
     }
-  }
-
-  if (level === "beginner") {
-    for (const exercise of exercises) {
-      if (
-        exercise.type === "fill_blank" ||
-        exercise.type === "reorder" ||
-        exercise.type === "reading"
-      ) {
-        throw new Error(
-          `[ai] Invalid exercise type for beginner: ${exercise.type}`,
-        );
-      }
-      if (exercise.difficulty > 3) {
-        throw new Error("[ai] beginner received difficulty above 3");
-      }
+    if (exercise.difficulty < rules.minDifficulty || exercise.difficulty > rules.maxDifficulty) {
+      throw new Error(
+        `[ai] ${level} difficulty must be between ${rules.minDifficulty} and ${rules.maxDifficulty}`,
+      );
     }
-  }
-
-  if (level === "lower_intermediate") {
-    for (const exercise of exercises) {
-      if (exercise.difficulty < 2 || exercise.difficulty > 4) {
-        throw new Error(
-          "[ai] lower_intermediate difficulty must be between 2 and 4",
-        );
-      }
+    if (
+      exercise.type === 'translation' &&
+      !rules.translationDirections.includes(exercise.direction)
+    ) {
+      throw new Error(
+        `[ai] ${level} translation direction must be one of ${rules.translationDirections.join(', ')}`,
+      );
     }
   }
 
@@ -474,40 +467,163 @@ function getUsageFromResponse(response: OpenAI.Responses.Response): {
 }
 
 function levelInstructions(level: UserLevel): string {
-  if (level === "absolute_beginner") {
+  if (level === 'absolute_beginner')
     return [
-      "User level is absolute_beginner.",
-      "All lesson and exercise text must include romaji support.",
-      "Teach only very basic travel survival Japanese (greetings, numbers, transport, restaurant basics).",
-      "Allowed exercise types: multiple_choice and translation only.",
-      "Translation must always be direction ja_to_en. Never require typing Japanese.",
-      "Do not generate fill_blank, reorder, reading, or listening.",
-      "Difficulty must be only 1-2.",
-    ].join(" ");
-  }
+      'User level is absolute_beginner.',
+      'Use only basic travel survival Japanese with clear romaji support.',
+      'Allowed exercise types: multiple_choice and translation.',
+      'Difficulty range is strictly 1-2.',
+      'Translation direction must be ja_to_en only.',
+      'Do not require Japanese typing.',
+    ].join(' ');
 
-  if (level === "beginner") {
+  if (level === 'beginner')
     return [
-      "User level is beginner.",
-      "Start introducing hiragana alongside romaji in a gentle way.",
-      "Allowed exercise types: multiple_choice, translation, listening.",
-      "Translation can be both directions, but en_to_ja answers must accept romaji.",
-      "Difficulty must be 1-3.",
-    ].join(" ");
-  }
+      'User level is beginner.',
+      'Introduce hiragana gently while keeping romaji support.',
+      'Allowed exercise types: multiple_choice, translation, listening.',
+      'Difficulty range is strictly 1-3.',
+      'Translation can be ja_to_en or en_to_ja; en_to_ja must accept romaji answers.',
+    ].join(' ');
+
+  if (level === 'elementary')
+    return [
+      'User level is elementary.',
+      'Allowed exercise types: multiple_choice, translation, listening, fill_blank.',
+      'Difficulty range is strictly 1-3.',
+      'Translation can be ja_to_en or en_to_ja.',
+    ].join(' ');
+
+  if (level === 'pre_intermediate')
+    return [
+      'User level is pre_intermediate.',
+      'All exercise types are allowed.',
+      'Difficulty range is strictly 2-4.',
+      'Translation can be ja_to_en or en_to_ja.',
+    ].join(' ');
+
+  if (level === 'intermediate')
+    return [
+      'User level is intermediate.',
+      'All exercise types are allowed.',
+      'Difficulty range is strictly 2-5.',
+      'Translation can be ja_to_en or en_to_ja.',
+    ].join(' ');
+
+  if (level === 'upper_intermediate')
+    return [
+      'User level is upper_intermediate.',
+      'All exercise types are allowed.',
+      'Difficulty range is strictly 3-5.',
+      'Translation can be ja_to_en or en_to_ja.',
+    ].join(' ');
+
+  if (level === 'advanced')
+    return [
+      'User level is advanced.',
+      'All exercise types are allowed.',
+      'Difficulty range is strictly 3-5.',
+      'Translation can be ja_to_en or en_to_ja.',
+    ].join(' ');
 
   return [
-    "User level is lower_intermediate.",
-    "All exercise types are allowed.",
-    "Difficulty must be 2-4.",
-    "Use practical travel context and polite, natural phrasing.",
-  ].join(" ");
+    'User level is ready_for_japan.',
+    'All exercise types are allowed.',
+    'Difficulty range is strictly 3-5.',
+    'Translation can be ja_to_en or en_to_ja.',
+  ].join(' ');
+}
+
+const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
+  multiple_choice:
+    '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).',
+  translation:
+    '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
+  fill_blank:
+    '- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.',
+  reorder: '- reorder: prompt, tokens (string array), correctOrder (string array).',
+  reading: '- reading: passage, passageRomaji, passageEnglish, question, answer.',
+  listening:
+    '- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).',
+};
+
+function exerciseFieldRequirements(level: UserLevel): string[] {
+  const requirements = LEVEL_RULES[level].allowedTypes.map(
+    (type) => EXERCISE_FIELD_REQUIREMENTS[type],
+  );
+  if (level === 'absolute_beginner') {
+    return [
+      ...requirements,
+      'For absolute_beginner, translation direction must always be "ja_to_en".',
+    ];
+  }
+  if (level === 'beginner') {
+    return [
+      ...requirements,
+      'For beginner en_to_ja translation exercises, acceptedAnswers must include a romaji answer variant.',
+    ];
+  }
+  return requirements;
+}
+
+function getExpectedAnswerDetails(exercise: Exercise | undefined): {
+  expectedAnswer: string;
+  acceptedAnswers: string[];
+} {
+  if (!exercise) {
+    return {
+      expectedAnswer: '',
+      acceptedAnswers: [],
+    };
+  }
+
+  if (exercise.type === 'multiple_choice') {
+    return {
+      expectedAnswer: exercise.correctAnswer,
+      acceptedAnswers: [exercise.correctAnswer],
+    };
+  }
+
+  if (exercise.type === 'translation') {
+    return {
+      expectedAnswer: exercise.expectedAnswer,
+      acceptedAnswers: exercise.acceptedAnswers,
+    };
+  }
+
+  if (exercise.type === 'fill_blank') {
+    return {
+      expectedAnswer: exercise.answer,
+      acceptedAnswers: [exercise.answer, exercise.answerRomaji],
+    };
+  }
+
+  if (exercise.type === 'reorder') {
+    const reorderedAnswer = exercise.correctOrder.join(' ');
+    return {
+      expectedAnswer: reorderedAnswer,
+      acceptedAnswers: [reorderedAnswer],
+    };
+  }
+
+  if (exercise.type === 'reading') {
+    return {
+      expectedAnswer: exercise.answer,
+      acceptedAnswers: [exercise.answer],
+    };
+  }
+
+  return {
+    expectedAnswer: exercise.correctAnswer,
+    acceptedAnswers: [exercise.correctAnswer],
+  };
 }
 
 export async function generateSessionPlan(input: {
   userId: string;
   userName: string;
   userLevel: UserLevel;
+  japaneseWritingEnabled?: boolean;
   exerciseCount?: number;
   sessionHistory?: Array<{
     date: string;
@@ -529,10 +645,16 @@ export async function generateSessionPlan(input: {
   };
 }): Promise<SessionPlan> {
   const client = getOpenAiClient();
-  const targetExerciseCount = Math.min(
-    12,
-    Math.max(4, Math.round(input.exerciseCount ?? 6)),
-  );
+  const japaneseWritingEnabled = input.japaneseWritingEnabled === true;
+  const allowWritingExercises =
+    japaneseWritingEnabled &&
+    (input.userLevel === 'elementary' ||
+      input.userLevel === 'pre_intermediate' ||
+      input.userLevel === 'intermediate' ||
+      input.userLevel === 'upper_intermediate' ||
+      input.userLevel === 'advanced' ||
+      input.userLevel === 'ready_for_japan');
+  const targetExerciseCount = Math.min(12, Math.max(4, Math.round(input.exerciseCount ?? 6)));
   const sessionHistory = (input.sessionHistory ?? []).slice(0, 10);
   const recentTopics = sessionHistory
     .slice(0, 5)
@@ -544,64 +666,53 @@ export async function generateSessionPlan(input: {
     temperature: 0.3,
     input: [
       {
-        role: "system",
+        role: 'system',
         content: [
-          "You are a Japanese tutor that adapts each session based on learner history.",
-          "Output valid JSON only with top-level keys: lesson, exercises, focus.",
-          "Tutor evolution rules:",
+          'You are a Japanese tutor that adapts each session based on learner history.',
+          'Output valid JSON only with top-level keys: lesson, exercises, focus.',
+          `Current user level: ${input.userLevel}. This level context is mandatory and all generated content must strictly follow its constraints.`,
+          'Treat level constraints as hard rules. Do not output any exercise outside allowed types, difficulty range, and translation direction limits for this level.',
+          'Tutor evolution rules:',
           "1) Never repeat a lesson topic from the learner's last 5 sessions.",
-          "2) Address recent weaknesses directly in lesson explanation and exercise selection.",
-          "3) Follow prior next-steps whenever possible.",
-          "4) Progression threshold: if recentAccuracy > 80, increase challenge slightly; if recentAccuracy < 50, reinforce fundamentals.",
-          "5) Staged curriculum by totalSessionCount: 0-20 travel survival only; 20-40 include daily life; 40+ broaden to practical social and work-adjacent situations.",
-          "6) Personalize by connecting to previously studied phrases and mistakes.",
-          "7) Vary exercise types inside one session (within level constraints).",
-          "The session must teach one topic first, then quiz only what was taught.",
-          "Lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).",
-          "Each key phrase item must include japanese, romaji, english, usage.",
-          "Every exercise must include japanese, romaji, englishContext, tags, difficulty, and type-specific fields.",
-          "Exercise type schemas:",
-          "multiple_choice requires: question (string), choices (array of 4 strings), correctAnswer (string matching one choice).",
+          '2) Address recent weaknesses directly in lesson explanation and exercise selection.',
+          '3) Follow prior next-steps whenever possible.',
+          '4) Progression threshold: if recentAccuracy > 80, increase challenge slightly; if recentAccuracy < 50, reinforce fundamentals.',
+          '5) Staged curriculum by totalSessionCount: 0-20 travel survival only; 20-40 include daily life; 40+ broaden to practical social and work-adjacent situations.',
+          '6) Personalize by connecting to previously studied phrases and mistakes.',
+          '7) Vary exercise types inside one session (within level constraints).',
+          'The session must teach one topic first, then quiz only what was taught.',
+          'Lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).',
+          'Each key phrase item must include japanese, romaji, english, usage.',
+          'Every exercise must include japanese, romaji, englishContext, tags, difficulty, and type-specific fields.',
+          'Exercise type schemas:',
+          'multiple_choice requires: question (string), choices (array of 4 strings), correctAnswer (string matching one choice).',
           'translation requires: direction ("ja_to_en" or "en_to_ja"), prompt (string to translate), expectedAnswer (correct translation string), acceptedAnswers (array of alternative correct strings).',
-          "fill_blank requires: sentence (with ___ for blank), sentenceRomaji, sentenceEnglish, blank (the missing word), answer, answerRomaji.",
-          "reorder requires: prompt (string), tokens (array of words to arrange), correctOrder (array in correct sequence).",
-          "reading requires: passage, passageRomaji, passageEnglish, question, answer.",
-          "listening requires: prompt, audioText, choices (array of strings), correctAnswer.",
-          "Exercise type field requirements:",
-          ...(input.userLevel === "absolute_beginner"
-            ? [
-                "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                '- translation: direction ("ja_to_en" only), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                'For absolute_beginner, translation direction must always be "ja_to_en".',
-              ]
-            : input.userLevel === "beginner"
-              ? [
-                  "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                  '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                  "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
-                ]
-              : [
-                  "- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).",
-                  '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
-                  "- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.",
-                  "- reorder: prompt, tokens (string array), correctOrder (string array).",
-                  "- reading: passage, passageRomaji, passageEnglish, question, answer.",
-                  "- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).",
-                ]),
+          'fill_blank requires: sentence (with ___ for blank), sentenceRomaji, sentenceEnglish, blank (the missing word), answer, answerRomaji.',
+          'reorder requires: prompt (string), tokens (array of words to arrange), correctOrder (array in correct sequence).',
+          'reading requires: passage, passageRomaji, passageEnglish, question, answer.',
+          'listening requires: prompt, audioText, choices (array of strings), correctAnswer.',
+          'Exercise type field requirements:',
+          ...exerciseFieldRequirements(input.userLevel),
           'For translation exercises, acceptedAnswers must include at least 3 natural alternative translations. Include common synonyms, informal variants, and shorter forms (e.g. for "Thank you very much" also accept "Thank you", "Thanks a lot").',
-          "CRITICAL: All Japanese text everywhere — in exercises, lesson explanations, cultural notes, key phrases, and any other output — must always include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without its romaji reading. This is essential because beginners cannot read Japanese script.",
+          'CRITICAL: All Japanese text everywhere — in exercises, lesson explanations, cultural notes, key phrases, and any other output — must always include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without its romaji reading. This is essential because beginners cannot read Japanese script.',
           'Exercise titles must be generic and must not reveal the answer. Use titles like "Translate the phrase", "Choose the meaning", "Fill in the blank" — never include the answer or topic-specific hint in the title.',
-          "When generating exercises for a session, ensure variety: cover at least 5 distinct phrases or concepts even if the topic is narrow. Do not repeat the same phrase across more than 2 exercises.",
+          'When generating exercises for a session, ensure variety: cover at least 5 distinct phrases or concepts even if the topic is narrow. Do not repeat the same phrase across more than 2 exercises.',
           'Exercise questions must be clear and direct. Instead of "What is the most natural English greeting for X in this situation?", write "What is the best English translation for X?" or "What does X mean?". Avoid vague phrasing like "in this situation" unless the situation is explicitly described.',
           levelInstructions(input.userLevel),
-          "For absolute_beginner, never ask learner to type Japanese script.",
-          "Use practical language the learner can immediately use in Japan.",
-          `Do not use these recent topics: ${recentTopics.length ? recentTopics.join(", ") : "none"}.`,
-          "Keep content coherent around the same lesson topic.",
-        ].join(" "),
+          ...(allowWritingExercises
+            ? [
+                'Japanese writing input is enabled for this learner and their level is elementary or above. You may include writing-style prompts when useful.',
+              ]
+            : [
+                'Japanese writing input is disabled or not available. Do NOT require the learner to type Japanese characters. All expected learner input must be in romaji or English only.',
+              ]),
+          'Use practical language the learner can immediately use in Japan.',
+          `Do not use these recent topics: ${recentTopics.length ? recentTopics.join(', ') : 'none'}.`,
+          'Keep content coherent around the same lesson topic.',
+        ].join(' '),
       },
       {
-        role: "user",
+        role: 'user',
         content: JSON.stringify({
           user: {
             id: input.userId,
@@ -621,67 +732,59 @@ export async function generateSessionPlan(input: {
           targetExerciseCount,
           requiredOutputExample: {
             lesson: {
-              topic: "Ordering at a restaurant",
-              explanation:
-                "When eating out in Japan, you can use a few polite phrases...",
+              topic: 'Ordering at a restaurant',
+              explanation: 'When eating out in Japan, you can use a few polite phrases...',
               culturalNote: "In Japan, you don't tip. Service is included.",
               keyPhrases: [
                 {
-                  japanese: "すみません",
-                  romaji: "sumimasen",
-                  english: "Excuse me",
+                  japanese: 'すみません',
+                  romaji: 'sumimasen',
+                  english: 'Excuse me',
                   usage: "Use to politely call the server's attention",
                 },
               ],
             },
             exercises: [
               {
-                type: "multiple_choice",
-                title: "Choose the greeting",
-                japanese: "こんにちは",
-                romaji: "konnichiwa",
-                englishContext: "A common daytime greeting",
-                tags: ["greetings"],
+                type: 'multiple_choice',
+                title: 'Choose the greeting',
+                japanese: 'こんにちは',
+                romaji: 'konnichiwa',
+                englishContext: 'A common daytime greeting',
+                tags: ['greetings'],
                 difficulty: 1,
-                question: "What does こんにちは (konnichiwa) mean?",
-                choices: [
-                  "Good morning",
-                  "Good evening",
-                  "Hello / Good afternoon",
-                  "Goodbye",
-                ],
-                correctAnswer: "Hello / Good afternoon",
+                question: 'What does こんにちは (konnichiwa) mean?',
+                choices: ['Good morning', 'Good evening', 'Hello / Good afternoon', 'Goodbye'],
+                correctAnswer: 'Hello / Good afternoon',
               },
               {
-                type: "translation",
-                title: "Translate the phrase",
-                japanese: "ありがとうございます",
-                romaji: "arigatou gozaimasu",
-                englishContext: "A polite expression of gratitude",
-                tags: ["polite_expressions"],
+                type: 'translation',
+                title: 'Translate the phrase',
+                japanese: 'ありがとうございます',
+                romaji: 'arigatou gozaimasu',
+                englishContext: 'A polite expression of gratitude',
+                tags: ['polite_expressions'],
                 difficulty: 1,
-                direction: "ja_to_en",
-                prompt: "ありがとうございます (arigatou gozaimasu)",
-                expectedAnswer: "Thank you very much",
-                acceptedAnswers: ["Thank you very much", "Thank you"],
+                direction: 'ja_to_en',
+                prompt: 'ありがとうございます (arigatou gozaimasu)',
+                expectedAnswer: 'Thank you very much',
+                acceptedAnswers: ['Thank you very much', 'Thank you'],
               },
             ],
-            focus: "restaurant_ordering",
+            focus: 'restaurant_ordering',
           },
         }),
       },
     ],
     text: {
       format: {
-        type: "json_object",
+        type: 'json_object',
       },
     },
   });
 
   if (!response.output_text) {
-    throw new Error(
-      "[ai] OpenAI response missing output_text for session generation",
-    );
+    throw new Error('[ai] OpenAI response missing output_text for session generation');
   }
 
   const parsed = JSON.parse(response.output_text) as {
@@ -695,17 +798,13 @@ export async function generateSessionPlan(input: {
   const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
   for (let i = 0; i < rawExercises.length; i += 1) {
     try {
-      validExercises.push(
-        normalizeExercise(rawExercises[i], i, input.userLevel),
-      );
+      validExercises.push(normalizeExercise(rawExercises[i], i, input.userLevel));
     } catch (err) {
       console.warn(`[ai] Skipping exercise ${i}: ${(err as Error).message}`);
     }
   }
   if (validExercises.length === 0) {
-    throw new Error(
-      "[ai] No valid exercises could be parsed from model output",
-    );
+    throw new Error('[ai] No valid exercises could be parsed from model output');
   }
   const exercises = validateExerciseSet(validExercises, input.userLevel);
 
@@ -721,7 +820,7 @@ export async function generateSessionPlan(input: {
   const plan: SessionPlan = {
     id: `session-${randomUUID()}`,
     userId: input.userId,
-    mode: "ai",
+    mode: 'ai',
     createdAt: nowIso(),
     model: usage.model,
     lesson,
@@ -731,14 +830,14 @@ export async function generateSessionPlan(input: {
       output: usage.output,
     },
     metadata: {
-      focus: assertString(parsed.focus, "focus"),
+      focus: assertString(parsed.focus, 'focus'),
       exerciseCount: exercises.length,
-      teachingFlow: "lesson_then_quiz",
+      teachingFlow: 'lesson_then_quiz',
       userLevel: input.userLevel,
     },
   };
 
-  console.info("[ai] generated session plan", {
+  console.warn('[ai] generated session plan', {
     sessionId: plan.id,
     userId: plan.userId,
     exerciseCount: plan.exercises.length,
@@ -754,7 +853,15 @@ export async function generateSessionSummary(input: {
   sessionId: string;
   userId: string;
   userLevel: UserLevel;
+  japaneseWritingEnabled?: boolean;
   lessonTopic?: string;
+  progressJournal?: string | null;
+  recentSessions?: Array<{
+    topic: string;
+    accuracy: number;
+    keyPhrases: string[];
+    exerciseTypes: string[];
+  }>;
   exercises: Exercise[];
   results: Array<{
     exerciseId: string;
@@ -763,19 +870,14 @@ export async function generateSessionSummary(input: {
   }>;
 }): Promise<{
   summary: SessionSummary;
-  tokenUsage: Pick<
-    TokenUsage,
-    "model" | "tokensIn" | "tokensOut" | "tokensTotal"
-  >;
+  tokenUsage: Pick<TokenUsage, 'model' | 'tokensIn' | 'tokensOut' | 'tokensTotal'>;
 }> {
   const client = getOpenAiClient();
   const accuracy =
     input.results.length === 0
       ? 0
       : Math.round(
-          (input.results.filter((row) => row.isCorrect).length /
-            input.results.length) *
-            100,
+          (input.results.filter((row) => row.isCorrect).length / input.results.length) * 100,
         );
 
   const exercisesById = new Map<string, Exercise>();
@@ -785,76 +887,109 @@ export async function generateSessionSummary(input: {
 
   const detailedResults = input.results.map((result) => {
     const exercise = exercisesById.get(result.exerciseId);
+    const expectedAnswerDetails = getExpectedAnswerDetails(exercise);
     return {
       exerciseId: result.exerciseId,
-      type: exercise?.type ?? "unknown",
-      title: exercise?.title ?? "Unknown exercise",
-      prompt: exercise?.englishContext ?? "",
+      type: exercise?.type ?? 'unknown',
+      title: exercise?.title ?? 'Unknown exercise',
+      prompt: exercise?.englishContext ?? '',
       answerText: result.answerText,
+      expectedAnswer: expectedAnswerDetails.expectedAnswer,
+      acceptedAnswers: expectedAnswerDetails.acceptedAnswers,
       isCorrect: result.isCorrect,
     };
   });
+
+  const recentSessionsCompact = (input.recentSessions ?? []).map((session) => ({
+    topic: session.topic,
+    accuracy: session.accuracy,
+    keyPhrases: (session.keyPhrases ?? []).slice(0, 5),
+    exerciseTypes: session.exerciseTypes ?? [],
+  }));
+
+  const progressContextBlocks: string[] = [];
+  if (typeof input.progressJournal === 'string' && input.progressJournal.trim()) {
+    progressContextBlocks.push(
+      `LEARNER PROGRESS JOURNAL (cumulative history):\n${input.progressJournal.trim()}\n`,
+    );
+  }
+  if (recentSessionsCompact.length > 0) {
+    progressContextBlocks.push(
+      `RECENT SESSIONS (last ${recentSessionsCompact.length}):\n${JSON.stringify(recentSessionsCompact)}\n`,
+    );
+  }
+
+  const currentSessionData = {
+    sessionId: input.sessionId,
+    userId: input.userId,
+    userLevel: input.userLevel,
+    japaneseWritingEnabled: input.japaneseWritingEnabled ?? false,
+    lessonTopic: input.lessonTopic ?? 'travel_japanese',
+    accuracy,
+    exercises: input.exercises.map((exercise) => ({
+      id: exercise.id,
+      type: exercise.type,
+      title: exercise.title,
+      japanese: exercise.japanese,
+      romaji: exercise.romaji,
+      englishContext: exercise.englishContext,
+      difficulty: exercise.difficulty,
+    })),
+    results: detailedResults,
+  };
 
   const response = await client.responses.create({
     model: SESSION_MODEL,
     temperature: 0.2,
     input: [
       {
-        role: "system",
+        role: 'system',
         content: [
-          "You are a Japanese tutor giving specific, actionable feedback based on actual answers.",
-          "Return JSON only with keys: summary, strengths, weaknesses, nextSteps.",
-          "CRITICAL RULES for accuracy:",
-          "1) Only reference exercises and answers that actually appear in the results data. Never fabricate or assume exercises that were not in the session.",
+          'You are a Japanese tutor giving specific, actionable feedback based on actual answers.',
+          'Return JSON only with keys: summary, strengths, weaknesses, nextSteps, levelUpRecommendation.',
+          'CRITICAL RULES for accuracy:',
+          '1) Only reference exercises and answers that actually appear in the results data. Never fabricate or assume exercises that were not in the session.',
           "2) If accuracy is below 100, 'weaknesses' must describe mistakes the learner actually made during this session. If accuracy is 100, provide 1-2 'weaknesses' phrased as areas to deepen (e.g., speed, nuance, alternative phrasing) based only on covered content.",
-          "3) 'nextSteps' should suggest what to learn next, including topics not yet covered.",
-          "4) 'strengths' must reference specific correct answers from the session data.",
-          "5) All Japanese text must include romaji in parentheses, e.g. こんにちは (konnichiwa). Never output Japanese without romaji.",
-          "6) Never leave 'weaknesses' empty.",
-          "Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.",
-          "Keep feedback encouraging, practical, and travel-focused.",
-        ].join(" "),
+          "3) If the learner progress journal is provided, use it to avoid repeating previously covered topics in 'nextSteps'. Prefer adjacent or progressive topics not already listed in journal 'Topics covered'.",
+          '4) If cumulative progress context exists, acknowledge it naturally in strengths (e.g., building on prior vocabulary).',
+          '5) All Japanese text must include romaji in parentheses, e.g. こんにちは (konnichiwa). Never output Japanese without romaji.',
+          "6) Keep 'weaknesses' specific to THIS session's mistakes. Only repeat a prior weakness if this session clearly shows it is persistent.",
+          "7) 'nextSteps' should suggest what to learn next, including topics not yet covered.",
+          "8) 'strengths' must reference specific correct answers from the session data.",
+          "9) Never leave 'weaknesses' empty.",
+          '10) Evaluate whether the learner should be promoted to the next level based on this session plus cumulative progress context.',
+          '11) Recommend promotion only when there is consistent strong performance and mastery: accuracy >= 80 across recent sessions and clear evidence of mastery in strengths/journal.',
+          '12) If userLevel is ready_for_japan, do not recommend promotion.',
+          '13) levelUpRecommendation must be either null or an object with recommendedLevel and reason.',
+          "IMPORTANT: The 'isCorrect' field reflects automated string matching which may be imperfect. As a tutor, use your own judgment: if the learner's answer conveys the same meaning as the expected answer (e.g., contractions like 'It is' vs 'It\\'s', minor phrasing differences, equivalent expressions), treat it as CORRECT in your feedback regardless of the isCorrect flag. Only flag an answer as wrong if it genuinely has a different meaning or shows a misunderstanding.",
+          "When evaluating answers, consider: contraction equivalence (It's = It is), minor punctuation differences, equivalent phrasings that convey the same meaning. A language tutor should recognize when a student understood the concept even if their wording differs slightly from the model answer.",
+          "If you determine that an answer marked as incorrect was actually correct (semantically equivalent), acknowledge the learner's understanding in strengths rather than listing it as a weakness. Adjust your calculated accuracy accordingly in your narrative (e.g., if 2 out of 8 'wrong' answers were actually correct, reflect this more positive assessment).",
+          'Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.',
+          'Keep feedback encouraging, practical, and travel-focused.',
+        ].join(' '),
       },
       {
-        role: "user",
-        content: JSON.stringify({
-          sessionId: input.sessionId,
-          userId: input.userId,
-          userLevel: input.userLevel,
-          lessonTopic: input.lessonTopic ?? "travel_japanese",
-          accuracy,
-          exercises: input.exercises.map((exercise) => ({
-            id: exercise.id,
-            type: exercise.type,
-            title: exercise.title,
-            japanese: exercise.japanese,
-            romaji: exercise.romaji,
-            englishContext: exercise.englishContext,
-            difficulty: exercise.difficulty,
-          })),
-          results: detailedResults,
-        }),
+        role: 'user',
+        content: `${progressContextBlocks.join('\n')}CURRENT SESSION DATA:\n${JSON.stringify(currentSessionData)}`,
       },
     ],
     text: {
       format: {
-        type: "json_object",
+        type: 'json_object',
       },
     },
   });
 
   if (!response.output_text) {
-    throw new Error(
-      "[ai] OpenAI response missing output_text for summary generation",
-    );
+    throw new Error('[ai] OpenAI response missing output_text for summary generation');
   }
 
-  console.info("[ai] raw session summary response", {
+  console.warn('[ai] raw session summary response', {
     sessionId: input.sessionId,
     responseId: response.id,
     status: response.status,
   });
-  console.debug("[ai] raw session summary output_text", {
+  console.warn('[ai] raw session summary output_text', {
     sessionId: input.sessionId,
     outputText: response.output_text,
   });
@@ -870,62 +1005,81 @@ export async function generateSessionSummary(input: {
   };
 
   const summaryText = String(
-    pickFirst(["summary", "sessionSummary", "session_summary", "overview"]) ??
-      "",
+    pickFirst(['summary', 'sessionSummary', 'session_summary', 'overview']) ?? '',
   ).trim();
+
+  const currentLevelIndex = LEVEL_ORDER.indexOf(input.userLevel);
+  const nextLevel =
+    currentLevelIndex >= 0 && currentLevelIndex < LEVEL_ORDER.length - 1
+      ? LEVEL_ORDER[currentLevelIndex + 1]
+      : null;
+  const recommendationRaw = pickFirst([
+    'levelUpRecommendation',
+    'level_up_recommendation',
+    'promotionRecommendation',
+    'promotion_recommendation',
+  ]);
+  let levelUpRecommendation: SessionSummary['levelUpRecommendation'] = null;
+  if (
+    nextLevel &&
+    input.userLevel !== 'ready_for_japan' &&
+    recommendationRaw &&
+    typeof recommendationRaw === 'object'
+  ) {
+    const candidate = recommendationRaw as Record<string, unknown>;
+    const recommendedLevel = String(
+      candidate.recommendedLevel ?? candidate.recommended_level ?? '',
+    ).trim();
+    const reason = String(candidate.reason ?? '').trim();
+    if (recommendedLevel === nextLevel && reason) {
+      levelUpRecommendation = {
+        recommendedLevel: nextLevel,
+        reason,
+      };
+    }
+  }
 
   const summary: SessionSummary = {
     sessionId: input.sessionId,
     userId: input.userId,
-    summary: assertString(summaryText, "summary"),
+    summary: assertString(summaryText, 'summary'),
     strengths: toStringArray(
-      pickFirst([
-        "strengths",
-        "strength",
-        "strongPoints",
-        "strong_points",
-        "positives",
-      ]),
-      "strengths",
-      [
-      "You completed the session.",
-      ],
+      pickFirst(['strengths', 'strength', 'strongPoints', 'strong_points', 'positives']),
+      'strengths',
+      ['You completed the session.'],
     ),
     weaknesses: toStringArray(
       pickFirst([
-        "weaknesses",
-        "weakness",
-        "areasToDeepen",
-        "areas_to_deepen",
-        "improvementAreas",
-        "improvement_areas",
+        'weaknesses',
+        'weakness',
+        'areasToDeepen',
+        'areas_to_deepen',
+        'improvementAreas',
+        'improvement_areas',
       ]),
-      "weaknesses",
-      [
-      "Review any missed phrases once more.",
-      ],
+      'weaknesses',
+      ['Review any missed phrases once more.'],
     ),
     nextSteps: toStringArray(
       pickFirst([
-        "nextSteps",
-        "nextStep",
-        "next_steps",
-        "next_step",
-        "recommendations",
-        "actionItems",
-        "action_items",
+        'nextSteps',
+        'nextStep',
+        'next_steps',
+        'next_step',
+        'recommendations',
+        'actionItems',
+        'action_items',
       ]),
-      "nextSteps",
-      [
-      "Complete one more short session tomorrow.",
-      ],
+      'nextSteps',
+      ['Complete one more short session tomorrow.'],
     ),
     accuracy,
     generatedAt: nowIso(),
+    levelUpRecommendation,
   };
 
   const usage = getUsageFromResponse(response);
-  console.info("[ai] generated session summary", {
+  console.warn('[ai] generated session summary', {
     sessionId: input.sessionId,
     tokensInput: usage.input,
     tokensOutput: usage.output,
@@ -933,6 +1087,95 @@ export async function generateSessionSummary(input: {
 
   return {
     summary,
+    tokenUsage: {
+      model: usage.model,
+      tokensIn: usage.input,
+      tokensOut: usage.output,
+      tokensTotal: usage.total,
+    },
+  };
+}
+
+export async function generateUpdatedJournal(input: {
+  currentJournal: string | null;
+  sessionSummary: SessionSummary;
+  sessionMeta: { topic: string; exerciseTypes: string[]; keyPhrases: string[] };
+  userLevel: UserLevel;
+}): Promise<{
+  journal: string;
+  tokenUsage: Pick<TokenUsage, 'model' | 'tokensIn' | 'tokensOut' | 'tokensTotal'>;
+}> {
+  const client = getOpenAiClient();
+  const currentJournalText =
+    typeof input.currentJournal === 'string' && input.currentJournal.trim()
+      ? input.currentJournal.trim()
+      : "This is the user's first session.";
+
+  const response = await client.responses.create({
+    model: SESSION_MODEL,
+    temperature: 0.2,
+    input: [
+      {
+        role: 'system',
+        content: [
+          'You maintain a concise cumulative learner journal for a Japanese learning app.',
+          'Return plain text only (not JSON).',
+          'Write under 500 words.',
+          'Update the existing journal by merging prior progress with this just-completed session.',
+          'Use this exact structure and headings:',
+          '**Topics covered**',
+          '**Key phrases mastered**',
+          '**Phrases needing review**',
+          '**Current strengths**',
+          '**Areas to improve**',
+          '**Sessions completed**',
+          '**Overall trajectory**',
+          'Rules:',
+          '- Keep entries specific and evidence-based from provided data.',
+          '- Keep wording concise and cumulative across sessions.',
+          '- For first session, sessions completed must be 1.',
+          '- For subsequent sessions, increment the running count from the existing journal.',
+          '- Prefer short bullet points under each heading.',
+          '- Include Japanese with romaji in parentheses when applicable.',
+        ].join(' '),
+      },
+      {
+        role: 'user',
+        content: [
+          `EXISTING JOURNAL:\n${currentJournalText}\n`,
+          'NEW SESSION DATA:',
+          JSON.stringify({
+            userLevel: input.userLevel,
+            topic: input.sessionMeta.topic,
+            exerciseTypes: input.sessionMeta.exerciseTypes,
+            keyPhrases: input.sessionMeta.keyPhrases,
+            summaryText: input.sessionSummary.summary,
+            accuracy: input.sessionSummary.accuracy,
+            strengths: input.sessionSummary.strengths,
+            weaknesses: input.sessionSummary.weaknesses,
+            nextSteps: input.sessionSummary.nextSteps,
+          }),
+        ].join('\n'),
+      },
+    ],
+  });
+
+  if (!response.output_text) {
+    throw new Error('[ai] OpenAI response missing output_text for progress journal generation');
+  }
+
+  const usage = getUsageFromResponse(response);
+  const journal = assertString(response.output_text, 'journal');
+
+  console.warn('[ai] generated updated progress journal', {
+    sessionId: input.sessionSummary.sessionId,
+    userId: input.sessionSummary.userId,
+    tokensInput: usage.input,
+    tokensOutput: usage.output,
+  });
+
+  return {
+    journal,
     tokenUsage: {
       model: usage.model,
       tokensIn: usage.input,

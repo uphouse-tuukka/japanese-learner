@@ -1,16 +1,16 @@
-import { json } from "@sveltejs/kit";
-import type { RequestHandler } from "./$types";
-import { generateSessionPlan } from "$lib/server/ai";
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { generateSessionPlan } from '$lib/server/ai';
 import {
   attachExercisesToSession,
   createSessionRecord,
   deleteStaleGhostSessions,
   getExerciseResultsForUser,
   getSessionsForUser,
-} from "$lib/server/db";
-import { checkBudget, recordUsageEvent } from "$lib/server/token-limiter";
-import { getUser } from "$lib/server/users";
-import type { Exercise, Lesson, Session, SessionMeta } from "$lib/types";
+} from '$lib/server/db';
+import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
+import { getUser } from '$lib/server/users';
+import type { Exercise, Lesson, Session, SessionMeta } from '$lib/types';
 
 type GenerateRequest = {
   userId?: string;
@@ -19,7 +19,7 @@ type GenerateRequest = {
 
 type GenerateResponse = {
   ok: boolean;
-  state: "active" | "budget_exhausted";
+  state: 'active' | 'budget_exhausted';
   session: Session | null;
   lesson: Lesson | null;
   exercises: Exercise[];
@@ -44,9 +44,9 @@ function parseSessionMeta(summary: string | null): SessionMeta | null {
   try {
     const parsed = JSON.parse(summary) as Partial<SessionMeta>;
     if (
-      typeof parsed.summaryText !== "string" ||
-      typeof parsed.topic !== "string" ||
-      typeof parsed.accuracy !== "number" ||
+      typeof parsed.summaryText !== 'string' ||
+      typeof parsed.topic !== 'string' ||
+      typeof parsed.accuracy !== 'number' ||
       !Array.isArray(parsed.strengths) ||
       !Array.isArray(parsed.weaknesses) ||
       !Array.isArray(parsed.nextSteps) ||
@@ -73,7 +73,7 @@ function parseSessionMeta(summary: string | null): SessionMeta | null {
 function legacySummaryToHistory(summary: string): SessionHistoryItem {
   return {
     date: new Date().toISOString(),
-    topic: "travel_japanese",
+    topic: 'travel_japanese',
     accuracy: 0,
     strengths: [],
     weaknesses: [],
@@ -85,14 +85,11 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = (await request.json()) as GenerateRequest;
-    const userId = String(body.userId ?? "").trim();
-    const exerciseCount = Math.min(
-      Math.max(Number(body.exerciseCount ?? 6), 4),
-      12,
-    );
+    const userId = String(body.userId ?? '').trim();
+    const exerciseCount = Math.min(Math.max(Number(body.exerciseCount ?? 6), 4), 12);
 
     if (!userId) {
-      return json({ ok: false, error: "Missing userId." }, { status: 400 });
+      return json({ ok: false, error: 'Missing userId.' }, { status: 400 });
     }
 
     await deleteStaleGhostSessions(userId);
@@ -101,7 +98,7 @@ export const POST: RequestHandler = async ({ request }) => {
     if (!budgetCheck.allowed) {
       const response: GenerateResponse = {
         ok: true,
-        state: "budget_exhausted",
+        state: 'budget_exhausted',
         session: null,
         lesson: null,
         exercises: [],
@@ -112,7 +109,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const user = await getUser(userId);
     if (!user) {
-      return json({ ok: false, error: "User not found." }, { status: 404 });
+      return json({ ok: false, error: 'User not found.' }, { status: 404 });
     }
 
     const priorSessions = await getSessionsForUser(userId, 10);
@@ -167,20 +164,14 @@ export const POST: RequestHandler = async ({ request }) => {
         )
       : undefined;
     const coveredTopics = Array.from(
-      new Set(
-        latestParsedHistory.map((item) => item.topic.trim()).filter(Boolean),
-      ),
+      new Set(latestParsedHistory.map((item) => item.topic.trim()).filter(Boolean)),
     );
 
     const exerciseResults = await getExerciseResultsForUser(userId);
     const totalResultCount = exerciseResults.length;
-    const totalCorrectCount = exerciseResults.filter(
-      (item) => item.isCorrect,
-    ).length;
+    const totalCorrectCount = exerciseResults.filter((item) => item.isCorrect).length;
     const overallAccuracy =
-      totalResultCount > 0
-        ? Math.round((totalCorrectCount / totalResultCount) * 100)
-        : 0;
+      totalResultCount > 0 ? Math.round((totalCorrectCount / totalResultCount) * 100) : 0;
     const byExercise = new Map<string, { total: number; correct: number }>();
     for (const row of exerciseResults) {
       const current = byExercise.get(row.exerciseId) ?? {
@@ -231,8 +222,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const session = await createSessionRecord({
       userId,
-      mode: "ai",
-      status: "planned",
+      mode: 'ai',
+      status: 'planned',
       model: plan.model,
       tokenInput: plan.tokenUsage.input,
       tokenOutput: plan.tokenUsage.output,
@@ -249,17 +240,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const response: GenerateResponse = {
       ok: true,
-      state: "active",
+      state: 'active',
       session,
       lesson: plan.lesson,
       exercises: plan.exercises,
     };
     return json(response);
   } catch (error) {
-    console.error("[api/session/generate] failed", { error });
-    return json(
-      { ok: false, error: "Failed to generate AI teaching session." },
-      { status: 500 },
-    );
+    console.error('[api/session/generate] failed', { error });
+    return json({ ok: false, error: 'Failed to generate AI teaching session.' }, { status: 500 });
   }
 };

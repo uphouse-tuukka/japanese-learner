@@ -1,19 +1,15 @@
-import { fail } from "@sveltejs/kit";
-import type { Actions, PageServerLoad } from "./$types";
-import { config } from "$lib/config";
-import { getDb } from "$lib/server/db";
-import { createUser, getUser, getUsers } from "$lib/server/users";
-import type { User, UserLevel } from "$lib/types";
+import { fail } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import { config } from '$lib/config';
+import { getDb } from '$lib/server/db';
+import { createUser, getUser, getUsers } from '$lib/server/users';
+import { LEVEL_ORDER, type User, type UserLevel } from '$lib/types';
 
-const SELECTED_USER_COOKIE = "selected_user";
+const SELECTED_USER_COOKIE = 'selected_user';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 function isUserLevel(value: string): value is UserLevel {
-  return (
-    value === "absolute_beginner" ||
-    value === "beginner" ||
-    value === "lower_intermediate"
-  );
+  return LEVEL_ORDER.includes(value as UserLevel);
 }
 
 function dayKey(date: Date): string {
@@ -31,11 +27,7 @@ function calculateStreak(days: string[]): number {
   yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
   const yesterday = dayKey(yesterdayDate);
 
-  let cursor = daySet.has(today)
-    ? today
-    : daySet.has(yesterday)
-      ? yesterday
-      : null;
+  let cursor = daySet.has(today) ? today : daySet.has(yesterday) ? yesterday : null;
   if (!cursor) return 0;
 
   let streak = 0;
@@ -49,9 +41,7 @@ function calculateStreak(days: string[]): number {
   return streak;
 }
 
-async function loadStatsForUser(
-  userId: string,
-): Promise<{ sessions: number; streak: number }> {
+async function loadStatsForUser(userId: string): Promise<{ sessions: number; streak: number }> {
   const db = await getDb();
   const result = await db.execute({
     sql: `
@@ -66,7 +56,7 @@ ORDER BY created_at DESC
   const days = result.rows
     .map((row) => {
       const value = row.date;
-      return typeof value === "string" ? value.slice(0, 10) : null;
+      return typeof value === 'string' ? value.slice(0, 10) : null;
     })
     .filter((value): value is string => Boolean(value));
 
@@ -77,14 +67,14 @@ ORDER BY created_at DESC
 }
 
 function setSelectedUserCookie(
-  cookies: Parameters<Actions["selectUser"]>[0]["cookies"],
+  cookies: Parameters<Actions['selectUser']>[0]['cookies'],
   userId: string,
 ): void {
   cookies.set(SELECTED_USER_COOKIE, userId, {
-    path: "/",
+    path: '/',
     maxAge: COOKIE_MAX_AGE,
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: 'lax',
   });
 }
 
@@ -96,13 +86,11 @@ export const load: PageServerLoad = async ({ cookies }) => {
   if (selectedUserId) {
     selectedUser = await getUser(selectedUserId);
     if (!selectedUser) {
-      cookies.delete(SELECTED_USER_COOKIE, { path: "/" });
+      cookies.delete(SELECTED_USER_COOKIE, { path: '/' });
     }
   }
 
-  const stats = selectedUser
-    ? await loadStatsForUser(selectedUser.id)
-    : { sessions: 0, streak: 0 };
+  const stats = selectedUser ? await loadStatsForUser(selectedUser.id) : { sessions: 0, streak: 0 };
 
   return {
     users,
@@ -115,15 +103,15 @@ export const load: PageServerLoad = async ({ cookies }) => {
 export const actions: Actions = {
   createUser: async ({ request, cookies }) => {
     const formData = await request.formData();
-    const name = String(formData.get("name") ?? "").trim();
-    const level = String(formData.get("level") ?? "").trim();
+    const name = String(formData.get('name') ?? '').trim();
+    const level = String(formData.get('level') ?? '').trim();
 
     if (name.length < 1 || name.length > 64) {
-      return fail(400, { error: "Name must be between 1 and 64 characters." });
+      return fail(400, { error: 'Name must be between 1 and 64 characters.' });
     }
 
     if (!isUserLevel(level)) {
-      return fail(400, { error: "Please select a valid level." });
+      return fail(400, { error: 'Please select a valid level.' });
     }
 
     const users = await getUsers();
@@ -143,15 +131,15 @@ export const actions: Actions = {
   },
   selectUser: async ({ request, cookies }) => {
     const formData = await request.formData();
-    const userId = String(formData.get("userId") ?? "").trim();
+    const userId = String(formData.get('userId') ?? '').trim();
 
     if (!userId) {
-      return fail(400, { error: "Please select a user." });
+      return fail(400, { error: 'Please select a user.' });
     }
 
     const user = await getUser(userId);
     if (!user) {
-      return fail(404, { error: "Selected user not found." });
+      return fail(404, { error: 'Selected user not found.' });
     }
 
     setSelectedUserCookie(cookies, user.id);

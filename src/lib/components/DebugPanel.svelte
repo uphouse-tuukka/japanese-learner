@@ -1,43 +1,43 @@
 <script lang="ts">
-import { dev } from '$app/environment';
-import type { ExerciseType } from '$lib/types';
+  import { dev } from '$app/environment';
+  import type { ExerciseType } from '$lib/types';
 
-let { onGenerateDebug }: { onGenerateDebug: (type: ExerciseType) => void } = $props();
+  let { onGenerateDebug }: { onGenerateDebug: (type: ExerciseType) => void } = $props();
 
-const exerciseTypes: ExerciseType[] = [
-  'multiple_choice',
-  'translation',
-  'fill_blank',
-  'reorder',
-  'reading',
-  'listening'
-];
+  const exerciseTypes: ExerciseType[] = [
+    'multiple_choice',
+    'translation',
+    'fill_blank',
+    'reorder',
+    'reading',
+    'listening',
+  ];
 
-let isOpen = $state(false);
-let selectedType = $state<ExerciseType>('multiple_choice');
+  let isOpen = $state(false);
+  let selectedType = $state<ExerciseType>('multiple_choice');
 
-function toggleOpen(): void {
-  isOpen = !isOpen;
-}
+  function toggleOpen(): void {
+    isOpen = !isOpen;
+  }
 
-function selectType(type: ExerciseType): void {
-  selectedType = type;
-}
+  function selectType(type: ExerciseType): void {
+    selectedType = type;
+  }
 
-function triggerGenerate(): void {
-  onGenerateDebug(selectedType);
-}
+  function triggerGenerate(): void {
+    onGenerateDebug(selectedType);
+  }
 
-function portal(node: HTMLElement) {
-  document.body.appendChild(node);
-  return {
-    destroy() {
-      if (node.parentNode) {
-        node.parentNode.removeChild(node);
-      }
-    }
-  };
-}
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return {
+      destroy() {
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        }
+      },
+    };
+  }
 </script>
 
 {#if dev}
@@ -110,7 +110,9 @@ function portal(node: HTMLElement) {
     line-height: 1;
     box-shadow: var(--shadow-md);
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .debug-toggle:hover {
