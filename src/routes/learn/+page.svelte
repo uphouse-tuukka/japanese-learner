@@ -99,7 +99,7 @@
     'Japan has one of the world’s oldest continuously operating hotel traditions, especially in ryokan culture.',
   ];
   let currentJapanFactIndex = $state(0);
-  let factShuffleBag = $state<number[]>([]);
+  let factShuffleBag: number[] = [];
   let factHasRotated = $state(false);
 
   function createFactShuffleBag(): number[] {
@@ -576,9 +576,7 @@
   }
 
   .loading-fact-text {
-    position: absolute;
-    inset: 0;
-    width: 100%;
+    grid-area: 1 / 1;
     margin: 0;
     font-size: var(--text-sm);
     color: var(--text-bokashi);
@@ -586,7 +584,6 @@
   }
 
   .loading-fact-text-container {
-    position: relative;
-    min-height: 4.5em;
+    display: grid;
   }
 </style>
