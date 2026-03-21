@@ -38,6 +38,8 @@
   --accent-matcha: #5b7a5e; /* secondary accent */
   --accent-matcha-soft: #7a9a7d; /* lighter variant */
   --accent-matcha-wash: #f0f5f0; /* tinted background */
+  --accent-gold: #d8b561;
+  --accent-gold-wash: #fdf8ed;
 
   /* — Color: Neutral borders & surfaces — */
   --border-light: #ddd8ce; /* subtle dividers */
@@ -123,6 +125,7 @@
   --duration-fast: 120ms;
   --duration-normal: 200ms;
   --duration-slow: 350ms;
+  --ink-float-duration: 800ms;
 
   /* — Z-index scale — */
   --z-base: 0;

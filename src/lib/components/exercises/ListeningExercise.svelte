@@ -6,6 +6,9 @@
   let selected = $state('');
   let speaking = $state(false);
   let loading = $state(false);
+  let answered = $state(false);
+  let isCorrect = $state(false);
+  let submittedAnswer = $state('');
 
   async function playAudio(): Promise<void> {
     loading = true;
@@ -35,32 +38,73 @@
   }
 
   function submit(): void {
+    if (answered) return;
     if (!selected) return;
+
+    submittedAnswer = selected;
+    isCorrect = selected === exercise.correctAnswer;
+    answered = true;
+  }
+
+  function continueToNext(): void {
     onAnswer({
       exerciseId: exercise.id,
-      answerText: selected,
-      isCorrect: selected === exercise.correctAnswer,
+      answerText: submittedAnswer,
+      isCorrect,
     });
   }
+
+  $effect(() => {
+    exercise.id;
+    selected = '';
+    speaking = false;
+    loading = false;
+    answered = false;
+    isCorrect = false;
+    submittedAnswer = '';
+  });
 </script>
 
 <section class="card">
   <h2>{exercise.title}</h2>
   <p>{exercise.prompt}</p>
   <div class="audio-actions">
-    <button type="button" class="btn btn-secondary" onclick={playAudio}>
+    <button type="button" class="btn btn-secondary" onclick={playAudio} disabled={answered}>
       {loading ? 'Loading…' : speaking ? 'Playing…' : 'Play audio'}
     </button>
-    <button type="button" class="btn btn-ghost" onclick={handleStop}>Stop</button>
+    <button type="button" class="btn btn-ghost" onclick={handleStop} disabled={answered}
+      >Stop</button
+    >
   </div>
   <div class="choices">
     {#each exercise.choices as choice}
-      <button type="button" class:selected={selected === choice} onclick={() => (selected = choice)}
-        >{choice}</button
+      <button
+        type="button"
+        class:selected={!answered && selected === choice}
+        class:correct={answered && choice === exercise.correctAnswer}
+        class:incorrect={answered && selected === choice && choice !== exercise.correctAnswer}
+        class:dimmed={answered && choice !== exercise.correctAnswer && choice !== selected}
+        onclick={() => (selected = choice)}
+        disabled={answered}>{choice}</button
       >
     {/each}
   </div>
-  <button class="btn btn-primary" type="button" onclick={submit}>Submit answer</button>
+
+  {#if answered}
+    <div class="result-panel">
+      {#if isCorrect}
+        <p class="result-correct">Correct!</p>
+        <p class="ink-reward">+10 墨</p>
+      {:else}
+        <p class="result-incorrect">Not quite</p>
+        <p>The correct answer: {exercise.correctAnswer}</p>
+      {/if}
+    </div>
+  {/if}
+
+  <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
+    {answered ? 'Continue' : 'Submit answer'}
+  </button>
 </section>
 
 <style>
@@ -73,5 +117,45 @@
   .selected {
     border-color: var(--accent-shu);
     background: var(--accent-shu-wash);
+  }
+
+  .correct {
+    border-color: var(--state-success);
+    background: var(--accent-matcha-wash, #dcfce7);
+    color: var(--state-success);
+  }
+
+  .incorrect {
+    border-color: var(--state-error);
+    background: var(--accent-shu-wash, #fee2e2);
+    color: var(--state-error);
+  }
+
+  .dimmed {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .result-panel {
+    background: var(--bg-washi);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+
+  .result-correct {
+    color: var(--state-success);
+    font-weight: var(--weight-medium);
+  }
+
+  .result-incorrect {
+    color: var(--state-error);
+    font-weight: var(--weight-medium);
+  }
+
+  .ink-reward {
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--text-usuzumi);
   }
 </style>

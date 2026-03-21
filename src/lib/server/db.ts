@@ -180,12 +180,43 @@ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY (user_id) REFERENCES users(id),
 FOREIGN KEY (session_id) REFERENCES sessions(id)
 );`,
+        `CREATE TABLE IF NOT EXISTS user_xp (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+session_id TEXT,
+amount INTEGER NOT NULL,
+reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus')),
+created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (user_id) REFERENCES users(id),
+FOREIGN KEY (session_id) REFERENCES sessions(id)
+);`,
+        `CREATE TABLE IF NOT EXISTS user_streaks (
+user_id TEXT PRIMARY KEY,
+current_streak INTEGER NOT NULL DEFAULT 0,
+longest_streak INTEGER NOT NULL DEFAULT 0,
+last_activity_date TEXT,
+daily_goal_met INTEGER NOT NULL DEFAULT 0,
+updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (user_id) REFERENCES users(id)
+);`,
+        `CREATE TABLE IF NOT EXISTS user_milestones (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+milestone_key TEXT NOT NULL,
+xp_at_unlock INTEGER NOT NULL,
+created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+UNIQUE(user_id, milestone_key),
+FOREIGN KEY (user_id) REFERENCES users(id)
+);`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_user_created_at ON sessions(user_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_exercises_seed ON exercises(is_seed);`,
         `CREATE INDEX IF NOT EXISTS idx_results_user_created_at ON user_exercise_results(user_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_results_exercise_created_at ON user_exercise_results(exercise_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_token_usage_user_created_at ON token_usage(user_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_token_usage_created_at ON token_usage(created_at);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_xp_user_id ON user_xp(user_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_xp_session_id ON user_xp(session_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_milestones_user_id ON user_milestones(user_id);`,
       ];
 
       await db.batch(schemaStatements);

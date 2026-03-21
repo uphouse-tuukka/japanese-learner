@@ -4,12 +4,19 @@
     LEVEL_ORDER,
     type SessionSummary as SessionSummaryType,
     type UserLevel,
+    type SessionXpBreakdown,
+    // type Milestone,
   } from '$lib/types';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
 
-  let { summary, score = summary?.accuracy || 0 } = $props<{
+  let {
+    summary,
+    score = summary?.accuracy || 0,
+    xpBreakdown,
+  } = $props<{
     summary: SessionSummaryType;
     score?: number;
+    xpBreakdown?: SessionXpBreakdown | null;
   }>();
   const celebrate = $derived(score >= 80);
   const recommendation = $derived(summary.levelUpRecommendation);
@@ -27,6 +34,7 @@
   );
 
   let displayScore = $state(0);
+  let displayXp = $state(0);
   let levelUpStatus = $state<'idle' | 'loading' | 'accepted' | 'declined' | 'error'>('idle');
 
   async function acceptLevelUp() {
@@ -63,8 +71,11 @@
     const duration = 1500;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    const targetXp = xpBreakdown?.totalXp || 0;
+
     if (prefersReducedMotion) {
       displayScore = score;
+      displayXp = targetXp;
       return;
     }
 
@@ -75,11 +86,13 @@
       const ease = 1 - Math.pow(1 - progress, 4); // easeOutQuart
 
       displayScore = Math.floor(ease * score);
+      displayXp = Math.floor(ease * targetXp);
 
       if (progress < 1) {
         animationFrame = requestAnimationFrame(animate);
       } else {
         displayScore = score;
+        displayXp = targetXp;
       }
     };
 
@@ -114,8 +127,49 @@
 
   <p class="summary-text">{summary.summary}</p>
 
+  {#if xpBreakdown}
+    <section class="ink-earned-card stagger-1 stagger-item">
+      <h4>墨 Ink Earned</h4>
+      <div class="xp-total-container">
+        <span class="xp-total">{displayXp}</span>
+      </div>
+      <div class="xp-breakdown">
+        {#if xpBreakdown.exerciseXp > 0}
+          <div class="xp-row">
+            <span>Correct answers</span>
+            <span>{xpBreakdown.exerciseXp}墨</span>
+          </div>
+        {/if}
+        {#if xpBreakdown.sessionBonusXp > 0}
+          <div class="xp-row">
+            <span>Session complete</span>
+            <span>+{xpBreakdown.sessionBonusXp}墨</span>
+          </div>
+        {/if}
+        {#if xpBreakdown.perfectBonusXp > 0}
+          <div class="xp-row highlight">
+            <span>Perfect score ✦</span>
+            <span>+{xpBreakdown.perfectBonusXp}墨</span>
+          </div>
+        {/if}
+        {#if xpBreakdown.streakBonusXp > 0}
+          <div class="xp-row highlight">
+            <span>Streak bonus 🔥</span>
+            <span>+{xpBreakdown.streakBonusXp}墨</span>
+          </div>
+        {/if}
+        {#if xpBreakdown.comboBonusXp > 0}
+          <div class="xp-row highlight">
+            <span>Combo bonus ⚡</span>
+            <span>+{xpBreakdown.comboBonusXp}墨</span>
+          </div>
+        {/if}
+      </div>
+    </section>
+  {/if}
+
   <div class="grid">
-    <section class="stagger-1 stagger-item">
+    <section class="stagger-2 stagger-item">
       <h3>Strengths</h3>
       <ul>
         {#each summary.strengths as item}
@@ -123,7 +177,7 @@
         {/each}
       </ul>
     </section>
-    <section class="stagger-2 stagger-item">
+    <section class="stagger-3 stagger-item">
       <h3>Areas to improve</h3>
       <ul>
         {#each summary.weaknesses as item}
@@ -131,7 +185,7 @@
         {/each}
       </ul>
     </section>
-    <section class="stagger-3 stagger-item">
+    <section class="stagger-4 stagger-item">
       <h3>Next steps</h3>
       <ul>
         {#each summary.nextSteps as item}
@@ -141,8 +195,24 @@
     </section>
   </div>
 
+  {#if xpBreakdown?.newMilestones?.length}
+    {#each xpBreakdown.newMilestones as milestone}
+      <section class="milestone-card stagger-milestone stagger-item">
+        <div class="milestone-content">
+          <div class="milestone-header">
+            <h3 class="milestone-jp">{milestone.nameJa}</h3>
+            <span class="milestone-label">Milestone Unlocked</span>
+          </div>
+          <h4 class="milestone-en">{milestone.name}</h4>
+          <p class="milestone-desc">{milestone.description}</p>
+        </div>
+        <div class="milestone-decoration">✦</div>
+      </section>
+    {/each}
+  {/if}
+
   {#if recommendation && levelUpStatus !== 'declined'}
-    <section class="level-up-card stagger-4 stagger-item" aria-label="Level up recommendation">
+    <section class="level-up-card stagger-5 stagger-item" aria-label="Level up recommendation">
       <div class="confetti-container" aria-hidden="true">
         <div class="confetti c1"></div>
         <div class="confetti c2"></div>
@@ -314,6 +384,129 @@
     flex-wrap: wrap;
     justify-content: center;
     margin-top: var(--space-4);
+  }
+
+  /* Ink Earned Card */
+  .ink-earned-card {
+    background-color: var(--bg-kinu);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    border: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .ink-earned-card h4 {
+    margin: 0;
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: var(--weight-medium);
+  }
+
+  .xp-total-container {
+    margin: var(--space-2) 0 var(--space-4);
+  }
+
+  .xp-total {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 2.5rem;
+    font-weight: var(--weight-bold);
+    color: var(--text-sumi);
+    line-height: 1;
+  }
+
+  .xp-breakdown {
+    width: 100%;
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .xp-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-bokashi);
+    padding: 2px 0;
+  }
+
+  .xp-row.highlight {
+    color: var(--accent-gold);
+    font-weight: var(--weight-medium);
+  }
+
+  .xp-row span:last-child {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Milestone Card */
+  .milestone-card {
+    margin-top: var(--space-6);
+    background-color: var(--accent-gold-wash);
+    border: 2px solid var(--accent-gold);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(216, 181, 97, 0.2);
+  }
+
+  .milestone-header {
+    margin-bottom: var(--space-2);
+  }
+
+  .milestone-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-gold);
+    border: 1px solid var(--accent-gold);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: var(--space-2);
+    background: #fff;
+  }
+
+  .milestone-jp {
+    font-family: 'Noto Sans JP', serif;
+    font-size: 2rem;
+    font-weight: var(--weight-bold);
+    color: var(--text-sumi);
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .milestone-en {
+    font-size: 1.1rem;
+    color: var(--text-bokashi);
+    font-weight: var(--weight-medium);
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .milestone-desc {
+    font-size: 0.95rem;
+    color: var(--text-sumi);
+    margin: 0;
+    line-height: 1.5;
+    max-width: 80%;
+    margin: 0 auto;
+  }
+
+  .milestone-decoration {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    color: var(--accent-gold);
+    font-size: 1.5rem;
+    opacity: 0.5;
   }
 
   /* Level Up Card */
@@ -695,6 +888,12 @@
     }
     .stagger-4 {
       animation-delay: 800ms;
+    }
+    .stagger-5 {
+      animation-delay: 1000ms;
+    }
+    .stagger-milestone {
+      animation-delay: 1500ms;
     }
 
     @keyframes fade-slide-up {

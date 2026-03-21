@@ -18,6 +18,14 @@
     completeSession,
     resetSession,
   } from '$lib/stores/session.svelte';
+  import {
+    maxCombo,
+    recordCorrectAnswer,
+    recordIncorrectAnswer,
+    resetGamification,
+    sessionXp,
+    setSessionXp,
+  } from '$lib/stores/gamification.svelte';
   import type { Exercise, ExerciseAnswerPayload, ExerciseType, Lesson, Session } from '$lib/types';
   import type { PageData } from './$types';
 
@@ -44,6 +52,7 @@
     ok: boolean;
     state: 'done';
     summary: import('$lib/types').SessionSummary;
+    xp?: import('$lib/types').SessionXpBreakdown;
     error?: string;
   };
 
@@ -168,11 +177,21 @@
     return shuffled;
   }
 
+  function getHelsinkiLocalDate(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Helsinki',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  }
+
   async function startLearning(): Promise<void> {
     uiState = 'loading';
     errorMessage = '';
     lesson = null;
     resetSession();
+    resetGamification();
 
     try {
       const response = await fetch('/api/session/generate', {
@@ -211,6 +230,7 @@
     errorMessage = '';
     lesson = null;
     resetSession();
+    resetGamification();
 
     try {
       const response = await fetch('/api/practice/generate', {
@@ -248,6 +268,11 @@
   async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
     if (!currentExercise) return;
     answerExercise($currentIndex, payload);
+    if (payload.isCorrect) {
+      recordCorrectAnswer(10);
+    } else {
+      recordIncorrectAnswer();
+    }
     const isLast = $currentIndex >= $exercises.length - 1;
     if (!isLast) {
       nextExercise();
@@ -271,11 +296,16 @@
           userId: data.selectedUserId,
           sessionId: $session.id,
           results: $answers.filter((a): a is NonNullable<typeof a> => a != null),
+          maxCombo: $maxCombo,
+          localDate: getHelsinkiLocalDate(),
         }),
       });
       const payload = (await response.json()) as CompleteResponse;
       if (!response.ok || !payload.ok)
         throw new Error(payload.error ?? 'Failed to complete session');
+      if (payload.xp) {
+        setSessionXp(payload.xp);
+      }
       completeSession(payload.summary);
       uiState = 'done';
     } catch (error) {
@@ -389,7 +419,7 @@
       <p class="sr-only">Generating your session summary, please wait.</p>
     </section>
   {:else if uiState === 'done' && $summary}
-    <SessionSummary summary={$summary} />
+    <SessionSummary summary={$summary} xpBreakdown={$sessionXp ?? undefined} />
   {:else if uiState === 'error'}
     <section class="card">
       <p>{errorMessage || 'Failed to generate session'}</p>

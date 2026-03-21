@@ -57,6 +57,7 @@
     <div class="result-panel">
       {#if isCorrect}
         <p class="result-correct">Correct!</p>
+        <p class="ink-reward">+10 墨</p>
       {:else}
         <p class="result-incorrect">Not quite</p>
         <p>The correct answer: {exercise.correctAnswer}</p>
@@ -131,6 +132,12 @@
     margin-top: var(--space-2);
     font-size: var(--text-sm);
     color: var(--text-bokashi);
+  }
+
+  .ink-reward {
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--text-usuzumi);
   }
 
   .btn {

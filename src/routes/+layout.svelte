@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import '../app.css';
 
-  let { children } = $props();
+  let { children, data } = $props();
 
   const pathname = $derived($page.url.pathname);
 
@@ -34,6 +34,12 @@
           <span class="nav-en">History</span>
           <span class="nav-ja">履歴</span>
         </a>
+        {#if data.dev}
+          <a href="/design" class="nav-link" class:active={isActive('/design')}>
+            <span class="nav-en">Design</span>
+            <span class="nav-ja">デザイン</span>
+          </a>
+        {/if}
       </nav>
     </div>
   </header>

@@ -217,3 +217,63 @@ export type ExerciseAnswerPayload = {
 };
 
 export type OnAnswer = (payload: ExerciseAnswerPayload) => void | Promise<void>;
+
+export type XpReason =
+  | 'exercise_correct'
+  | 'session_complete'
+  | 'perfect_score'
+  | 'streak_bonus'
+  | 'combo_bonus';
+
+export interface XpTransaction {
+  id: string;
+  userId: string;
+  sessionId: string | null;
+  amount: number;
+  reason: XpReason;
+  createdAt: string;
+}
+
+export interface UserStreak {
+  userId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+  dailyGoalMet: boolean;
+  updatedAt: string;
+}
+
+export interface Milestone {
+  key: string;
+  name: string;
+  nameJa: string;
+  description: string;
+  xpThreshold: number;
+}
+
+export interface UserMilestone {
+  id: string;
+  userId: string;
+  milestoneKey: string;
+  xpAtUnlock: number;
+  createdAt: string;
+}
+
+export interface SessionXpBreakdown {
+  exerciseXp: number;
+  sessionBonusXp: number;
+  perfectBonusXp: number;
+  streakBonusXp: number;
+  comboBonusXp: number;
+  totalXp: number;
+  newMilestones: Milestone[];
+}
+
+export interface GamificationStats {
+  totalXp: number;
+  currentStreak: number;
+  longestStreak: number;
+  dailyGoalMet: boolean;
+  nextMilestone: Milestone | null;
+  xpToNextMilestone: number;
+}

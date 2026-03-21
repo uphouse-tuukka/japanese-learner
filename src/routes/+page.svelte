@@ -1,6 +1,7 @@
 <script lang="ts">
+  import MilestoneProgress from '$lib/components/MilestoneProgress.svelte';
   import UserSelector from '$lib/components/UserSelector.svelte';
-  import { LEVEL_LABELS, LEVEL_ORDER } from '$lib/types';
+  import { LEVEL_LABELS, LEVEL_ORDER, type GamificationStats } from '$lib/types';
   import type { ActionData, PageData } from './$types';
 
   let { data, form } = $props<{ data: PageData; form?: ActionData }>();
@@ -9,8 +10,30 @@
   let writingToggleError = $state<string | null>(null);
 
   const selectedUser = $derived<PageData['selectedUser']>(data.selectedUser);
-  const selectedLevelLabel = $derived(selectedUser ? LEVEL_LABELS[selectedUser.level] : '');
   const isReadyForJapan = $derived(selectedUser?.level === 'ready_for_japan');
+  const fallbackFirstMilestone: NonNullable<GamificationStats['nextMilestone']> = {
+    key: 'first_ink',
+    name: 'First Stroke',
+    nameJa: '一筆',
+    description: 'Your first confident brush mark on the learning path.',
+    xpThreshold: 10,
+  };
+
+  const gamification = $derived.by(() => {
+    const value = data.gamification;
+    if (value) {
+      return value;
+    }
+
+    return {
+      totalXp: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      dailyGoalMet: false,
+      nextMilestone: fallbackFirstMilestone,
+      xpToNextMilestone: fallbackFirstMilestone.xpThreshold,
+    } satisfies GamificationStats;
+  });
 
   $effect(() => {
     writingEnabled = data.selectedUser?.japaneseWritingEnabled ?? false;
@@ -94,10 +117,9 @@
     </article>
   {:else}
     <div class="dashboard">
-      <article class="card block">
+      <header class="welcome-header">
         <h1>こんにちは、{data.selectedUser.name}さん</h1>
-        <p>Welcome back to your Japanese study dashboard.</p>
-      </article>
+      </header>
 
       {#if isReadyForJapan}
         <article class="card ready-badge-card">
@@ -109,35 +131,59 @@
         </article>
       {/if}
 
-      <section class="stats-grid">
-        <article class="card stat-card">
-          <p class="label">Sessions</p>
-          <p class="value">{data.stats.sessions}</p>
-        </article>
-        <article class="card stat-card">
-          <p class="label">Streak</p>
-          <p class="value">{data.stats.streak} days</p>
-        </article>
-        <article class="card stat-card">
-          <p class="label">Level</p>
-          <p class="value">{selectedLevelLabel}</p>
-        </article>
-      </section>
+      <!-- Hero Card -->
+      <article class="card hero-card">
+        <div class="hero-content">
+          <div class="hero-stats">
+            <div class="streak-number-container">
+              <span class="streak-number" class:is-zero={gamification.currentStreak === 0}>
+                {gamification.currentStreak}
+              </span>
+            </div>
 
-      <section class="action-grid">
-        <article class="card action-card">
-          <h2>Start Today&apos;s Session</h2>
-          <p>Generate your AI-guided learning session.</p>
-          <a href="/learn" class="btn-primary">Start learning</a>
-        </article>
+            <div class="streak-info">
+              {#if gamification.currentStreak > 0}
+                <span class="streak-label">Day Streak</span>
+              {:else}
+                <span class="streak-label">Start your streak</span>
+              {/if}
 
-        <article class="card action-card">
-          <h2>Practice Mode</h2>
-          <p>Unlimited review with no AI token cost.</p>
-          <a href="/practice" class="btn-secondary">Open practice</a>
-        </article>
-      </section>
+              <div class="daily-goal">
+                {#if gamification.dailyGoalMet}
+                  <span class="goal-met">✓ Goal complete</span>
+                {:else}
+                  <span class="goal-pending">Today's goal: complete a session</span>
+                {/if}
+              </div>
+            </div>
+          </div>
 
+          <div class="hero-actions">
+            <a href="/learn" class="btn-primary start-button"> Start Today's Session </a>
+            <a href="/practice" class="practice-link"> Practice weak points → </a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Combined Stats Card -->
+      <article class="card combined-stats-card">
+        <div class="ink-stat">
+          <div class="ink-value-group">
+            <span class="ink-value">{gamification.totalXp}</span>
+            <span class="ink-suffix">墨</span>
+          </div>
+          <span class="ink-label">Ink earned</span>
+        </div>
+        <div class="milestone-wrapper">
+          <MilestoneProgress
+            currentXp={gamification.totalXp}
+            nextMilestone={gamification.nextMilestone}
+            xpRemaining={gamification.xpToNextMilestone}
+          />
+        </div>
+      </article>
+
+      <!-- Settings Card -->
       <section class="card settings-card">
         <h2>Study settings</h2>
         <p class="settings-description">Choose how your learning sessions are generated.</p>
@@ -175,6 +221,9 @@
   .home {
     display: grid;
     gap: var(--space-4);
+    max-width: var(--content-width);
+    margin: 0 auto;
+    width: 100%;
   }
 
   .block {
@@ -222,28 +271,156 @@
     color: var(--state-error);
   }
 
+  /* Dashboard Layout */
   .dashboard {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .welcome-header h1 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-1);
+  }
+
+  /* Hero Card */
+  .hero-card {
+    padding: var(--space-6);
+    background: white;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .hero-content {
+    width: 100%;
+    max-width: 24rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    margin: 0 auto;
+    align-items: center;
+  }
+
+  .hero-stats {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     gap: var(--space-4);
   }
 
-  .stats-grid,
-  .action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: var(--space-4);
+  .streak-number-container {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .stat-card .label {
-    font-size: var(--text-sm);
-    color: var(--text-bokashi);
+  .streak-number {
+    font-size: 3rem;
+    font-weight: var(--weight-bold);
+    color: var(--accent-shu);
+    line-height: 1;
   }
 
-  .stat-card .value {
-    font-size: var(--text-xl);
+  .streak-number.is-zero {
+    color: var(--text-usuzumi);
+  }
+
+  .streak-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-1);
+  }
+
+  .streak-label {
+    font-size: var(--text-base);
+    color: var(--text-sumi);
     font-weight: var(--weight-medium);
   }
 
+  .daily-goal {
+    font-size: var(--text-sm);
+    display: flex;
+    align-items: center;
+  }
+
+  .goal-met {
+    color: var(--accent-matcha);
+  }
+
+  .goal-pending {
+    color: var(--text-bokashi);
+    opacity: 0.8;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .start-button {
+    width: 100%;
+    justify-content: center;
+    font-size: var(--text-base);
+    padding: var(--space-3) var(--space-6);
+  }
+
+  .practice-link {
+    font-size: var(--text-sm);
+    color: var(--text-bokashi);
+    text-align: center;
+  }
+
+  .practice-link:hover {
+    color: var(--accent-shu);
+  }
+
+  /* Combined Stats Card */
+  .combined-stats-card {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-5);
+  }
+
+  .ink-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .ink-value-group {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+  }
+
+  .ink-value {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-bold);
+    color: var(--text-sumi);
+    line-height: 1;
+  }
+
+  .ink-suffix {
+    font-size: var(--text-lg);
+    color: var(--text-usuzumi);
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+
+  .ink-label {
+    font-size: var(--text-sm);
+    color: var(--text-bokashi);
+    font-weight: var(--weight-medium);
+  }
+
+  .milestone-wrapper {
+    width: 100%;
+  }
+
+  /* Ready Badge */
   .ready-badge-card {
     background:
       radial-gradient(
@@ -291,6 +468,7 @@
     font-size: var(--text-sm);
   }
 
+  /* Settings Card */
   .settings-card {
     display: grid;
     gap: var(--space-3);
@@ -383,11 +561,6 @@
 
   .writing-switch.is-on .switch-text {
     text-align: left;
-  }
-
-  .action-card {
-    display: grid;
-    gap: var(--space-3);
   }
 
   @keyframes badge-entry {

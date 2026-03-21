@@ -10,6 +10,7 @@ import {
 } from '$lib/server/db';
 import { generateUpdatedJournal } from '$lib/server/ai';
 import { recordUsageEvent } from '$lib/server/token-limiter';
+import { processSessionCompletion } from '$lib/server/gamification';
 
 type ResultPayload = {
   exerciseId: string;
@@ -21,7 +22,49 @@ type CompleteRequest = {
   userId?: string;
   sessionId?: string;
   results?: ResultPayload[];
+  localDate?: string;
 };
+
+function getTodayInHelsinki(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function resolveLocalDate(value: unknown): string {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+    return candidate;
+  }
+  return getTodayInHelsinki();
+}
+
+function calculateMaxCombo(results: ResultPayload[]): number {
+  let currentCombo = 0;
+  let maxCombo = 0;
+  for (const result of results) {
+    if (result.isCorrect) {
+      currentCombo += 1;
+      if (currentCombo > maxCombo) {
+        maxCombo = currentCombo;
+      }
+      continue;
+    }
+    currentCombo = 0;
+  }
+  return maxCombo;
+}
+
+type ProcessSessionCompletionWithLocalDate = (
+  userId: string,
+  sessionId: string,
+  results: Array<{ isCorrect: boolean }>,
+  maxCombo: number,
+  localDate?: string,
+) => ReturnType<typeof processSessionCompletion>;
 
 function buildSummary(userId: string, sessionId: string, results: ResultPayload[]): SessionSummary {
   const total = results.length;
@@ -50,6 +93,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const userId = String(body.userId ?? '').trim();
     const sessionId = String(body.sessionId ?? '').trim();
     const results = Array.isArray(body.results) ? body.results : [];
+    const localDate = resolveLocalDate(body.localDate);
 
     if (!userId || !sessionId) {
       return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 });
@@ -99,7 +143,21 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     await completeSessionRecord(sessionId, { summary: summary.summary });
 
-    return json({ ok: true, state: 'done', summary });
+    let xpBreakdown: Awaited<ReturnType<typeof processSessionCompletion>> | null = null;
+    try {
+      const maxCombo = calculateMaxCombo(results);
+      const processCompletion =
+        processSessionCompletion as unknown as ProcessSessionCompletionWithLocalDate;
+      xpBreakdown = await processCompletion(userId, sessionId, results, maxCombo, localDate);
+    } catch (xpError) {
+      console.error('[api/practice/complete] xp processing failed (non-fatal)', {
+        error: xpError,
+        sessionId,
+        userId,
+      });
+    }
+
+    return json({ ok: true, state: 'done', summary, xp: xpBreakdown });
   } catch (error) {
     console.error('[api/practice/complete] failed', { error });
     return json({ ok: false, error: 'Failed to complete practice session.' }, { status: 500 });

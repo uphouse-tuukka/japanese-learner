@@ -148,6 +148,7 @@
           <span class="result-icon">✓</span>
           <span class="result-title">Correct!</span>
         </div>
+        <p class="ink-reward">+10 墨</p>
       {:else}
         <div class="result-header incorrect">
           <span class="result-title">Not quite</span>
@@ -414,6 +415,12 @@
     font-size: var(--text-lg);
     color: var(--state-error);
     font-weight: var(--weight-medium);
+  }
+
+  .ink-reward {
+    margin: 0 0 var(--space-3) 0;
+    font-size: var(--text-xs);
+    color: var(--text-usuzumi);
   }
 
   .result-answers {

@@ -2,11 +2,22 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { config } from '$lib/config';
 import { getDb } from '$lib/server/db';
+import { getGamificationStats } from '$lib/server/gamification';
 import { createUser, getUser, getUsers } from '$lib/server/users';
-import { LEVEL_ORDER, type User, type UserLevel } from '$lib/types';
+import { LEVEL_ORDER, type GamificationStats, type User, type UserLevel } from '$lib/types';
 
 const SELECTED_USER_COOKIE = 'selected_user';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const HELSINKI_TIME_ZONE = 'Europe/Helsinki';
+
+const EMPTY_GAMIFICATION_STATS: GamificationStats = {
+  totalXp: 0,
+  currentStreak: 0,
+  longestStreak: 0,
+  dailyGoalMet: false,
+  nextMilestone: null,
+  xpToNextMilestone: 0,
+};
 
 function isUserLevel(value: string): value is UserLevel {
   return LEVEL_ORDER.includes(value as UserLevel);
@@ -78,9 +89,12 @@ function setSelectedUserCookie(
   });
 }
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
   const users = await getUsers();
   const selectedUserId = cookies.get(SELECTED_USER_COOKIE);
+  const localDate = url.searchParams.get('localDate')?.trim() ?? '';
+  const fallbackDate = new Date().toLocaleDateString('sv-SE', { timeZone: HELSINKI_TIME_ZONE });
+  const todayDateStr = /^\d{4}-\d{2}-\d{2}$/.test(localDate) ? localDate : fallbackDate;
 
   let selectedUser: User | null = null;
   if (selectedUserId) {
@@ -90,12 +104,18 @@ export const load: PageServerLoad = async ({ cookies }) => {
     }
   }
 
-  const stats = selectedUser ? await loadStatsForUser(selectedUser.id) : { sessions: 0, streak: 0 };
+  const [stats, gamification] = selectedUser
+    ? await Promise.all([
+        loadStatsForUser(selectedUser.id),
+        getGamificationStats(selectedUser.id, todayDateStr),
+      ])
+    : [{ sessions: 0, streak: 0 }, EMPTY_GAMIFICATION_STATS];
 
   return {
     users,
     selectedUser,
     stats,
+    gamification,
     maxUsers: config.limits.maxUsers,
   };
 };
