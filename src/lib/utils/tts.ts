@@ -1,5 +1,4 @@
 import { playAudio, stopAudio, isPlaying } from '$lib/utils/audio';
-import { PUBLIC_USE_OPENAI_TTS } from '$env/static/public';
 
 export interface SpeakOptions {
   rate?: number;
@@ -15,7 +14,11 @@ let cachedJapaneseVoice: SpeechSynthesisVoice | null | undefined;
 let voiceLookupPromise: Promise<SpeechSynthesisVoice | null> | null = null;
 const serverAudioCache = new Map<string, ArrayBuffer>();
 const pendingServerAudio = new Map<string, Promise<ArrayBuffer>>();
-const useOpenAiTts = PUBLIC_USE_OPENAI_TTS.toLowerCase() === 'true';
+let useOpenAiTts = false;
+
+export function configureOpenAiTts(enabled: boolean): void {
+  useOpenAiTts = enabled;
+}
 
 function scoreJapaneseVoice(voice: SpeechSynthesisVoice): number {
   const lang = voice.lang.toLowerCase();

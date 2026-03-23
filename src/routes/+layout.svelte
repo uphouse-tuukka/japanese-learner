@@ -1,8 +1,12 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { configureOpenAiTts } from '$lib/utils/tts';
   import '../app.css';
 
   let { children, data } = $props();
+  $effect(() => {
+    configureOpenAiTts(data.useOpenAiTts);
+  });
 
   const pathname = $derived($page.url.pathname);
 
