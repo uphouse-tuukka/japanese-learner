@@ -16,7 +16,6 @@
     resetSession,
   } from '$lib/stores/session.svelte';
   import {
-    maxCombo,
     recordCorrectAnswer,
     recordIncorrectAnswer,
     resetGamification,
@@ -93,16 +92,20 @@
   const currentExercise = $derived($exercises[$currentIndex] ?? null);
   const progressCurrent = $derived(Math.min($currentIndex + 1, Math.max($exercises.length, 1)));
 
-  async function startPractice(): Promise<void> {
+  async function startPracticeSession(body: {
+    exerciseCount: number;
+    debugExerciseType?: ExerciseType;
+  }): Promise<void> {
     uiState = 'loading';
     errorMessage = '';
     resetSession();
     resetGamification();
+
     try {
       const response = await fetch('/api/practice/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: data.selectedUserId, exerciseCount: 10 }),
+        body: JSON.stringify({ userId: data.selectedUserId, ...body }),
       });
       const payload = (await response.json()) as GenerateResponse;
       if (!response.ok || !payload.ok || !payload.session)
@@ -119,30 +122,12 @@
     }
   }
 
-  async function startDebugPractice(type: ExerciseType): Promise<void> {
-    uiState = 'loading';
-    errorMessage = '';
-    resetSession();
-    resetGamification();
-    try {
-      const response = await fetch('/api/practice/generate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          userId: data.selectedUserId,
-          exerciseCount: 6,
-          debugExerciseType: type,
-        }),
-      });
-      const payload = (await response.json()) as GenerateResponse;
-      if (!response.ok || !payload.ok || !payload.session)
-        throw new Error(payload.error ?? 'Failed to generate debug session');
-      startSession(payload.session, payload.exercises);
-      uiState = 'active';
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      uiState = 'error';
-    }
+  function startPractice(): Promise<void> {
+    return startPracticeSession({ exerciseCount: 10 });
+  }
+
+  function startDebugPractice(type: ExerciseType): Promise<void> {
+    return startPracticeSession({ exerciseCount: 6, debugExerciseType: type });
   }
 
   async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
@@ -176,7 +161,6 @@
           userId: data.selectedUserId,
           sessionId: $session.id,
           results: $answers,
-          maxCombo: $maxCombo,
           localDate: getHelsinkiLocalDate(),
         }),
       });

@@ -66,6 +66,49 @@ type ProcessSessionCompletionWithLocalDate = (
   localDate?: string,
 ) => ReturnType<typeof processSessionCompletion>;
 
+function runJournalUpdateInBackground(
+  userId: string,
+  sessionId: string,
+  summary: SessionSummary,
+): void {
+  void (async () => {
+    try {
+      const [progressJournal, user] = await Promise.all([
+        getProgressJournal(userId),
+        getUserById(userId),
+      ]);
+      if (!user) {
+        return;
+      }
+
+      const journalResult = await generateUpdatedJournal({
+        currentJournal: progressJournal,
+        sessionSummary: summary,
+        sessionMeta: {
+          topic: 'practice_review',
+          exerciseTypes: [],
+          keyPhrases: [],
+        },
+        userLevel: user.level,
+      });
+      await updateProgressJournal(userId, journalResult.journal);
+      await recordUsageEvent({
+        userId,
+        sessionId,
+        model: journalResult.tokenUsage.model,
+        tokensIn: journalResult.tokenUsage.tokensIn,
+        tokensOut: journalResult.tokenUsage.tokensOut,
+      });
+    } catch (journalError) {
+      console.error('[api/practice/complete] journal update failed (non-fatal)', {
+        error: journalError,
+        sessionId,
+        userId,
+      });
+    }
+  })();
+}
+
 function buildSummary(userId: string, sessionId: string, results: ResultPayload[]): SessionSummary {
   const total = results.length;
   const correct = results.filter((result) => result.isCorrect).length;
@@ -111,36 +154,7 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     const summary = buildSummary(userId, sessionId, results);
-    try {
-      const [progressJournal, user] = await Promise.all([
-        getProgressJournal(userId),
-        getUserById(userId),
-      ]);
-      if (user) {
-        const journalResult = await generateUpdatedJournal({
-          currentJournal: progressJournal,
-          sessionSummary: summary,
-          sessionMeta: {
-            topic: 'practice_review',
-            exerciseTypes: [],
-            keyPhrases: [],
-          },
-          userLevel: user.level,
-        });
-        await updateProgressJournal(userId, journalResult.journal);
-        await recordUsageEvent({
-          userId,
-          sessionId,
-          model: journalResult.tokenUsage.model,
-          tokensIn: journalResult.tokenUsage.tokensIn,
-          tokensOut: journalResult.tokenUsage.tokensOut,
-        });
-      }
-    } catch (journalError) {
-      console.error('[api/practice/complete] journal update failed (non-fatal)', {
-        error: journalError,
-      });
-    }
+    runJournalUpdateInBackground(userId, sessionId, summary);
     await completeSessionRecord(sessionId, { summary: summary.summary });
 
     let xpBreakdown: Awaited<ReturnType<typeof processSessionCompletion>> | null = null;

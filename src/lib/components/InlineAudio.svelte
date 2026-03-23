@@ -11,6 +11,10 @@
     if (pollInterval) clearInterval(pollInterval);
   }
 
+  function stripParentheticalRomaji(text: string): string {
+    return text.replace(/\s*\([^)]*\)/g, '').trim();
+  }
+
   onDestroy(() => {
     cleanup();
     if (status !== 'idle') {
@@ -37,7 +41,8 @@
     }, 50);
 
     try {
-      await speak(japanese);
+      const cleanedJapanese = stripParentheticalRomaji(japanese);
+      await speak(cleanedJapanese);
     } catch (e) {
       console.warn('TTS playback failed', e);
     } finally {

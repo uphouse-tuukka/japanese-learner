@@ -15,6 +15,13 @@ import type {
 
 let dbClient: Client | null = null;
 let databaseInitPromise: Promise<void> | null = null;
+const HELSINKI_TIME_ZONE = 'Europe/Helsinki';
+const HELSINKI_DATE_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: HELSINKI_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
 
 function requiredValue(name: string, value: string): string {
   const normalized = value.trim();
@@ -225,20 +232,6 @@ FOREIGN KEY (user_id) REFERENCES users(id)
       ];
 
       await db.batch(schemaStatements);
-      try {
-        await db.execute(`ALTER TABLE users ADD COLUMN progress_journal TEXT DEFAULT NULL`);
-      } catch (error) {
-        console.warn('[db] users.progress_journal already exists or skipped', {
-          error,
-        });
-      }
-      try {
-        await db.execute(
-          `ALTER TABLE users ADD COLUMN japanese_writing_enabled INTEGER NOT NULL DEFAULT 0`,
-        );
-      } catch {
-        /* column already exists */
-      }
       console.warn('[db] schema initialized');
     })();
   }
@@ -813,17 +806,29 @@ export async function getActivityDates(userId: string): Promise<string[]> {
   const db = await getDb();
   const result = await db.execute({
     sql: `
-SELECT DISTINCT date(created_at) AS activity_date
+SELECT created_at
 FROM sessions
 WHERE user_id = ? AND status = 'completed'
-ORDER BY activity_date ASC
+ORDER BY created_at ASC
 `,
     args: [userId],
   });
 
-  return (result.rows as Array<Record<string, unknown>>)
-    .map((row) => asString(row.activity_date))
-    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
+  const dates = new Set<string>();
+  for (const row of result.rows as Array<Record<string, unknown>>) {
+    const rawCreatedAt = asString(row.created_at);
+    if (!rawCreatedAt) continue;
+
+    const parsed = new Date(rawCreatedAt);
+    if (Number.isNaN(parsed.getTime())) continue;
+
+    const dateKey = HELSINKI_DATE_FORMATTER.format(parsed);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      dates.add(dateKey);
+    }
+  }
+
+  return Array.from(dates).sort();
 }
 
 export async function getExerciseTypeBreakdown(userId: string): Promise<

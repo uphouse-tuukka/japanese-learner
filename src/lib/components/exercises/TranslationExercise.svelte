@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { OnAnswer, TranslationExercise as TranslationExerciseData } from '$lib/types';
+  import InlineAudio from '$lib/components/InlineAudio.svelte';
   import { normalizeForComparison } from '$lib/utils/text';
 
   interface Props {
@@ -100,7 +101,10 @@
 
   <div class="prompt-area">
     {#if exercise.direction === 'ja_to_en'}
-      <p class="prompt-japanese">{exercise.japanese}</p>
+      <p class="prompt-japanese">
+        {exercise.japanese}
+        <InlineAudio japanese={exercise.japanese} size="md" />
+      </p>
       <p class="prompt-romaji">{exercise.romaji}</p>
     {:else}
       <p class="prompt-english">{exercise.prompt}</p>
@@ -146,9 +150,8 @@
       {#if isCorrect}
         <div class="result-header correct">
           <span class="result-icon">✓</span>
-          <span class="result-title">Correct!</span>
+          <span class="result-title">Correct! <span class="ink-reward">+10 墨</span></span>
         </div>
-        <p class="ink-reward">+10 墨</p>
       {:else}
         <div class="result-header incorrect">
           <span class="result-title">Not quite</span>
@@ -418,9 +421,12 @@
   }
 
   .ink-reward {
-    margin: 0 0 var(--space-3) 0;
+    display: inline;
+    margin-left: var(--space-2);
     font-size: var(--text-xs);
+    font-weight: var(--weight-regular, 400);
     color: var(--text-usuzumi);
+    opacity: 0.85;
   }
 
   .result-answers {

@@ -24,9 +24,11 @@
   // 2. Streak Calendar
   // specific logic to ensure the grid aligns with Mon-Sun rows
   const calendarData = $derived.by(() => {
+    const toLocalDateKey = (value: Date): string => value.toLocaleDateString('sv-SE');
     const today = new Date();
     // Normalize today to start of day to avoid time discrepancies
     today.setHours(0, 0, 0, 0);
+    const todayKey = toLocalDateKey(today);
 
     const currentDay = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
     // We want Monday to be index 0.
@@ -48,8 +50,8 @@
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
 
-      const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
-      const isToday = d.getTime() === today.getTime();
+      const dateStr = toLocalDateKey(d);
+      const isToday = dateStr === todayKey;
       const isFuture = d.getTime() > today.getTime();
       const isActive = activeSet.has(dateStr);
 

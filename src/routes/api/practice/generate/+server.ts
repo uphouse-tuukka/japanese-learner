@@ -34,20 +34,24 @@ export const POST: RequestHandler = async ({ request }) => {
     const body = (await request.json()) as GenerateRequest;
     const userId = String(body.userId ?? '').trim();
     const exerciseCount = typeof body.exerciseCount === 'number' ? body.exerciseCount : undefined;
-    const debugExerciseType =
+    const debugExerciseTypeValue =
       typeof body.debugExerciseType === 'string' ? body.debugExerciseType.trim() : undefined;
+    const debugExerciseType =
+      dev && debugExerciseTypeValue && isExerciseType(debugExerciseTypeValue)
+        ? debugExerciseTypeValue
+        : undefined;
 
     if (!userId) {
       return json({ ok: false, error: 'Missing userId.' }, { status: 400 });
     }
 
-    if (debugExerciseType && dev && !isExerciseType(debugExerciseType)) {
+    if (dev && debugExerciseTypeValue && !debugExerciseType) {
       return json({ ok: false, error: 'Invalid debugExerciseType.' }, { status: 400 });
     }
 
     await deleteStaleGhostSessions(userId);
 
-    if (debugExerciseType && dev && isExerciseType(debugExerciseType)) {
+    if (debugExerciseType) {
       const debugExercises = getDebugExercises(debugExerciseType, exerciseCount ?? 6);
       const session = await createSessionRecord({
         userId,

@@ -193,30 +193,35 @@ export const POST: RequestHandler = async ({ request }) => {
         summary = aiResult.summary;
         summaryTokenInput = aiResult.tokenUsage.tokensIn;
         summaryTokenOutput = aiResult.tokenUsage.tokensOut;
-        try {
-          const journalResult = await generateUpdatedJournal({
-            currentJournal: progressJournal,
-            sessionSummary: summary,
-            sessionMeta: {
-              topic: lessonTopic,
-              exerciseTypes,
-              keyPhrases,
-            },
-            userLevel: user.level,
+        // Fire-and-forget — do not block the main response on journal generation.
+        void generateUpdatedJournal({
+          currentJournal: progressJournal,
+          sessionSummary: summary,
+          sessionMeta: {
+            topic: lessonTopic,
+            exerciseTypes,
+            keyPhrases,
+          },
+          userLevel: user.level,
+        })
+          .then(async (journalResult) => {
+            if (!journalResult?.journal) {
+              return;
+            }
+            await updateProgressJournal(userId, journalResult.journal);
+            await recordUsageEvent({
+              userId,
+              sessionId,
+              model: journalResult.tokenUsage.model,
+              tokensIn: journalResult.tokenUsage.tokensIn,
+              tokensOut: journalResult.tokenUsage.tokensOut,
+            });
+          })
+          .catch((journalError) => {
+            console.error('[api/session/complete] journal update failed (non-fatal)', {
+              error: journalError,
+            });
           });
-          await updateProgressJournal(userId, journalResult.journal);
-          await recordUsageEvent({
-            userId,
-            sessionId,
-            model: journalResult.tokenUsage.model,
-            tokensIn: journalResult.tokenUsage.tokensIn,
-            tokensOut: journalResult.tokenUsage.tokensOut,
-          });
-        } catch (journalError) {
-          console.error('[api/session/complete] journal update failed (non-fatal)', {
-            error: journalError,
-          });
-        }
         await recordUsageEvent({
           userId,
           sessionId,

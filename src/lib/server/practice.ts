@@ -10,8 +10,9 @@ type PracticeOptions = {
 type CandidateExercise = {
   exercise: Exercise;
   wrongCount: number;
-  correctCount: number;
-  lastSeenAt: string | null;
+  inRecentSessions?: boolean;
+  correctCount?: number;
+  lastSeenAt?: string | null;
 };
 
 function requireUserId(userId: string): string {
@@ -30,26 +31,53 @@ export function toExerciseCount(requested?: number): number {
   return Math.min(12, Math.max(4, Math.round(requested)));
 }
 
+function getCandidateWeight(item: CandidateExercise): number {
+  let weight = 1;
+  weight += item.wrongCount * 2;
+  if (item.inRecentSessions) {
+    weight += 1;
+  }
+  return weight;
+}
+
 export function scoreCandidate(item: CandidateExercise): number {
-  let score = 1;
-  score += item.wrongCount * 5;
-  score += Math.max(0, 3 - item.correctCount);
-  if (!item.lastSeenAt) score += 3;
-  return score;
+  return getCandidateWeight(item);
+}
+
+function shuffleInPlace<T>(items: T[]): void {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [items[index], items[randomIndex]] = [items[randomIndex], items[index]];
+  }
+}
+
+function pickWeightedExercises(candidates: CandidateExercise[], target: number): Exercise[] {
+  const pool = candidates.slice();
+  const selected: Exercise[] = [];
+
+  while (pool.length > 0 && selected.length < target) {
+    const totalWeight = pool.reduce((sum, item) => sum + getCandidateWeight(item), 0);
+    let roll = Math.random() * totalWeight;
+    let selectedIndex = 0;
+
+    for (let index = 0; index < pool.length; index += 1) {
+      roll -= getCandidateWeight(pool[index]);
+      if (roll <= 0) {
+        selectedIndex = index;
+        break;
+      }
+    }
+
+    const [picked] = pool.splice(selectedIndex, 1);
+    selected.push(picked.exercise);
+  }
+
+  shuffleInPlace(selected);
+  return selected;
 }
 
 export function pickTopExercises(candidates: CandidateExercise[], target: number): Exercise[] {
-  return candidates
-    .slice()
-    .sort((a, b) => {
-      const scoreDiff = scoreCandidate(b) - scoreCandidate(a);
-      if (scoreDiff !== 0) return scoreDiff;
-      const aTime = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
-      const bTime = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
-      return aTime - bTime;
-    })
-    .slice(0, target)
-    .map((item) => item.exercise);
+  return pickWeightedExercises(candidates, target);
 }
 
 async function getPracticeCandidates(userId: string): Promise<CandidateExercise[]> {
@@ -60,8 +88,20 @@ SELECT
 e.id,
 e.content_json,
 SUM(CASE WHEN r.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_count,
-SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) AS correct_count,
-MAX(r.created_at) AS last_seen_at
+MAX(
+  CASE
+    WHEN r.session_id IN (
+      SELECT id
+      FROM sessions
+      WHERE user_id = ?
+        AND mode = 'ai'
+        AND status = 'completed'
+      ORDER BY datetime(COALESCE(completed_at, created_at)) DESC
+      LIMIT 3
+    ) THEN 1
+    ELSE 0
+  END
+) AS in_recent_sessions
 FROM user_exercise_results r
 JOIN sessions s ON s.id = r.session_id
 JOIN exercises e ON e.id = r.exercise_id
@@ -70,9 +110,8 @@ WHERE r.user_id = ?
   AND s.mode = 'ai'
   AND s.status = 'completed'
 GROUP BY e.id, e.content_json
-ORDER BY datetime(last_seen_at) DESC
 `,
-    args: [userId, userId],
+    args: [userId, userId, userId],
   });
 
   return (result.rows as Array<Record<string, unknown>>)
@@ -82,8 +121,7 @@ ORDER BY datetime(last_seen_at) DESC
         return {
           exercise,
           wrongCount: Number(row.wrong_count ?? 0),
-          correctCount: Number(row.correct_count ?? 0),
-          lastSeenAt: row.last_seen_at ? String(row.last_seen_at) : null,
+          inRecentSessions: Number(row.in_recent_sessions ?? 0) > 0,
         };
       } catch {
         return null;
@@ -107,7 +145,7 @@ export async function buildPracticeSession(
     );
   }
 
-  const exercises = pickTopExercises(candidates, Math.min(targetCount, candidates.length));
+  const exercises = pickWeightedExercises(candidates, Math.min(targetCount, candidates.length));
   if (exercises.length === 0) {
     throw new Error('No practice exercises available from your completed AI sessions yet.');
   }
@@ -121,7 +159,7 @@ export async function buildPracticeSession(
     lesson: {
       topic: 'Review from your previous AI sessions',
       explanation:
-        'This practice session reuses exercises from your completed AI lessons. We prioritize items you previously answered incorrectly so you can improve weak spots.',
+        'This practice session reuses exercises from your completed AI lessons. Exercises are selected with weighted randomness so weaker and recently practiced items appear more often while keeping variety.',
       culturalNote:
         'Repetition and correction are important in Japanese learning. Short, frequent review sessions are more effective than cramming.',
       keyPhrases: [
@@ -153,7 +191,7 @@ export async function buildPracticeSession(
     metadata: {
       focus: 'review_past_ai_session_exercises',
       exerciseCount: exercises.length,
-      selectionStrategy: 'prioritize_incorrect_then_least_recent',
+      selectionStrategy: 'weighted_random_without_replacement',
       candidateCount: candidates.length,
     },
   };
