@@ -10,10 +10,15 @@
   let isCorrect = $state(false);
   let submittedAnswer = $state('');
 
+  function stripParentheticalRomaji(text: string): string {
+    return text.replace(/\s*\([^)]*\)/g, '').trim();
+  }
+
   async function playAudio(): Promise<void> {
     loading = true;
     speaking = false;
-    const playback = speak(exercise.audioText, { rate: 0.9, pitch: 1, serverVoice: 'nova' });
+    const cleanedAudioText = stripParentheticalRomaji(exercise.audioText);
+    const playback = speak(cleanedAudioText, { rate: 0.9, pitch: 1, serverVoice: 'nova' });
     try {
       while (!isSpeaking()) {
         const completed = await Promise.race([

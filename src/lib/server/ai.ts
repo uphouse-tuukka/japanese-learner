@@ -32,7 +32,7 @@ const LEVEL_RULES: Record<
     minDifficulty: 1,
     maxDifficulty: 3,
     allowedTypes: ['multiple_choice', 'translation', 'listening'],
-    translationDirections: ['ja_to_en', 'en_to_ja'],
+    translationDirections: ['ja_to_en'],
   },
   elementary: {
     minDifficulty: 1,
@@ -116,7 +116,7 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-const SESSION_MODEL = 'gpt-4.1';
+const SESSION_MODEL = 'gpt-5.2';
 
 let openaiClient: OpenAI | null = null;
 
@@ -483,7 +483,7 @@ function levelInstructions(level: UserLevel): string {
       'Introduce hiragana gently while keeping romaji support.',
       'Allowed exercise types: multiple_choice, translation, listening.',
       'Difficulty range is strictly 1-3.',
-      'Translation can be ja_to_en or en_to_ja; en_to_ja must accept romaji answers.',
+      'Translation direction must be ja_to_en only.',
     ].join(' ');
 
   if (level === 'elementary')
@@ -558,10 +558,7 @@ function exerciseFieldRequirements(level: UserLevel): string[] {
     ];
   }
   if (level === 'beginner') {
-    return [
-      ...requirements,
-      'For beginner en_to_ja translation exercises, acceptedAnswers must include a romaji answer variant.',
-    ];
+    return [...requirements, 'For beginner, translation direction must always be "ja_to_en".'];
   }
   return requirements;
 }
