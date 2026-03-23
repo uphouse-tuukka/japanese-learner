@@ -4,9 +4,10 @@ import {
   getDailyXpHistory,
   getExerciseTypeBreakdown,
   getSessionHistory,
+  getUserById,
 } from '$lib/server/db';
 import { getGamificationStats, getUnlockedMilestones, MILESTONES } from '$lib/server/gamification';
-import type { GamificationStats, Milestone, UserMilestone } from '$lib/types';
+import type { GamificationStats, Milestone, UserLevel, UserMilestone } from '$lib/types';
 
 const HELSINKI_TIME_ZONE = 'Europe/Helsinki';
 
@@ -30,6 +31,7 @@ function normalizePercentage(value: number): number {
 
 type ProgressPageData = {
   selectedUserId: string | null;
+  user: { id: string; level: UserLevel } | null;
   history: Awaited<ReturnType<typeof getSessionHistory>>;
   gamification: GamificationStats;
   unlockedMilestones: UserMilestone[];
@@ -53,6 +55,7 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
   if (!selectedUserId) {
     return {
       selectedUserId: null,
+      user: null,
       history: [],
       gamification: EMPTY_GAMIFICATION_STATS,
       unlockedMilestones: [],
@@ -74,6 +77,7 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
     activityDates,
     rawExerciseTypeBreakdown,
     dailyXpHistory,
+    user,
   ] = await Promise.all([
     getSessionHistory(selectedUserId),
     getGamificationStats(selectedUserId, todayDateStr),
@@ -81,6 +85,7 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
     getActivityDates(selectedUserId),
     getExerciseTypeBreakdown(selectedUserId),
     getDailyXpHistory(selectedUserId),
+    getUserById(selectedUserId),
   ]);
 
   const history = rawHistory.map((entry) => ({
@@ -95,6 +100,15 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
 
   return {
     selectedUserId,
+    user: user
+      ? {
+          id: user.id,
+          level: user.level,
+        }
+      : {
+          id: selectedUserId,
+          level: 'absolute_beginner',
+        },
     history,
     gamification,
     unlockedMilestones,

@@ -393,7 +393,7 @@
 
   .ink-value-group {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-1);
   }
 

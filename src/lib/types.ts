@@ -247,6 +247,7 @@ export interface Milestone {
   key: string;
   name: string;
   nameJa: string;
+  icon?: string;
   description: string;
   xpThreshold: number;
 }

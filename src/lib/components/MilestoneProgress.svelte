@@ -9,16 +9,33 @@
     xpRemaining: number;
   } = $props();
 
+  const milestoneThresholds = [
+    50, 200, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 25000, 50000,
+  ];
+
+  const previousThreshold = $derived.by(() => {
+    if (!nextMilestone) return 0;
+
+    const index = milestoneThresholds.findIndex(
+      (threshold) => threshold === nextMilestone.xpThreshold,
+    );
+    if (index <= 0) return 0;
+    return milestoneThresholds[index - 1];
+  });
+
   const progressPercent = $derived.by(() => {
     if (!nextMilestone) {
       return 100;
     }
 
-    if (nextMilestone.xpThreshold <= 0) {
+    const nextThreshold = nextMilestone.xpThreshold;
+    const prevThreshold = previousThreshold;
+    const segment = nextThreshold - prevThreshold;
+    if (segment <= 0) {
       return 0;
     }
 
-    const raw = (currentXp / nextMilestone.xpThreshold) * 100;
+    const raw = ((currentXp - prevThreshold) / segment) * 100;
     return Math.min(100, Math.max(0, raw));
   });
 </script>
@@ -26,6 +43,7 @@
 <div class="milestone-progress" aria-live="polite">
   {#if nextMilestone}
     <div class="milestone-header">
+      <span class="next-label">Next milestone:</span>
       <span class="milestone-name-en">{nextMilestone.name}</span>
       <span class="milestone-name-ja">({nextMilestone.nameJa})</span>
     </div>
@@ -34,14 +52,14 @@
       class="progress-track"
       role="progressbar"
       aria-label={`Progress to ${nextMilestone.name}`}
-      aria-valuemin={0}
+      aria-valuemin={previousThreshold}
       aria-valuemax={nextMilestone.xpThreshold}
-      aria-valuenow={Math.max(0, Math.min(currentXp, nextMilestone.xpThreshold))}
+      aria-valuenow={Math.max(previousThreshold, Math.min(currentXp, nextMilestone.xpThreshold))}
     >
       <div class="progress-fill" style={`width: ${progressPercent}%`}></div>
     </div>
 
-    <div class="xp-remaining">{xpRemaining} ink to next milestone</div>
+    <div class="xp-remaining">{xpRemaining} ink left</div>
   {:else}
     <div class="all-achieved">All milestones achieved! 🎉</div>
   {/if}
@@ -58,6 +76,12 @@
     align-items: baseline;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+
+  .next-label {
+    font-size: var(--text-xs);
+    color: var(--text-bokashi);
+    font-weight: var(--weight-medium);
   }
 
   .milestone-name-en {

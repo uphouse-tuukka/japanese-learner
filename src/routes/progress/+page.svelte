@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LevelBadge from '$lib/components/LevelBadge.svelte';
   import type { PageData } from './$types';
 
   let { data } = $props<{ data: PageData }>();
@@ -20,6 +21,8 @@
       xpToNextMilestone: 0,
     },
   );
+
+  const userLevel = $derived(data.user?.level ?? 'absolute_beginner');
 
   // 2. Streak Calendar
   // specific logic to ensure the grid aligns with Mon-Sun rows
@@ -136,9 +139,12 @@
   <!-- 1. Header -->
   <header class="header-section">
     <h1>Progress</h1>
-    <div class="total-ink-badge">
-      <span class="ink-val">{gamification.totalXp}</span>
-      <span class="ink-unit">墨 ink earned</span>
+    <div class="header-badges">
+      <div class="total-ink-badge">
+        <span class="ink-val">{gamification.totalXp}</span>
+        <span class="ink-unit">墨 ink earned</span>
+      </div>
+      <LevelBadge level={userLevel} />
     </div>
   </header>
 
@@ -180,10 +186,11 @@
       {#each milestoneGallery as m}
         <article class="card milestone-card" class:locked={!m.isUnlocked}>
           <div class="milestone-icon">
-            <span class="kanji-decorative">{m.nameJa}</span>
+            <span class="kanji-decorative" title={m.nameJa}>{m.icon}</span>
           </div>
           <div class="milestone-content">
-            <h3>{m.name}</h3>
+            <h3 title={m.name}>{m.name}</h3>
+            <p class="milestone-ja" title={m.nameJa}>{m.nameJa}</p>
             {#if m.isUnlocked}
               <p class="achieved-date">Achieved {m.achievedAt || 'Earned'}</p>
             {:else}
@@ -277,11 +284,19 @@
     border-bottom: 1px solid var(--border-light);
     padding-bottom: var(--space-4);
     margin-top: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .header-badges {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
   }
 
   .total-ink-badge {
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: center;
     gap: var(--space-2);
   }
 
@@ -410,7 +425,7 @@
   /* --- Milestone Gallery --- */
   .milestone-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: var(--space-4);
   }
 
@@ -438,6 +453,7 @@
     height: 3rem;
     display: flex;
     align-items: center;
+    overflow: hidden;
   }
 
   .kanji-decorative {
@@ -446,6 +462,8 @@
     color: var(--accent-shu-wash); /* Very subtle normally */
     /* If achieved, make it pop */
     font-weight: 700;
+    line-height: 1;
+    display: block;
   }
 
   .milestone-card:not(.locked) .kanji-decorative {
@@ -457,8 +475,23 @@
   }
 
   .milestone-content h3 {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     margin-bottom: var(--space-1);
+    line-height: var(--leading-tight);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .milestone-ja {
+    font-size: var(--text-xs);
+    color: var(--text-usuzumi);
+    margin: 0 0 var(--space-1) 0;
+    line-height: var(--leading-tight);
+  }
+
+  .milestone-content p {
+    line-height: var(--leading-tight);
   }
 
   .achieved-date {
@@ -575,6 +608,20 @@
 
   /* Responsive Adjustments */
   @media (max-width: 600px) {
+    .header-section {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .header-badges {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .milestone-grid {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
     .skill-row {
       grid-template-columns: 1fr;
       gap: var(--space-2);
