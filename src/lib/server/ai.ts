@@ -38,7 +38,7 @@ const LEVEL_RULES: Record<
     minDifficulty: 1,
     maxDifficulty: 3,
     allowedTypes: ['multiple_choice', 'translation', 'listening', 'fill_blank'],
-    translationDirections: ['ja_to_en', 'en_to_ja'],
+    translationDirections: ['ja_to_en'],
   },
   pre_intermediate: {
     minDifficulty: 2,
