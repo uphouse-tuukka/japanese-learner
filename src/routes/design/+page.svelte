@@ -101,7 +101,9 @@
 
           <div class="flex flex-col gap-3">
             <button class="btn-primary w-full">Start Session</button>
-            <a href="#" class="text-sm text-center text-bokashi">Practice weak points →</a>
+            <button type="button" class="link-button text-sm text-center text-bokashi">
+              Practice weak points →
+            </button>
           </div>
         </div>
       </div>
@@ -123,7 +125,9 @@
 
           <div class="flex flex-col gap-3 w-full">
             <button class="btn-primary w-full">Start Today's Session</button>
-            <a href="#" class="text-sm text-center text-bokashi">Practice weak points →</a>
+            <button type="button" class="link-button text-sm text-center text-bokashi">
+              Practice weak points →
+            </button>
           </div>
         </div>
       </div>
@@ -150,7 +154,9 @@
 
           <div class="flex flex-col gap-3">
             <button class="btn-primary w-full">Start Session</button>
-            <a href="#" class="text-sm text-center text-bokashi">Practice weak points →</a>
+            <button type="button" class="link-button text-sm text-center text-bokashi">
+              Practice weak points →
+            </button>
           </div>
         </div>
       </div>
@@ -183,9 +189,6 @@
   .border-light {
     border-color: var(--border-light);
   }
-  .border-mid {
-    border-color: var(--border-mid);
-  }
 
   /* Utility classes */
   .grid {
@@ -213,9 +216,6 @@
 
   .p-4 {
     padding: var(--space-4);
-  }
-  .p-8 {
-    padding: var(--space-8);
   }
   .pb-2 {
     padding-bottom: var(--space-2);
@@ -245,12 +245,6 @@
     border-bottom-width: 1px;
     border-bottom-style: solid;
   }
-  .border-2 {
-    border-width: 2px;
-  }
-  .border-dashed {
-    border-style: dashed;
-  }
 
   .shadow-md {
     box-shadow: var(--shadow-md);
@@ -278,9 +272,6 @@
   .font-medium {
     font-weight: var(--weight-medium);
   }
-  .italic {
-    font-style: italic;
-  }
 
   .tracking-wide {
     letter-spacing: var(--tracking-wide);
@@ -288,10 +279,6 @@
 
   .opacity-80 {
     opacity: 0.8;
-  }
-
-  .min-h-\[300px\] {
-    min-height: 300px;
   }
 
   @media (min-width: 768px) {
@@ -362,14 +349,8 @@
   .text-base {
     font-size: var(--text-base);
   }
-  .text-lg {
-    font-size: var(--text-lg);
-  }
   .text-2xl {
     font-size: var(--text-2xl);
-  }
-  .text-4xl {
-    font-size: 2.25rem;
   }
   .text-5xl {
     font-size: 3rem;
@@ -384,5 +365,12 @@
   }
   .uppercase {
     text-transform: uppercase;
+  }
+
+  .link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
   }
 </style>

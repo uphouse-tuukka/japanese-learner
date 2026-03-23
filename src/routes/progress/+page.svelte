@@ -552,10 +552,6 @@
     border-bottom: none;
   }
 
-  .text-right {
-    text-align: right;
-  }
-
   .mode-badge {
     display: inline-block;
     padding: 2px 8px;
