@@ -1,4 +1,5 @@
 import { playAudio, stopAudio, isPlaying } from '$lib/utils/audio';
+import { PUBLIC_USE_OPENAI_TTS } from '$env/static/public';
 
 export interface SpeakOptions {
   rate?: number;
@@ -14,6 +15,7 @@ let cachedJapaneseVoice: SpeechSynthesisVoice | null | undefined;
 let voiceLookupPromise: Promise<SpeechSynthesisVoice | null> | null = null;
 const serverAudioCache = new Map<string, ArrayBuffer>();
 const pendingServerAudio = new Map<string, Promise<ArrayBuffer>>();
+const useOpenAiTts = PUBLIC_USE_OPENAI_TTS.toLowerCase() === 'true';
 
 function scoreJapaneseVoice(voice: SpeechSynthesisVoice): number {
   const lang = voice.lang.toLowerCase();
@@ -229,6 +231,21 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
     (options.preferBrowser === undefined && trimmedText.length <= 15);
 
   stop();
+
+  if (!useOpenAiTts) {
+    try {
+      await speakViaBrowser(trimmedText, rate, pitch, volume, browserFallbackVoiceName);
+    } catch (browserError) {
+      console.warn('[tts] browser speech failed while OpenAI TTS is disabled', {
+        voice: browserFallbackVoiceName,
+        rate,
+        pitch,
+        volume,
+        error: browserError,
+      });
+    }
+    return;
+  }
 
   if (useBrowserFirst) {
     try {

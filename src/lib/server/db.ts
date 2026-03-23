@@ -42,6 +42,11 @@ function asNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function toPercent(correctCount: number, totalCount: number): number {
+  if (totalCount <= 0) return 0;
+  return Math.round((correctCount / totalCount) * 100);
+}
+
 function asIso(value: unknown): string {
   if (typeof value === 'string' && value.trim()) {
     const parsed = new Date(value);
@@ -780,7 +785,7 @@ export async function getHistoryByUser(userId: string): Promise<
       (scoreRow.rows[0] as Record<string, unknown> | undefined)?.correct,
       0,
     );
-    const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+    const accuracy = toPercent(correctCount, answeredCount);
 
     history.push({
       session: mapSessionRow(row),
@@ -791,6 +796,100 @@ export async function getHistoryByUser(userId: string): Promise<
   }
 
   return history;
+}
+
+export async function getSessionHistory(userId: string): Promise<
+  Array<{
+    session: Session;
+    exerciseCount: number;
+    correctCount: number;
+    accuracy: number;
+  }>
+> {
+  return getHistoryByUser(userId);
+}
+
+export async function getActivityDates(userId: string): Promise<string[]> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+SELECT DISTINCT date(created_at) AS activity_date
+FROM sessions
+WHERE user_id = ? AND status = 'completed'
+ORDER BY activity_date ASC
+`,
+    args: [userId],
+  });
+
+  return (result.rows as Array<Record<string, unknown>>)
+    .map((row) => asString(row.activity_date))
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+export async function getExerciseTypeBreakdown(userId: string): Promise<
+  Array<{
+    type: string;
+    totalCount: number;
+    correctCount: number;
+    accuracy: number;
+  }>
+> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+SELECT
+  e.type AS type,
+  COUNT(*) AS total_count,
+  COALESCE(SUM(r.is_correct), 0) AS correct_count
+FROM user_exercise_results r
+JOIN exercises e ON e.id = r.exercise_id
+WHERE r.user_id = ?
+GROUP BY e.type
+ORDER BY total_count DESC, e.type ASC
+`,
+    args: [userId],
+  });
+
+  return (result.rows as Array<Record<string, unknown>>).map((row) => {
+    const totalCount = asNumber(row.total_count, 0);
+    const correctCount = asNumber(row.correct_count, 0);
+    const accuracy = toPercent(correctCount, totalCount);
+    return {
+      type: asString(row.type),
+      totalCount,
+      correctCount,
+      accuracy,
+    };
+  });
+}
+
+export async function getDailyXpHistory(
+  userId: string,
+  days = 30,
+): Promise<Array<{ date: string; totalXp: number }>> {
+  const db = await getDb();
+  const safeDays = Math.max(1, Math.floor(days));
+  const daysModifier = `-${safeDays - 1} days`;
+  const result = await db.execute({
+    sql: `
+SELECT
+  date(created_at) AS date,
+  COALESCE(SUM(amount), 0) AS total_xp
+FROM user_xp
+WHERE user_id = ?
+  AND date(created_at) >= date('now', ?)
+GROUP BY date(created_at)
+ORDER BY date(created_at) ASC
+`,
+    args: [userId, daysModifier],
+  });
+
+  return (result.rows as Array<Record<string, unknown>>)
+    .map((row) => ({
+      date: asString(row.date),
+      totalXp: asNumber(row.total_xp, 0),
+    }))
+    .filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date));
 }
 
 export async function createSessionSummary(input: {

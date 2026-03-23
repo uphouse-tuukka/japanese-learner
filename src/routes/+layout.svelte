@@ -30,9 +30,9 @@
           <span class="nav-en">Practice</span>
           <span class="nav-ja">練習</span>
         </a>
-        <a href="/history" class="nav-link" class:active={isActive('/history')}>
-          <span class="nav-en">History</span>
-          <span class="nav-ja">履歴</span>
+        <a href="/progress" class="nav-link" class:active={isActive('/progress')}>
+          <span class="nav-en">Progress</span>
+          <span class="nav-ja">進捗</span>
         </a>
         {#if data.dev}
           <a href="/design" class="nav-link" class:active={isActive('/design')}>
