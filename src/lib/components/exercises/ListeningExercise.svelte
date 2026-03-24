@@ -72,9 +72,9 @@
 
 <section class="card">
   <h2>{exercise.title}</h2>
-  <p>{exercise.prompt}</p>
+  <p>Listen and choose the correct meaning.</p>
   <div class="audio-actions">
-    <button type="button" class="btn btn-secondary" onclick={playAudio} disabled={answered}>
+    <button type="button" class="btn btn-primary" onclick={playAudio} disabled={answered}>
       {loading ? 'Loading…' : speaking ? 'Playing…' : 'Play audio'}
     </button>
     <button type="button" class="btn btn-ghost" onclick={handleStop} disabled={answered}
@@ -103,6 +103,7 @@
         <p class="result-incorrect">Not quite</p>
         <p>The correct answer: {exercise.correctAnswer}</p>
       {/if}
+      <p><strong>{exercise.japanese}</strong> ({exercise.romaji})</p>
     </div>
   {/if}
 

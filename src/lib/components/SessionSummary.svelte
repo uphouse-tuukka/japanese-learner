@@ -32,6 +32,15 @@
   const currentLevelLabel = $derived(
     currentLevelKey ? LEVEL_LABELS[currentLevelKey as UserLevel] : '',
   );
+  const displayedMilestones = $derived.by(() => {
+    const milestones = xpBreakdown?.newMilestones ?? [];
+    if (milestones.length <= 2) return milestones;
+    return [milestones[milestones.length - 1]];
+  });
+  const hiddenMilestoneCount = $derived.by(() => {
+    const milestones = xpBreakdown?.newMilestones ?? [];
+    return milestones.length > 2 ? milestones.length - 1 : 0;
+  });
 
   let displayScore = $state(0);
   let displayXp = $state(0);
@@ -195,8 +204,8 @@
     </section>
   </div>
 
-  {#if xpBreakdown?.newMilestones?.length}
-    {#each xpBreakdown.newMilestones as milestone}
+  {#if displayedMilestones.length}
+    {#each displayedMilestones as milestone}
       <section class="milestone-card stagger-milestone stagger-item">
         <div class="milestone-content">
           <div class="milestone-header">
@@ -205,6 +214,9 @@
           </div>
           <h4 class="milestone-en">{milestone.name}</h4>
           <p class="milestone-desc">{milestone.description}</p>
+          {#if hiddenMilestoneCount > 0}
+            <p class="milestone-extra-note">+{hiddenMilestoneCount} more milestones unlocked</p>
+          {/if}
         </div>
         <div class="milestone-decoration">✦</div>
       </section>
@@ -507,6 +519,12 @@
     color: var(--accent-gold);
     font-size: 1.5rem;
     opacity: 0.5;
+  }
+
+  .milestone-extra-note {
+    margin: var(--space-3) 0 0 0;
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--text-usuzumi);
   }
 
   /* Level Up Card */

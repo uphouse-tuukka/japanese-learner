@@ -544,7 +544,7 @@ const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
   reorder: '- reorder: prompt, tokens (string array), correctOrder (string array).',
   reading: '- reading: passage, passageRomaji, passageEnglish, question, answer.',
   listening:
-    '- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice).',
+    '- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice). For listening exercises, prompt must be short English-only instruction, e.g. "Listen and choose the correct meaning". Do NOT include Japanese text or romaji in prompt.',
 };
 
 function exerciseFieldRequirements(level: UserLevel): string[] {
