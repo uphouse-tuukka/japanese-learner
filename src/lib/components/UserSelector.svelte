@@ -173,7 +173,7 @@
   button {
     padding: 0.625rem 1rem;
     border: none;
-    border-radius: var(--radius-md, 0.7rem);
+    border-radius: 999px;
     cursor: pointer;
     background: var(--accent-shu, #c1440e);
     color: var(--bg-shoji, white);

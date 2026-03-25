@@ -536,7 +536,7 @@ function levelInstructions(level: UserLevel): string {
 
 const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
   multiple_choice:
-    '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional).',
+    '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional). For multiple_choice exercises, every choice that contains Japanese must include romaji in parentheses. Example choice: "すみません (sumimasen)". This applies to ALL choices in the array and to correctAnswer.',
   translation:
     '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
   fill_blank:
