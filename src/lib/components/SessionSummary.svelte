@@ -179,7 +179,7 @@
 
   <div class="grid">
     <section class="stagger-2 stagger-item">
-      <h3>Strengths</h3>
+      <h3>What you're mastering</h3>
       <ul>
         {#each summary.strengths as item}
           <li>{item}</li>
@@ -187,7 +187,7 @@
       </ul>
     </section>
     <section class="stagger-3 stagger-item">
-      <h3>Areas to improve</h3>
+      <h3>What to work on</h3>
       <ul>
         {#each summary.weaknesses as item}
           <li>{item}</li>
@@ -195,7 +195,7 @@
       </ul>
     </section>
     <section class="stagger-4 stagger-item">
-      <h3>Next steps</h3>
+      <h3>Coming up next</h3>
       <ul>
         {#each summary.nextSteps as item}
           <li>{item}</li>

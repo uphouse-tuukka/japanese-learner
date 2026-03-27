@@ -162,6 +162,7 @@ export interface KeyPhrase {
 
 export interface Lesson {
   topic: string;
+  category?: string;
   explanation: string;
   culturalNote: string;
   keyPhrases: KeyPhrase[];
@@ -201,6 +202,7 @@ export interface LevelUpRecommendation {
 
 export interface SessionMeta {
   summaryText: string;
+  category?: string; // NEW: topic category key (e.g., "food_dining")
   topic: string;
   accuracy: number;
   strengths: string[];

@@ -25,6 +25,7 @@ type CompleteRequest = {
   sessionId?: string;
   results?: ResultPayload[];
   lessonTopic?: string;
+  category?: string;
   keyPhrases?: string[];
   localDate?: string;
 };
@@ -154,7 +155,9 @@ export const POST: RequestHandler = async ({ request }) => {
     const user = await getUserById(userId);
     const sessionExercises = await getSessionExercises(sessionId);
     const exercises = sessionExercises.map((item) => item.exercise);
-    const lessonTopic = String(body.lessonTopic ?? '').trim() || inferLessonTopic(exercises);
+    const requestedLessonTopic = String(body.lessonTopic ?? '').trim();
+    const lessonTopic = requestedLessonTopic || inferLessonTopic(exercises);
+    const category = String(body.category ?? '').trim() || undefined;
     const requestKeyPhrases = toStringList(body.keyPhrases);
     const keyPhrases =
       requestKeyPhrases.length > 0
@@ -198,6 +201,7 @@ export const POST: RequestHandler = async ({ request }) => {
           currentJournal: progressJournal,
           sessionSummary: summary,
           sessionMeta: {
+            category,
             topic: lessonTopic,
             exerciseTypes,
             keyPhrases,
@@ -242,6 +246,7 @@ export const POST: RequestHandler = async ({ request }) => {
     await completeSessionRecord(sessionId, {
       summary: JSON.stringify({
         summaryText: summary.summary,
+        category,
         topic: lessonTopic,
         accuracy: summary.accuracy,
         strengths: summary.strengths,

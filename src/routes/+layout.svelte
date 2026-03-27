@@ -14,7 +14,6 @@
   let password = $state('');
   let loginError = $state('');
   let isSubmitting = $state(false);
-  let isLoggingOut = $state(false);
 
   function isActive(path: string): boolean {
     if (path === '/') return pathname === '/';
@@ -69,18 +68,6 @@
       isSubmitting = false;
     }
   }
-
-  async function handleLogout(): Promise<void> {
-    if (isLoggingOut) return;
-    isLoggingOut = true;
-
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.reload();
-    } finally {
-      isLoggingOut = false;
-    }
-  }
 </script>
 
 {#if data.authenticated}
@@ -124,9 +111,6 @@
 
     <footer class="footer">
       <p>毎日少しずつ学びましょう。</p>
-      <button class="logout-link" onclick={handleLogout} disabled={isLoggingOut}>
-        {isLoggingOut ? 'Logging out…' : 'Log out'}
-      </button>
     </footer>
   </div>
 {:else}
@@ -271,27 +255,6 @@
     align-items: center;
     gap: var(--space-3);
     flex-wrap: wrap;
-  }
-
-  .logout-link {
-    border: 0;
-    padding: 0;
-    background: none;
-    color: var(--text-usuzumi);
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-    cursor: pointer;
-    font: inherit;
-    transition: color var(--duration-fast) var(--ease-out);
-  }
-
-  .logout-link:hover:not(:disabled) {
-    color: var(--accent-shu);
-  }
-
-  .logout-link:disabled {
-    opacity: 0.6;
-    cursor: wait;
   }
 
   .auth-gate {

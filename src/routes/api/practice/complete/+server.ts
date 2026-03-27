@@ -85,6 +85,7 @@ function runJournalUpdateInBackground(
         currentJournal: progressJournal,
         sessionSummary: summary,
         sessionMeta: {
+          category: 'practice_review',
           topic: 'practice_review',
           exerciseTypes: [],
           keyPhrases: [],

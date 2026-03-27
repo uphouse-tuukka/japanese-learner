@@ -118,6 +118,61 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 const SESSION_MODEL = 'gpt-5.2';
 
+export const TOPIC_CATEGORIES = [
+  {
+    key: 'greetings_basics',
+    label: 'Greetings & Basics',
+    examples: 'Self-introductions, thank you, excuse me, counting, basic polite phrases',
+  },
+  {
+    key: 'food_dining',
+    label: 'Food & Dining',
+    examples: 'Restaurants, ordering food, menu items, dietary needs, paying the bill',
+  },
+  {
+    key: 'transport',
+    label: 'Transport',
+    examples: 'Trains, buses, taxis, buying tickets, asking for platforms, IC cards',
+  },
+  {
+    key: 'shopping',
+    label: 'Shopping',
+    examples: 'Convenience stores, souvenirs, prices, sizes, trying on clothes',
+  },
+  {
+    key: 'directions',
+    label: 'Directions & Navigation',
+    examples: 'Asking the way, landmarks, reading signs, using maps',
+  },
+  {
+    key: 'hotel_accommodation',
+    label: 'Hotel & Accommodation',
+    examples: 'Check-in/out, room requests, problems, amenities',
+  },
+  {
+    key: 'emergencies_health',
+    label: 'Emergencies & Health',
+    examples: 'Pharmacy, doctor visits, lost items, police, feeling unwell',
+  },
+  {
+    key: 'social_conversation',
+    label: 'Social & Conversation',
+    examples: 'Small talk, weather, compliments, hobbies, meeting people',
+  },
+  {
+    key: 'sightseeing_culture',
+    label: 'Sightseeing & Culture',
+    examples: 'Temples, museums, etiquette, customs, photo requests',
+  },
+  {
+    key: 'bars_nightlife',
+    label: 'Bars & Nightlife',
+    examples: 'Izakaya ordering, drinks, karaoke, bar etiquette, nomikai culture',
+  },
+] as const;
+
+export type TopicCategoryKey = (typeof TOPIC_CATEGORIES)[number]['key'];
+
 let openaiClient: OpenAI | null = null;
 
 function nowIso(): string {
@@ -270,6 +325,8 @@ function normalizeLesson(raw: unknown): Lesson {
     throw new Error('[ai] lesson.keyPhrases must contain at least 1 entry');
   return {
     topic: requireString(row, 'lesson.topic', 'topic', 'title', 'subject'),
+    category:
+      typeof row.category === 'string' && row.category.trim() ? row.category.trim() : undefined,
     explanation: requireString(
       row,
       'lesson.explanation',
@@ -624,6 +681,7 @@ export async function generateSessionPlan(input: {
   exerciseCount?: number;
   sessionHistory?: Array<{
     date: string;
+    category?: string;
     topic: string;
     accuracy: number;
     strengths: string[];
@@ -633,6 +691,12 @@ export async function generateSessionPlan(input: {
   }>;
   recentAccuracy?: number;
   coveredTopics?: string[];
+  categoryRotation?: {
+    currentCategory: string | null;
+    currentCategoryStreak: number;
+    recentCategories: Array<{ category: string; sessionsAgo: number }>;
+    neverVisited: string[];
+  };
   totalSessionCount?: number;
   performanceInsights?: {
     overallAccuracy: number;
@@ -653,10 +717,46 @@ export async function generateSessionPlan(input: {
       input.userLevel === 'ready_for_japan');
   const targetExerciseCount = Math.min(12, Math.max(4, Math.round(input.exerciseCount ?? 6)));
   const sessionHistory = (input.sessionHistory ?? []).slice(0, 10);
-  const recentTopics = sessionHistory
-    .slice(0, 5)
-    .map((item) => item.topic.trim())
+  const categoryList = TOPIC_CATEGORIES.map((c) => `${c.key}: ${c.label} (${c.examples})`).join(
+    '; ',
+  );
+  const categoryRotation = input.categoryRotation;
+  const categoryContext = categoryRotation
+    ? [
+        'TOPIC CATEGORY ROTATION:',
+        `Available categories: ${categoryList}.`,
+        `Current category streak: ${categoryRotation.currentCategory ? `"${categoryRotation.currentCategory}" × ${categoryRotation.currentCategoryStreak} session(s)` : 'none (first session)'}. `,
+        categoryRotation.currentCategoryStreak >= 3
+          ? `MUST switch to a different category — 3 sessions reached.`
+          : categoryRotation.currentCategoryStreak >= 2
+            ? `You may continue this category one more time or switch — your choice based on learner progress.`
+            : `Continue this category to build depth, or switch if the learner seems ready.`,
+        categoryRotation.recentCategories.length > 0
+          ? `Recently visited (do NOT return to these yet): ${categoryRotation.recentCategories.map((c) => c.category).join(', ')}.`
+          : '',
+        categoryRotation.neverVisited.length > 0
+          ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
+          : '',
+        'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow.',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : '';
+
+  const priorNotes = (input.sessionHistory ?? [])
+    .slice(0, 3)
+    .map((s) => {
+      const parts: string[] = [];
+      if (s.weaknesses?.length) parts.push(`weak: ${s.weaknesses.join(', ')}`);
+      if (s.nextSteps?.length) parts.push(`next: ${s.nextSteps.join(', ')}`);
+      return parts.length ? `[${s.topic}] ${parts.join('; ')}` : null;
+    })
     .filter(Boolean);
+
+  const priorNotesBlock =
+    priorNotes.length > 0
+      ? `PRIOR SESSION NOTES (from summary AI — address these):\n${priorNotes.join('\n')}`
+      : '';
 
   const response = await client.responses.create({
     model: SESSION_MODEL,
@@ -668,40 +768,46 @@ export async function generateSessionPlan(input: {
           'You are a Japanese tutor that adapts each session based on learner history.',
           'Output valid JSON only with top-level keys: lesson, exercises, focus.',
           `Current user level: ${input.userLevel}. Apply levelInstructions() as hard constraints for allowed exercise types, difficulty range, and translation directions.`,
-          '1) Teaching flow and progression:',
-          '- Teach one topic first, then quiz only what was taught.',
-          "- Never repeat a lesson topic from the learner's last 5 sessions.",
-          '- Address recent weaknesses directly; follow prior next-steps when possible.',
-          '- Progression threshold: if recentAccuracy > 80, increase challenge slightly; if recentAccuracy < 50, reinforce fundamentals.',
-          '- Staged curriculum by totalSessionCount: 0-20 travel survival only; 20-40 include daily life; 40+ broaden to practical social and work-adjacent situations.',
-          '- Personalize by connecting to previously studied phrases and mistakes.',
+          '',
+          categoryContext,
+          '',
+          priorNotesBlock,
+          '',
+          '1) Teaching flow:',
+          '- Pick a specific topic WITHIN the chosen category. Teach it first, then quiz only what was taught.',
+          '- Address prior session weaknesses and next-steps when relevant to the chosen topic.',
+          '- If recentAccuracy > 80, increase challenge slightly; if < 50, reinforce fundamentals.',
+          '- Personalize by connecting to previously studied phrases.',
+          '',
           '2) Required output structure:',
-          '- lesson must include topic, explanation, culturalNote, keyPhrases (3-5 items).',
-          '- each key phrase must include japanese, romaji, english, usage.',
-          '- every exercise must include: type, title, tags, difficulty, japanese, romaji, englishContext, plus required type-specific fields.',
-          '- if any required field is missing, output is invalid.',
+          '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
+          '- each key phrase: japanese, romaji, english, usage.',
+          '- every exercise must include: type, title, tags, difficulty, japanese, romaji, englishContext, plus type-specific fields.',
           'Exercise type-specific required fields:',
           ...exerciseFieldRequirements(input.userLevel),
+          '',
           '3) Translation robustness:',
-          'For every translation exercise, acceptedAnswers must include AT LEAST 5 valid English variants. Include formal, casual, polite, concise, and natural conversational phrasings; include variants with and without "please"; include variants with and without contractions (e.g., "it is" / "it\'s"); and include both minimal/direct forms and fuller natural English phrasings. A learner saying "Can I have the room key, please" and "Room key, please" are BOTH correct translations of ください requests. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
-          '4) CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output (lesson explanation, cultural note, key phrases, prompts, passages, choices, etc.) must include romaji in parentheses immediately with it. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
-          '5) Exercise quality rules:',
+          'For every translation exercise, acceptedAnswers must include AT LEAST 5 valid English variants. Include formal, casual, polite, concise, and natural conversational phrasings; include variants with and without "please"; include variants with and without contractions (e.g., "it is" / "it\'s"); and include both minimal/direct forms and fuller natural English phrasings. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
+          '',
+          '4) CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output must include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
+          '',
+          '5) Exercise quality:',
           '- Vary exercise types within level constraints.',
-          '- Cover at least 5 distinct phrases or concepts per session; do not use the same phrase in more than 2 exercises.',
-          '- Use generic, non-revealing titles (e.g., "Translate the phrase", "Choose the meaning", "Fill in the blank").',
-          '- Keep questions clear and direct; avoid vague wording unless the context is explicitly described.',
+          '- Cover at least 5 distinct phrases per session; do not reuse the same phrase in more than 2 exercises.',
+          '- Use generic titles (e.g., "Translate the phrase", "Choose the meaning").',
           levelInstructions(input.userLevel),
           ...(allowWritingExercises
             ? [
-                'Japanese writing input is enabled for this learner and their level is elementary or above. You may include writing-style prompts when useful.',
+                'Japanese writing input is enabled for this learner. You may include writing-style prompts when useful.',
               ]
             : [
-                'Japanese writing input is disabled or not available. Do NOT require the learner to type Japanese characters. All expected learner input must be in romaji or English only.',
+                'Japanese writing input is disabled. All expected learner input must be in romaji or English only.',
               ]),
           'Use practical language the learner can immediately use in Japan.',
-          `Do not use these recent topics: ${recentTopics.length ? recentTopics.join(', ') : 'none'}.`,
-          'Keep content coherent around the same lesson topic.',
-        ].join(' '),
+          'Keep content coherent around the chosen topic.',
+        ]
+          .filter(Boolean)
+          .join(' '),
       },
       {
         role: 'user',
@@ -712,7 +818,6 @@ export async function generateSessionPlan(input: {
             level: input.userLevel,
             sessionHistory,
             recentAccuracy: input.recentAccuracy ?? null,
-            coveredTopics: input.coveredTopics ?? [],
             totalSessionCount: input.totalSessionCount ?? 0,
             performanceInsights: input.performanceInsights ?? {
               overallAccuracy: 0,
@@ -725,6 +830,7 @@ export async function generateSessionPlan(input: {
           requiredOutputExample: {
             lesson: {
               topic: 'Ordering at a restaurant',
+              category: 'food_dining',
               explanation: 'When eating out in Japan, you can use a few polite phrases...',
               culturalNote: "In Japan, you don't tip. Service is included.",
               keyPhrases: [
@@ -808,6 +914,7 @@ export async function generateSessionPlan(input: {
   }
 
   const usage = getUsageFromResponse(response);
+  const parsedLesson = parsed.lesson as Record<string, unknown> | null;
 
   const plan: SessionPlan = {
     id: `session-${randomUUID()}`,
@@ -823,6 +930,7 @@ export async function generateSessionPlan(input: {
     },
     metadata: {
       focus: assertString(parsed.focus, 'focus'),
+      category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : undefined,
       exerciseCount: exercises.length,
       teachingFlow: 'lesson_then_quiz',
       userLevel: input.userLevel,
@@ -937,27 +1045,19 @@ export async function generateSessionSummary(input: {
       {
         role: 'system',
         content: [
-          'You are a Japanese tutor giving specific, actionable feedback based on actual answers.',
-          'Return JSON only with keys: summary, strengths, weaknesses, nextSteps, levelUpRecommendation.',
-          'CRITICAL RULES for accuracy:',
-          '1) Only reference exercises and answers that actually appear in the results data. Never fabricate or assume exercises that were not in the session.',
-          "2) If accuracy is below 100, 'weaknesses' must describe mistakes the learner actually made during this session. If accuracy is 100, provide 1-2 'weaknesses' phrased as areas to deepen (e.g., speed, nuance, alternative phrasing) based only on covered content.",
-          "3) If the learner progress journal is provided, use it to avoid repeating previously covered topics in 'nextSteps'. Prefer adjacent or progressive topics not already listed in journal 'Topics covered'.",
-          '4) If cumulative progress context exists, acknowledge it naturally in strengths (e.g., building on prior vocabulary).',
-          '5) All Japanese text must include romaji in parentheses, e.g. こんにちは (konnichiwa). Never output Japanese without romaji.',
-          "6) Keep 'weaknesses' specific to THIS session's mistakes. Only repeat a prior weakness if this session clearly shows it is persistent.",
-          "7) 'nextSteps' should suggest what to learn next, including topics not yet covered.",
-          "8) 'strengths' must reference specific correct answers from the session data.",
-          "9) Never leave 'weaknesses' empty.",
-          '10) Evaluate whether the learner should be promoted to the next level based on this session plus cumulative progress context.',
-          '11) Recommend promotion only when there is consistent strong performance and mastery: accuracy >= 80 across recent sessions and clear evidence of mastery in strengths/journal.',
-          '12) If userLevel is ready_for_japan, do not recommend promotion.',
-          '13) levelUpRecommendation must be either null or an object with recommendedLevel and reason.',
-          "IMPORTANT: The 'isCorrect' field reflects automated string matching which may be imperfect. Translation answers that convey the same meaning ARE CORRECT even if phrased differently from acceptedAnswers. Do NOT penalize natural English phrasings, added politeness words, or minor structural differences.",
-          "Focus on meaning equivalence, not word-for-word matching: if core meaning, intent, and politeness level are preserved, mark the answer correct. Do not mark answers wrong for added 'please', different word order with the same meaning, contractions vs full forms (e.g., 'It's' vs 'It is'), or formal vs casual register shifts that keep meaning.",
-          'If you determine that an answer marked as incorrect was actually correct (semantically equivalent), call it out as a strength, not a weakness, and reflect the more accurate positive assessment in your narrative accuracy.',
-          'Reference exact phrases, exact topics, and concrete mistakes from the completed exercises.',
-          'Keep feedback encouraging, practical, and travel-focused.',
+          'You are a Japanese tutor providing a concise handoff note for the next session.',
+          'Return JSON only with keys: summary, patterns_strong, patterns_weak, next_focus, levelUpRecommendation.',
+          '',
+          'RULES:',
+          '1) Only reference exercises that appear in the provided session data. Never fabricate.',
+          '2) patterns_strong: Identify PATTERNS and skills the learner demonstrates consistently — compare with prior sessions/journal when evidence exists. Do NOT list individual correct answers. Focus on what skills are ready to build upon.',
+          '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
+          '4) next_focus: Concrete instructions for what THIS APP should cover in upcoming sessions. These feed directly back to the session generator AI. Prioritize progressive topics. Do NOT suggest external activities like flashcards or real-life practice.',
+          '5) All Japanese must include romaji in parentheses. Example: こんにちは (konnichiwa).',
+          '6) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence). Never promote ready_for_japan.',
+          '',
+          "TRANSLATION ACCURACY: The 'isCorrect' field uses string matching which may be imperfect. Answers conveying the same meaning ARE correct. Do not penalize natural phrasings, added politeness, contractions, or word order differences. If an 'incorrect' answer was actually correct, acknowledge it as a strength.",
+          'Keep feedback encouraging, concise, and travel-focused.',
         ].join(' '),
       },
       {
@@ -1036,12 +1136,20 @@ export async function generateSessionSummary(input: {
     userId: input.userId,
     summary: assertString(summaryText, 'summary'),
     strengths: toStringArray(
-      pickFirst(['strengths', 'strength', 'strongPoints', 'strong_points', 'positives']),
+      pickFirst([
+        'patterns_strong',
+        'strengths',
+        'strength',
+        'strongPoints',
+        'strong_points',
+        'positives',
+      ]),
       'strengths',
       ['You completed the session.'],
     ),
     weaknesses: toStringArray(
       pickFirst([
+        'patterns_weak',
         'weaknesses',
         'weakness',
         'areasToDeepen',
@@ -1054,6 +1162,7 @@ export async function generateSessionSummary(input: {
     ),
     nextSteps: toStringArray(
       pickFirst([
+        'next_focus',
         'nextSteps',
         'nextStep',
         'next_steps',
@@ -1091,7 +1200,7 @@ export async function generateSessionSummary(input: {
 export async function generateUpdatedJournal(input: {
   currentJournal: string | null;
   sessionSummary: SessionSummary;
-  sessionMeta: { topic: string; exerciseTypes: string[]; keyPhrases: string[] };
+  sessionMeta: { category?: string; topic: string; exerciseTypes: string[]; keyPhrases: string[] };
   userLevel: UserLevel;
 }): Promise<{
   journal: string;
@@ -1110,21 +1219,19 @@ export async function generateUpdatedJournal(input: {
       {
         role: 'system',
         content: [
-          'Maintain a cumulative learner journal for a Japanese learning app.',
+          'Maintain a cumulative learner journal for a Japanese learning app. This journal is read by AI models to generate future sessions — optimize for machine readability, not human presentation.',
           'Return plain text only, under 500 words.',
           'Merge the existing journal with the new session data.',
           'Use these exact headings in this order:',
-          '**Topics covered**',
-          '**Key phrases mastered**',
-          '**Phrases needing review**',
-          '**Current strengths**',
-          '**Areas to improve**',
-          '**Sessions completed**',
-          '**Overall trajectory**',
+          '**Categories & topics covered** — list each category with its topics (e.g., food_dining: ordering, menu items)',
+          '**Vocabulary bank** — key phrases learned, capped at ~30 most recent/important. Drop older mastered items to stay under cap.',
+          '**Persistent weak spots** — only patterns that keep recurring across multiple sessions. Remove items the learner has since mastered.',
+          '**Progress snapshot** — session count, current level, any streak info',
+          '**Learning trajectory** — 1-2 sentences on overall direction and readiness',
           'Use short bullet points under each heading.',
           'Keep content specific, evidence-based, and cumulative.',
           'Sessions completed rule: first session = 1; otherwise increment the count from the existing journal.',
-          'When Japanese appears, include romaji in parentheses.',
+          'Do NOT include romaji — this data is for AI consumption only.',
         ].join(' '),
       },
       {
@@ -1134,6 +1241,7 @@ export async function generateUpdatedJournal(input: {
           'SESSION:',
           JSON.stringify({
             level: input.userLevel,
+            category: input.sessionMeta.category ?? 'unknown',
             topic: input.sessionMeta.topic,
             exerciseTypes: input.sessionMeta.exerciseTypes,
             keyPhrases: input.sessionMeta.keyPhrases,

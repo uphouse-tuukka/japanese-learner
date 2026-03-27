@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { generateSessionPlan } from '$lib/server/ai';
+import { generateSessionPlan, TOPIC_CATEGORIES } from '$lib/server/ai';
 import {
   attachExercisesToSession,
   createSessionRecord,
@@ -29,6 +29,7 @@ type GenerateResponse = {
 
 type SessionHistoryItem = {
   date: string;
+  category?: string;
   topic: string;
   accuracy: number;
   strengths: string[];
@@ -57,6 +58,7 @@ function parseSessionMeta(summary: string | null): SessionMeta | null {
     }
     return {
       summaryText: parsed.summaryText,
+      category: typeof parsed.category === 'string' ? parsed.category : undefined,
       topic: parsed.topic,
       accuracy: parsed.accuracy,
       strengths: parsed.strengths.map((item) => String(item)),
@@ -114,13 +116,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const priorSessions = await getSessionsForUser(userId, 10);
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
-      .map((session) => {
+      .map((session): SessionHistoryItem | null => {
         const parsedMeta = parseSessionMeta(session.summary);
         if (!parsedMeta) {
           return null;
         }
         return {
           date: session.createdAt,
+          category: parsedMeta.category,
           topic: parsedMeta.topic,
           accuracy: parsedMeta.accuracy,
           strengths: parsedMeta.strengths,
@@ -132,11 +135,12 @@ export const POST: RequestHandler = async ({ request }) => {
       .filter((item): item is SessionHistoryItem => item !== null);
 
     const sessionHistory: SessionHistoryItem[] = priorSessions
-      .map((session) => {
+      .map((session): SessionHistoryItem | null => {
         const parsedMeta = parseSessionMeta(session.summary);
         if (parsedMeta) {
           return {
             date: session.createdAt,
+            category: parsedMeta.category,
             topic: parsedMeta.topic,
             accuracy: parsedMeta.accuracy,
             strengths: parsedMeta.strengths,
@@ -166,6 +170,50 @@ export const POST: RequestHandler = async ({ request }) => {
     const coveredTopics = Array.from(
       new Set(latestParsedHistory.map((item) => item.topic.trim()).filter(Boolean)),
     );
+    // Compute category rotation
+    const allCategoryKeys = TOPIC_CATEGORIES.map((c) => c.key);
+    const sessionsWithCategory = parsedSessionHistory.filter((s) => s.category);
+
+    // Find current category streak (consecutive sessions with same category from most recent)
+    let currentCategory: string | null = null;
+    let currentCategoryStreak = 0;
+    if (sessionsWithCategory.length > 0) {
+      currentCategory = sessionsWithCategory[0].category!;
+      currentCategoryStreak = 1;
+      for (let i = 1; i < sessionsWithCategory.length; i++) {
+        if (sessionsWithCategory[i].category === currentCategory) {
+          currentCategoryStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Find recently visited categories (within last 4 distinct category changes — these cannot be revisited)
+    const recentCategories: Array<{ category: string; sessionsAgo: number }> = [];
+    const seenCategories = new Set<string>();
+    if (currentCategory) seenCategories.add(currentCategory);
+    let distinctChanges = 0;
+    for (let i = 0; i < sessionsWithCategory.length; i++) {
+      const cat = sessionsWithCategory[i].category!;
+      if (!seenCategories.has(cat)) {
+        seenCategories.add(cat);
+        recentCategories.push({ category: cat, sessionsAgo: i });
+        distinctChanges++;
+        if (distinctChanges >= 4) break;
+      }
+    }
+
+    // Categories never visited
+    const visitedCategories = new Set(sessionsWithCategory.map((s) => s.category!));
+    const neverVisited = allCategoryKeys.filter((k) => !visitedCategories.has(k));
+
+    const categoryRotation = {
+      currentCategory,
+      currentCategoryStreak,
+      recentCategories,
+      neverVisited,
+    };
 
     const exerciseResults = await getExerciseResultsForUser(userId);
     const totalResultCount = exerciseResults.length;
@@ -212,6 +260,7 @@ export const POST: RequestHandler = async ({ request }) => {
       recentAccuracy,
       coveredTopics,
       totalSessionCount: priorSessions.length,
+      categoryRotation,
       performanceInsights: {
         overallAccuracy,
         weakExerciseIds,
