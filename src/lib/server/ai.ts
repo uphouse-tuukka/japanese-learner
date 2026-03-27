@@ -1052,7 +1052,7 @@ export async function generateSessionSummary(input: {
           '1) Only reference exercises that appear in the provided session data. Never fabricate.',
           '2) patterns_strong: Identify PATTERNS and skills the learner demonstrates consistently — compare with prior sessions/journal when evidence exists. Do NOT list individual correct answers. Focus on what skills are ready to build upon.',
           '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
-          '4) next_focus: Concrete instructions for what THIS APP should cover in upcoming sessions. These feed directly back to the session generator AI. Prioritize progressive topics. Do NOT suggest external activities like flashcards or real-life practice.',
+          '4) next_focus: Written as friendly collaborative statements the LEARNER sees (e.g., "Next time we\'ll focus on…", "Let\'s add these to your vocabulary…"). These also feed back to the session generator, so be specific about topics/grammar. Do NOT suggest external activities like flashcards or real-life practice.',
           '5) All Japanese must include romaji in parentheses. Example: こんにちは (konnichiwa).',
           '6) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence). Never promote ready_for_japan.',
           '',
