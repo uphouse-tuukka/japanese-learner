@@ -4,6 +4,7 @@ import { recordTokenUsage } from './db';
 import type { Mission, MissionChoice, MissionMode, MissionTurn } from '../types';
 
 const SESSION_MODEL = 'gpt-5.2';
+const EVALUATION_MODEL = 'gpt-4.1';
 
 let openaiClient: OpenAI | null = null;
 
@@ -475,7 +476,7 @@ export async function evaluateUserResponse(input: {
     return {
       ...evaluation,
       tokenUsage: {
-        model: SESSION_MODEL,
+        model: EVALUATION_MODEL,
         input: 0,
         output: 0,
         total: 0,
@@ -486,7 +487,7 @@ export async function evaluateUserResponse(input: {
   const client = getOpenAiClient();
 
   const response = await client.responses.create({
-    model: SESSION_MODEL,
+    model: EVALUATION_MODEL,
     temperature: 0.2,
     input: [
       {

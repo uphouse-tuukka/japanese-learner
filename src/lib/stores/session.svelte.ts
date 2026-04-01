@@ -16,15 +16,6 @@ type SessionState = {
   summary: SessionSummary | null;
 };
 
-type StoredSessionState = {
-  session: Session;
-  exercises: Exercise[];
-  answers: ExerciseAnswer[];
-  currentIndex: number;
-  summary: SessionSummary | null;
-  savedAt: string;
-};
-
 const stateInternal = $state<SessionState>({
   session: null,
   exercises: [],
@@ -112,14 +103,12 @@ const STORAGE_PREFIX = 'jp-session:';
 
 export function saveSessionToStorage(key: string): void {
   try {
-    if (!stateInternal.session || stateInternal.exercises.length === 0) return;
-    const data: StoredSessionState = {
+    const data = {
       session: stateInternal.session,
       exercises: stateInternal.exercises,
       answers: stateInternal.answers,
       currentIndex: stateInternal.currentIndex,
-      summary: stateInternal.summary,
-      savedAt: new Date().toISOString(),
+      // Don't save summary — completed sessions don't need resuming
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
   } catch {
@@ -131,13 +120,13 @@ export function restoreSessionFromStorage(key: string): boolean {
   try {
     const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return false;
-    const data = JSON.parse(raw) as Partial<StoredSessionState>;
+    const data = JSON.parse(raw) as Partial<SessionState>;
     if (!data.session || !data.exercises || data.exercises.length === 0) return false;
     stateInternal.session = data.session;
     stateInternal.exercises = data.exercises;
     stateInternal.answers = data.answers ?? [];
     stateInternal.currentIndex = data.currentIndex ?? 0;
-    stateInternal.summary = data.summary ?? null;
+    stateInternal.summary = null;
     return true;
   } catch {
     return false;
@@ -148,22 +137,10 @@ export function hasSavedSession(key: string): boolean {
   try {
     const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return false;
-    const data = JSON.parse(raw) as Partial<StoredSessionState>;
-    const hasExercises = Array.isArray(data.exercises) && data.exercises.length > 0;
-    return !!(data.session && hasExercises);
+    const data = JSON.parse(raw);
+    return !!(data?.session && data?.exercises?.length > 0);
   } catch {
     return false;
-  }
-}
-
-export function getSavedSessionAt(key: string): string | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as Partial<StoredSessionState>;
-    return typeof data.savedAt === 'string' ? data.savedAt : null;
-  } catch {
-    return null;
   }
 }
 

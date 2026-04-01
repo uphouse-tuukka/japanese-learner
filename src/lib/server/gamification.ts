@@ -676,8 +676,15 @@ export async function getGamificationStats(
 
   const [totalXp, streak] = await Promise.all([getTotalXp(userId), getUserStreak(userId)]);
 
-  const currentStreak = streak?.currentStreak ?? 0;
+  let currentStreak = streak?.currentStreak ?? 0;
   const longestStreak = streak?.longestStreak ?? 0;
+  if (currentStreak > 0 && streak?.lastActivityDate) {
+    const isCurrentDate = streak.lastActivityDate === todayDateStr;
+    const isPreviousDate = isYesterday(streak.lastActivityDate, todayDateStr);
+    if (!isCurrentDate && !isPreviousDate) {
+      currentStreak = 0;
+    }
+  }
   const dailyGoalMet =
     streak?.lastActivityDate === todayDateStr ? (streak?.dailyGoalMet ?? false) : false;
 

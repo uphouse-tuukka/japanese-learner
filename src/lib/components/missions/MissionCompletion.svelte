@@ -2,10 +2,11 @@
   import { goto } from '$app/navigation';
   import type { Mission, MissionCompleteResponse, MissionMode } from '$lib/types';
 
-  let { data, mission, mode } = $props<{
+  let { data, mission, mode, onTryAgain } = $props<{
     data: MissionCompleteResponse;
     mission: Mission;
     mode: MissionMode;
+    onTryAgain?: () => void;
   }>();
 
   const isImmersion = $derived(mode === 'immersion');
@@ -76,6 +77,9 @@
 
   <footer class="actions">
     <button type="button" class="btn-secondary" onclick={backToMissions}>Back to Missions</button>
+    {#if onTryAgain}
+      <button type="button" class="btn-outline" onclick={onTryAgain}>Try Again</button>
+    {/if}
     <button type="button" class="btn-primary" onclick={primaryAction}>
       {isImmersion ? 'Next Mission →' : 'Try in Immersion Mode →'}
     </button>
@@ -214,5 +218,23 @@
     justify-content: center;
     gap: var(--space-3);
     flex-wrap: wrap;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1.5px solid var(--border-sumi);
+    color: var(--text-sumi);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+  }
+
+  .btn-outline:hover {
+    background: var(--bg-washi);
+    border-color: var(--accent-shu);
   }
 </style>

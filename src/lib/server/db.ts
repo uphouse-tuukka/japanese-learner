@@ -197,7 +197,7 @@ id TEXT PRIMARY KEY,
 user_id TEXT NOT NULL,
 session_id TEXT,
 amount INTEGER NOT NULL,
-reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus')),
+reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY (user_id) REFERENCES users(id),
 FOREIGN KEY (session_id) REFERENCES sessions(id)
@@ -280,6 +280,54 @@ PRIMARY KEY (user_id, date)
       ];
 
       await db.batch(schemaStatements);
+      await db.execute({
+        sql: `CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);`,
+      });
+
+      const userXpMigrationKey = 'user_xp_mission_reasons';
+      const userXpMigration = await db.execute({
+        sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+        args: [userXpMigrationKey],
+      });
+
+      if (userXpMigration.rows.length === 0) {
+        const userXpTable = await db.execute({
+          sql: `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_xp' LIMIT 1;`,
+        });
+        const userXpCreateSql = userXpTable.rows[0]?.sql;
+        const hasMissionReasons =
+          typeof userXpCreateSql === 'string' &&
+          userXpCreateSql.includes('mission_complete') &&
+          userXpCreateSql.includes('mission_correct_response') &&
+          userXpCreateSql.includes('mission_natural_phrasing');
+
+        if (!hasMissionReasons) {
+          await db.batch([
+            `ALTER TABLE user_xp RENAME TO user_xp_old;`,
+            `CREATE TABLE user_xp (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+session_id TEXT,
+amount INTEGER NOT NULL,
+reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
+created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (user_id) REFERENCES users(id),
+FOREIGN KEY (session_id) REFERENCES sessions(id)
+);`,
+            `INSERT INTO user_xp (id, user_id, session_id, amount, reason, created_at)
+SELECT id, user_id, session_id, amount, reason, created_at FROM user_xp_old;`,
+            `DROP TABLE user_xp_old;`,
+            `CREATE INDEX IF NOT EXISTS idx_user_xp_user_id ON user_xp(user_id);`,
+            `CREATE INDEX IF NOT EXISTS idx_user_xp_session_id ON user_xp(session_id);`,
+          ]);
+        }
+
+        await db.execute({
+          sql: `INSERT INTO _migrations (key) VALUES (?);`,
+          args: [userXpMigrationKey],
+        });
+      }
+
       const { seedMissions } = await import('./missions-seed');
       await seedMissions(db);
       console.warn('[db] schema initialized');

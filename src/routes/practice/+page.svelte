@@ -17,7 +17,6 @@
     saveSessionToStorage,
     restoreSessionFromStorage,
     hasSavedSession,
-    getSavedSessionAt,
     clearSessionStorage,
   } from '$lib/stores/session.svelte';
   import {
@@ -55,7 +54,6 @@
 
   const STORAGE_KEY = 'practice';
   let showContinuePrompt = $state(false);
-  let continueSavedAtLabel = $state('');
 
   function saveState(): void {
     saveSessionToStorage(STORAGE_KEY);
@@ -67,38 +65,22 @@
     clearGamificationStorage(STORAGE_KEY);
   }
 
-  function continuePracticeSession(): void {
+  function continueSession(): void {
     const restored = restoreSessionFromStorage(STORAGE_KEY);
     if (!restored) {
       showContinuePrompt = false;
-      continueSavedAtLabel = '';
       return;
     }
     restoreGamificationFromStorage(STORAGE_KEY);
     uiState = 'active';
     showContinuePrompt = false;
-    continueSavedAtLabel = '';
   }
 
   function startFresh(): void {
     clearAllStorage();
     showContinuePrompt = false;
-    continueSavedAtLabel = '';
     resetSession();
     resetGamification();
-  }
-
-  function formatSavedAt(savedAt: string | null): string {
-    if (!savedAt) return '';
-    const date = new Date(savedAt);
-    if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
   }
 
   /* — Loading animation state — */
@@ -141,7 +123,6 @@
   $effect(() => {
     if (hasSavedSession(STORAGE_KEY) && uiState === 'idle') {
       showContinuePrompt = true;
-      continueSavedAtLabel = formatSavedAt(getSavedSessionAt(STORAGE_KEY));
     }
   });
 
@@ -157,7 +138,6 @@
     errorMessage = '';
     clearAllStorage();
     showContinuePrompt = false;
-    continueSavedAtLabel = '';
     resetSession();
     resetGamification();
 
@@ -235,7 +215,6 @@
       completeSession(payload.summary);
       clearAllStorage();
       showContinuePrompt = false;
-      continueSavedAtLabel = '';
       uiState = 'done';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -245,23 +224,18 @@
 </script>
 
 <main class="practice-page page-transition">
-  {#if uiState === 'idle'}
+  {#if showContinuePrompt}
     <section class="card">
       <h1>Practice</h1>
-      {#if showContinuePrompt}
-        <div class="continue-prompt">
-          <p>
-            Continue your previous practice session?
-            {#if continueSavedAtLabel}Last saved on {continueSavedAtLabel}.{/if}
-          </p>
-          <div class="continue-actions">
-            <button class="btn btn-primary" onclick={continuePracticeSession}
-              >Continue session</button
-            >
-            <button class="btn btn-secondary" onclick={startFresh}>Start new session</button>
-          </div>
-        </div>
-      {/if}
+      <p>You have an ongoing practice session. Would you like to continue where you left off?</p>
+      <div class="continue-actions">
+        <button class="btn btn-primary" onclick={continueSession}>Continue session</button>
+        <button class="btn btn-secondary" onclick={startFresh}>Start new session</button>
+      </div>
+    </section>
+  {:else if uiState === 'idle'}
+    <section class="card">
+      <h1>Practice</h1>
       <p>
         Run a focused review session with weighted practice exercises drawn from your past learning
         sessions.
@@ -417,16 +391,6 @@
     transition: opacity 0.4s var(--ease-in-out);
     min-height: 1.6em;
     margin: 0;
-  }
-
-  .continue-prompt {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .continue-prompt p {
-    margin: 0;
-    color: var(--text-bokashi);
   }
 
   .continue-actions {

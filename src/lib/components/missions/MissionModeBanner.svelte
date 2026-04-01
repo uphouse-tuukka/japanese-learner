@@ -34,6 +34,7 @@
     border-radius: var(--radius-md);
     border: 1px solid var(--border-light);
     background: var(--bg-washi);
+    min-height: 2.75rem;
   }
 
   .mode-banner.immersion {

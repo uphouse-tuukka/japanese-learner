@@ -13,11 +13,13 @@
   let userInput = $state('');
   let answered = $state(false);
   let isCorrect = $state(false);
-  let hintLevel = $state(0); // 0 = no hint, 1 = first char, 2 = first 3 chars
+  let checking = $state(false);
+  let hintLevel = $state(0);
   let announcement = $state('');
   let resultRef: HTMLElement | undefined = $state();
   let submittedAnswer = $state('');
   let submittedCorrect = $state(false);
+  let aiVerified = $state(false);
 
   const hintText = $derived(
     hintLevel === 0
@@ -36,10 +38,29 @@
     if (hintLevel < 2) hintLevel += 1;
   }
 
-  function handleSubmit(event: SubmitEvent): void {
+  async function checkWithAI(trimmed: string): Promise<boolean> {
+    try {
+      const res = await fetch('/api/check-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedAnswer: exercise.expectedAnswer,
+          acceptedAnswers: exercise.acceptedAnswers,
+          userAnswer: trimmed,
+          exerciseType: 'translation',
+        }),
+      });
+      const data = await res.json();
+      return data.ok === true && data.correct === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleSubmit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
 
-    if (answered || !userInput.trim()) return;
+    if (answered || checking || !userInput.trim()) return;
 
     const trimmed = userInput.trim();
     const normalizedInput = normalizeForComparison(trimmed);
@@ -49,18 +70,37 @@
       allAnswers.push(exercise.expectedRomaji);
     }
 
-    const correct = allAnswers.some((answer) => normalizeForComparison(answer) === normalizedInput);
+    const stringMatchCorrect = allAnswers.some(
+      (answer) => normalizeForComparison(answer) === normalizedInput,
+    );
 
-    answered = true;
-    isCorrect = correct;
+    if (stringMatchCorrect) {
+      answered = true;
+      isCorrect = true;
+      submittedAnswer = trimmed;
+      submittedCorrect = true;
+      aiVerified = false;
+      announcement = 'Correct!';
+      setTimeout(() => resultRef?.focus(), 100);
+      return;
+    }
+
+    // String match failed — ask AI before marking incorrect
+    checking = true;
     submittedAnswer = trimmed;
-    submittedCorrect = correct;
 
-    announcement = correct ? 'Correct!' : `Incorrect. Expected: ${exercise.expectedAnswer}`;
+    const aiCorrect = await checkWithAI(trimmed);
 
-    setTimeout(() => {
-      resultRef?.focus();
-    }, 100);
+    checking = false;
+    answered = true;
+    isCorrect = aiCorrect;
+    submittedCorrect = aiCorrect;
+    aiVerified = aiCorrect;
+    announcement = aiCorrect
+      ? 'Correct! (AI verified)'
+      : `Incorrect. Expected: ${exercise.expectedAnswer}`;
+
+    setTimeout(() => resultRef?.focus(), 100);
   }
 
   function continueToNext(): void {
@@ -77,10 +117,12 @@
     userInput = '';
     answered = false;
     isCorrect = false;
+    checking = false;
     hintLevel = 0;
     announcement = '';
     submittedAnswer = '';
     submittedCorrect = false;
+    aiVerified = false;
   });
 </script>
 
@@ -122,18 +164,25 @@
       class:incorrect={answered && !isCorrect}
       bind:value={userInput}
       placeholder="Type your answer..."
-      disabled={answered}
+      disabled={answered || checking}
       autocomplete="off"
       autocapitalize="off"
     />
 
-    {#if !answered}
+    {#if !answered && !checking}
       <div class="button-row">
         <button type="button" class="hint-btn" onclick={showHint} disabled={hintLevel >= 2}>
           {hintLevel === 0 ? 'Show Hint' : 'More Hint'}
         </button>
 
         <button type="submit" class="check-btn" disabled={!userInput.trim()}> Check </button>
+      </div>
+    {/if}
+
+    {#if checking}
+      <div class="checking-indicator">
+        <span class="checking-dot"></span>
+        <span>Checking your answer…</span>
       </div>
     {/if}
   </form>
@@ -150,7 +199,10 @@
       {#if isCorrect}
         <div class="result-header correct">
           <span class="result-icon">✓</span>
-          <span class="result-title">Correct! <span class="ink-reward">+10 墨</span></span>
+          <span class="result-title"
+            >Correct! {#if aiVerified}<span class="ai-badge">AI verified</span>{/if}
+            <span class="ink-reward">+10 墨</span></span
+          >
         </div>
       {:else}
         <div class="result-header incorrect">
@@ -493,6 +545,37 @@
     display: inline-block;
   }
 
+  .checking-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    margin-top: var(--space-3);
+    background: var(--bg-kinu);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--text-bokashi);
+    animation: slideDown 200ms var(--ease-out);
+  }
+
+  .checking-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-shu);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .ai-badge {
+    font-size: var(--text-xs);
+    background: var(--accent-matcha-wash);
+    color: var(--state-success);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    margin-left: var(--space-1);
+    font-weight: var(--weight-regular, 400);
+  }
+
   .sr-only {
     position: absolute;
     width: 1px;
@@ -541,6 +624,16 @@
 
     100% {
       transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
       opacity: 1;
     }
   }

@@ -53,7 +53,6 @@
   let selectedChoiceIndex = $state<number | null>(null);
 
   let showContinuePrompt = $state(false);
-  let continueSavedAtLabel = $state('');
 
   function getMissionStorageKey(): string {
     return `jp-mission:${data.mission.id}`;
@@ -70,7 +69,6 @@
     totalTurns: number;
     correctCount: number;
     naturalCount: number;
-    savedAt: string;
   };
 
   function saveMissionState(): void {
@@ -86,36 +84,19 @@
         totalTurns,
         correctCount,
         naturalCount,
-        savedAt: new Date().toISOString(),
       };
       sessionStorage.setItem(getMissionStorageKey(), JSON.stringify(stateData));
     } catch {
-      /* ignore */
+      // ignore
     }
   }
 
-  function clearMissionStorage(): void {
-    try {
-      sessionStorage.removeItem(getMissionStorageKey());
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function continueMission(): void {
+  function restoreMissionState(): boolean {
     try {
       const raw = sessionStorage.getItem(getMissionStorageKey());
-      if (!raw) {
-        showContinuePrompt = false;
-        continueSavedAtLabel = '';
-        return;
-      }
+      if (!raw) return false;
       const saved = JSON.parse(raw) as MissionStorageState;
-      if (!saved.userMissionId || !saved.turns?.length) {
-        showContinuePrompt = false;
-        continueSavedAtLabel = '';
-        return;
-      }
+      if (!saved.userMissionId || !saved.turns || saved.turns.length === 0) return false;
       mode = saved.mode;
       userMissionId = saved.userMissionId;
       turns = saved.turns;
@@ -126,50 +107,53 @@
       totalTurns = saved.totalTurns;
       correctCount = saved.correctCount;
       naturalCount = saved.naturalCount;
-      uiState = 'active';
-      showContinuePrompt = false;
-      continueSavedAtLabel = '';
+      return true;
     } catch {
-      showContinuePrompt = false;
-      continueSavedAtLabel = '';
+      return false;
     }
+  }
+
+  function hasSavedMissionState(): boolean {
+    try {
+      const raw = sessionStorage.getItem(getMissionStorageKey());
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      return !!(data?.userMissionId && data?.turns?.length > 0);
+    } catch {
+      return false;
+    }
+  }
+
+  function clearMissionStorage(): void {
+    try {
+      sessionStorage.removeItem(getMissionStorageKey());
+    } catch {
+      // ignore
+    }
+  }
+
+  function continueMission(): void {
+    const restored = restoreMissionState();
+    if (!restored) {
+      showContinuePrompt = false;
+      return;
+    }
+    uiState = 'active';
+    showContinuePrompt = false;
   }
 
   function startFreshMission(): void {
     clearMissionStorage();
     showContinuePrompt = false;
-    continueSavedAtLabel = '';
     resetMissionState();
-  }
-
-  function formatSavedAt(savedAt: string | undefined): string {
-    if (!savedAt) return '';
-    const date = new Date(savedAt);
-    if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
   }
 
   const canStart = $derived(data.unlocked && uiState === 'ready');
   const currentTurn = $derived(turns[currentTurnIndex] ?? null);
 
   $effect(() => {
-    if (uiState !== 'ready' || !data.unlocked) return;
-    try {
-      const raw = sessionStorage.getItem(getMissionStorageKey());
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved?.userMissionId && saved?.turns?.length > 0) {
-        showContinuePrompt = true;
-        continueSavedAtLabel = formatSavedAt(saved.savedAt);
-      }
-    } catch {
-      /* ignore */
+    if (hasSavedMissionState() && uiState === 'ready' && data.unlocked) {
+      showContinuePrompt = true;
     }
   });
 
@@ -355,10 +339,7 @@
 
   {#if showContinuePrompt}
     <section class="card ready-card">
-      <p>
-        Continue your previous mission?
-        {#if continueSavedAtLabel}Last saved on {continueSavedAtLabel}.{/if}
-      </p>
+      <p>You have an ongoing mission session. Would you like to continue?</p>
       <div class="continue-actions">
         <button class="btn btn-primary" onclick={continueMission}>Continue mission</button>
         <button class="btn btn-secondary" onclick={startFreshMission}>Start over</button>
@@ -453,7 +434,17 @@
       {/if}
     </section>
   {:else if uiState === 'complete' && completionData}
-    <MissionCompletion data={completionData} mission={data.mission} {mode} />
+    <MissionCompletion
+      data={completionData}
+      mission={data.mission}
+      {mode}
+      onTryAgain={() => {
+        clearMissionStorage();
+        resetMissionState();
+        uiState = 'ready';
+        mode = 'practice';
+      }}
+    />
   {:else if uiState === 'error'}
     <section class="card error-card" aria-live="polite">
       <p>{errorMessage || 'Something went wrong.'}</p>
@@ -487,7 +478,6 @@
     color: var(--text-usuzumi);
   }
 
-  .ready-card,
   .status-card,
   .chat-card,
   .error-card {
@@ -495,10 +485,14 @@
     gap: var(--space-3);
   }
 
-  .ready-card,
-  .status-card {
-    min-height: 16rem;
-    align-content: center;
+  .ready-card {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6);
+  }
+
+  .ready-card .btn-primary {
+    justify-self: start;
   }
 
   .locked-message {
@@ -578,6 +572,8 @@
   }
 
   .status-card {
+    min-height: 16rem;
+    align-content: center;
     justify-items: center;
     text-align: center;
     padding: var(--space-8) var(--space-6);
