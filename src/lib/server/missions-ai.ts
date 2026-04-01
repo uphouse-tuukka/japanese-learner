@@ -3,7 +3,7 @@ import { config } from './config';
 import { recordTokenUsage } from './db';
 import type { Mission, MissionChoice, MissionMode, MissionTurn } from '../types';
 
-const SESSION_MODEL = 'gpt-5.2';
+const SESSION_MODEL = 'gpt-5.4';
 const EVALUATION_MODEL = 'gpt-4.1';
 
 let openaiClient: OpenAI | null = null;

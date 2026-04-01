@@ -108,6 +108,7 @@ export function saveSessionToStorage(key: string): void {
       exercises: stateInternal.exercises,
       answers: stateInternal.answers,
       currentIndex: stateInternal.currentIndex,
+      savedAt: new Date().toISOString(),
       // Don't save summary — completed sessions don't need resuming
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
@@ -144,6 +145,16 @@ export function hasSavedSession(key: string): boolean {
   }
 }
 
+export function getSavedSessionAt(key: string): string | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return typeof data?.savedAt === 'string' ? data.savedAt : null;
+  } catch {
+    return null;
+  }
+}
 export function clearSessionStorage(key: string): void {
   try {
     sessionStorage.removeItem(STORAGE_PREFIX + key);
