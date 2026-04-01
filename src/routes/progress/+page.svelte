@@ -115,12 +115,12 @@
         <h1>Progress</h1>
         <div class="header-badges">
           <div class="total-ink-badge">
-            <span class="shimmer-block" style="width: 4rem; height: 2.25rem;"></span>
-            <span class="shimmer-block" style="width: 6rem; height: 1rem;"></span>
+            <span class="shimmer-block" style="width: 4rem; height: 38px;"></span>
+            <span class="shimmer-block" style="width: 6rem; height: 26px;"></span>
           </div>
           <span
             class="shimmer-block"
-            style="width: 5rem; height: 2.5rem; border-radius: var(--radius-md);"
+            style="width: 5rem; height: 69px; border-radius: var(--radius-md);"
           ></span>
         </div>
       </header>
@@ -402,7 +402,7 @@
   }
 
   .skeleton-calendar {
-    padding-left: 2.5rem;
+    padding-left: 2.3rem;
   }
 
   @keyframes shimmer {
