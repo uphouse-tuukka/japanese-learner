@@ -70,6 +70,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Your own Japanese Tutor!</title>
+</svelte:head>
+
 {#if data.authenticated}
   <div class="shell">
     <header class="header">
@@ -97,12 +101,6 @@
             <span class="nav-en">Progress</span>
             <span class="nav-ja">進捗</span>
           </a>
-          {#if data.dev}
-            <a href="/design" class="nav-link" class:active={isActive('/design')}>
-              <span class="nav-en">Design</span>
-              <span class="nav-ja">デザイン</span>
-            </a>
-          {/if}
         </nav>
       </div>
     </header>

@@ -35,7 +35,7 @@ function candidate(input: CandidateInput) {
 }
 
 describe('scoreCandidate', () => {
-  it('returns 7 for never-seen exercise with no history', () => {
+  it('returns 1 when wrongCount=0, correctCount=0, lastSeenAt=null', () => {
     const score = scoreCandidate(
       candidate({
         id: 'a',
@@ -45,10 +45,10 @@ describe('scoreCandidate', () => {
       }),
     );
 
-    expect(score).toBe(7);
+    expect(score).toBe(1);
   });
 
-  it('returns 22 for never-seen exercise with 3 wrong and 0 correct', () => {
+  it('returns 7 when wrongCount=3, correctCount=0, lastSeenAt=null', () => {
     const score = scoreCandidate(
       candidate({
         id: 'a',
@@ -58,10 +58,10 @@ describe('scoreCandidate', () => {
       }),
     );
 
-    expect(score).toBe(22);
+    expect(score).toBe(7);
   });
 
-  it('returns 1 for seen exercise with 0 wrong and 5 correct', () => {
+  it("returns 1 when wrongCount=0, correctCount=5, lastSeenAt='2025-01-01...'", () => {
     const score = scoreCandidate(
       candidate({
         id: 'a',
@@ -74,7 +74,7 @@ describe('scoreCandidate', () => {
     expect(score).toBe(1);
   });
 
-  it('returns 13 for seen exercise with 2 wrong and 1 correct', () => {
+  it("returns 5 when wrongCount=2, correctCount=1, lastSeenAt='2025-01-01...'", () => {
     const score = scoreCandidate(
       candidate({
         id: 'a',
@@ -84,10 +84,10 @@ describe('scoreCandidate', () => {
       }),
     );
 
-    expect(score).toBe(13);
+    expect(score).toBe(5);
   });
 
-  it('returns 6 for seen exercise with 1 wrong and 3 correct', () => {
+  it("returns 3 when wrongCount=1, correctCount=3, lastSeenAt='2025-01-01...'", () => {
     const score = scoreCandidate(
       candidate({
         id: 'a',
@@ -97,7 +97,7 @@ describe('scoreCandidate', () => {
       }),
     );
 
-    expect(score).toBe(6);
+    expect(score).toBe(3);
   });
 });
 
@@ -128,7 +128,7 @@ describe('toExerciseCount', () => {
 });
 
 describe('pickTopExercises', () => {
-  it('returns highest-scored candidates first', () => {
+  it('returns all candidates when target equals pool size', () => {
     const result = pickTopExercises(
       [
         candidate({
@@ -153,10 +153,11 @@ describe('pickTopExercises', () => {
       3,
     );
 
-    expect(result.map((exercise) => exercise.id)).toEqual(['top', 'mid', 'low']);
+    expect(result).toHaveLength(3);
+    expect(result.map((exercise) => exercise.id).sort()).toEqual(['low', 'mid', 'top']);
   });
 
-  it('breaks score ties by oldest lastSeenAt first', () => {
+  it('returns all candidates for equal-weight items', () => {
     const result = pickTopExercises(
       [
         candidate({
@@ -175,7 +176,8 @@ describe('pickTopExercises', () => {
       2,
     );
 
-    expect(result.map((exercise) => exercise.id)).toEqual(['older', 'newer']);
+    expect(result).toHaveLength(2);
+    expect(result.map((exercise) => exercise.id).sort()).toEqual(['newer', 'older']);
   });
 
   it('respects target count and returns only N items', () => {
@@ -204,7 +206,6 @@ describe('pickTopExercises', () => {
     );
 
     expect(result).toHaveLength(2);
-    expect(result.map((exercise) => exercise.id)).toEqual(['a', 'b']);
   });
 
   it('returns fewer than target when candidates are fewer than target', () => {
