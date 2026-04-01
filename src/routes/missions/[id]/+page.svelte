@@ -486,6 +486,8 @@
   }
 
   .ready-card {
+    min-height: 16rem;
+    align-content: center;
     display: grid;
     gap: var(--space-3);
     padding: var(--space-6);

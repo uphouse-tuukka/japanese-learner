@@ -68,7 +68,7 @@
 
   .track-scroller {
     overflow-x: auto;
-    padding-bottom: var(--space-2);
+    padding: var(--space-2) 0;
   }
 
   .track-row {

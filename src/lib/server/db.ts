@@ -190,7 +190,6 @@ tokens_out INTEGER NOT NULL,
 tokens_total INTEGER NOT NULL,
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY (user_id) REFERENCES users(id),
-FOREIGN KEY (session_id) REFERENCES sessions(id)
 );`,
         `CREATE TABLE IF NOT EXISTS user_xp (
 id TEXT PRIMARY KEY,
@@ -199,8 +198,7 @@ session_id TEXT,
 amount INTEGER NOT NULL,
 reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id),
-FOREIGN KEY (session_id) REFERENCES sessions(id)
+FOREIGN KEY (user_id) REFERENCES users(id)
 );`,
         `CREATE TABLE IF NOT EXISTS user_streaks (
 user_id TEXT PRIMARY KEY,
@@ -311,8 +309,7 @@ session_id TEXT,
 amount INTEGER NOT NULL,
 reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id),
-FOREIGN KEY (session_id) REFERENCES sessions(id)
+FOREIGN KEY (user_id) REFERENCES users(id)
 );`,
             `INSERT INTO user_xp (id, user_id, session_id, amount, reason, created_at)
 SELECT id, user_id, session_id, amount, reason, created_at FROM user_xp_old;`,

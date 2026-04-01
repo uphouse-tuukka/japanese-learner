@@ -623,7 +623,7 @@ export async function processMissionCompletion(
   if (xpBreakdown.missionCompletion > 0) {
     transactions.push({
       userId,
-      sessionId: missionId,
+      sessionId: null,
       amount: xpBreakdown.missionCompletion,
       reason: 'mission_complete',
     });
@@ -632,7 +632,7 @@ export async function processMissionCompletion(
   if (xpBreakdown.correctResponses > 0) {
     transactions.push({
       userId,
-      sessionId: missionId,
+      sessionId: null,
       amount: xpBreakdown.correctResponses,
       reason: 'mission_correct_response',
     });
@@ -641,7 +641,7 @@ export async function processMissionCompletion(
   if (xpBreakdown.naturalPhrasing > 0) {
     transactions.push({
       userId,
-      sessionId: missionId,
+      sessionId: null,
       amount: xpBreakdown.naturalPhrasing,
       reason: 'mission_natural_phrasing',
     });
