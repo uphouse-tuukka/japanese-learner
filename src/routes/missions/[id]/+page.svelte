@@ -46,6 +46,7 @@
   let totalTurns = $state(5);
   let correctCount = $state(0);
   let naturalCount = $state(0);
+  let hintsEnabled = $state(true);
   let userInput = $state('');
   let completionData = $state<MissionCompleteResponse | null>(null);
 
@@ -69,6 +70,7 @@
     totalTurns: number;
     correctCount: number;
     naturalCount: number;
+    hintsEnabled: boolean;
   };
 
   function saveMissionState(): void {
@@ -84,6 +86,7 @@
         totalTurns,
         correctCount,
         naturalCount,
+        hintsEnabled,
       };
       sessionStorage.setItem(getMissionStorageKey(), JSON.stringify(stateData));
     } catch {
@@ -107,6 +110,7 @@
       totalTurns = saved.totalTurns;
       correctCount = saved.correctCount;
       naturalCount = saved.naturalCount;
+      hintsEnabled = saved.hintsEnabled ?? true;
       return true;
     } catch {
       return false;
@@ -146,6 +150,7 @@
     clearMissionStorage();
     showContinuePrompt = false;
     resetMissionState();
+    hintsEnabled = true;
   }
 
   const canStart = $derived(data.unlocked && uiState === 'ready');
@@ -351,6 +356,24 @@
         Ready to practice your Japanese? Start the mission to begin your conversation.
       </p>
 
+      {#if mode === 'immersion'}
+        <div class="hints-toggle-row">
+          <span class="hints-label">💡 Hints</span>
+          <button
+            type="button"
+            class="hints-toggle"
+            role="switch"
+            aria-checked={hintsEnabled}
+            onclick={() => (hintsEnabled = !hintsEnabled)}
+          >
+            <span class="hints-toggle-track" data-enabled={hintsEnabled}>
+              <span class="hints-toggle-thumb" data-enabled={hintsEnabled}></span>
+            </span>
+            <span class="hints-toggle-text">{hintsEnabled ? 'On' : 'Off'}</span>
+          </button>
+        </div>
+      {/if}
+
       {#if !data.unlocked}
         <p class="locked-message">
           🔒 This mission is locked. Complete {data.mission.unlockSessionsRequired} learn sessions in
@@ -413,7 +436,7 @@
             disabled={uiState !== 'active'}
           />
 
-          {#if currentTurn.hint}
+          {#if hintsEnabled && currentTurn.hint}
             <p class="hint">💡 {currentTurn.hint}</p>
           {/if}
 
@@ -443,6 +466,7 @@
         resetMissionState();
         uiState = 'ready';
         mode = 'practice';
+        hintsEnabled = true;
       }}
     />
   {:else if uiState === 'error'}
@@ -486,7 +510,6 @@
   }
 
   .ready-card {
-    min-height: 16rem;
     align-content: center;
     display: grid;
     gap: var(--space-3);
@@ -508,6 +531,73 @@
   .mission-desc {
     margin: 0;
     color: var(--text-bokashi);
+  }
+
+  .hints-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .hints-label {
+    font-size: var(--text-sm);
+    color: var(--text-bokashi);
+    font-weight: var(--weight-medium);
+  }
+
+  .hints-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    border: none;
+    background: transparent;
+    color: var(--text-bokashi);
+    cursor: pointer;
+    padding: 0;
+    font-size: var(--text-sm);
+  }
+
+  .hints-toggle-track {
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--bg-kinu);
+    border: 1px solid var(--border-light);
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .hints-toggle-track[data-enabled='true'] {
+    background: var(--accent-matcha);
+    border-color: var(--accent-matcha);
+  }
+
+  .hints-toggle-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--bg-shoji);
+    border: 1px solid var(--border-light);
+    transform: translateX(0);
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .hints-toggle-thumb[data-enabled='true'] {
+    transform: translateX(16px);
+    border-color: var(--accent-matcha);
+  }
+
+  .hints-toggle-text {
+    min-width: 1.5rem;
+    text-align: left;
+    color: var(--text-usuzumi);
+    font-size: var(--text-xs);
   }
 
   .scene-card {

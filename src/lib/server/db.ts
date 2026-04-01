@@ -189,7 +189,7 @@ tokens_in INTEGER NOT NULL,
 tokens_out INTEGER NOT NULL,
 tokens_total INTEGER NOT NULL,
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id),
+FOREIGN KEY (user_id) REFERENCES users(id)
 );`,
         `CREATE TABLE IF NOT EXISTS user_xp (
 id TEXT PRIMARY KEY,

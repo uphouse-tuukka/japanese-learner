@@ -10,6 +10,7 @@
   }>();
 
   const isImmersion = $derived(mode === 'immersion');
+  const passed = $derived(data.passed ?? true);
 
   async function backToMissions(): Promise<void> {
     await goto('/missions');
@@ -18,12 +19,26 @@
   async function primaryAction(): Promise<void> {
     await goto('/missions');
   }
+
+  async function tryAgainAction(): Promise<void> {
+    if (onTryAgain) {
+      onTryAgain();
+      return;
+    }
+
+    await goto('/missions');
+  }
 </script>
 
 <section class="completion card">
-  {#if isImmersion}
+  {#if isImmersion && passed}
     <header class="banner success">
       <h2>🎉 Mission Complete!</h2>
+    </header>
+  {:else if isImmersion && !passed}
+    <header class="banner not-passed">
+      <h2>😔 Not Quite...</h2>
+      <p>You need 80% correct to pass and earn the badge.</p>
     </header>
   {:else}
     <header class="banner practice">
@@ -67,6 +82,12 @@
       <p class="badge-statement">{data.confidenceStatement ?? mission.badgeStatement}</p>
       <p class="badge-note">Badge added to your profile ✓</p>
     </section>
+  {:else if isImmersion && !passed}
+    <section class="badge-card locked">
+      <p class="badge-emoji">🔒</p>
+      <p class="badge-name muted">{mission.badgeEmoji} {mission.badgeName}</p>
+      <p class="badge-statement muted">Score 80% or higher to earn this badge</p>
+    </section>
   {:else}
     <section class="badge-card locked">
       <p class="badge-emoji">🔒</p>
@@ -77,12 +98,13 @@
 
   <footer class="actions">
     <button type="button" class="btn-secondary" onclick={backToMissions}>Back to Missions</button>
-    {#if onTryAgain}
-      <button type="button" class="btn-outline" onclick={onTryAgain}>Try Again</button>
+    {#if isImmersion && !passed}
+      <button type="button" class="btn-primary" onclick={tryAgainAction}>Try Again →</button>
+    {:else}
+      <button type="button" class="btn-primary" onclick={primaryAction}>
+        {isImmersion ? 'Next Mission →' : 'Try in Immersion Mode →'}
+      </button>
     {/if}
-    <button type="button" class="btn-primary" onclick={primaryAction}>
-      {isImmersion ? 'Next Mission →' : 'Try in Immersion Mode →'}
-    </button>
   </footer>
 </section>
 
@@ -105,10 +127,21 @@
     background: var(--bg-washi);
   }
 
+  .banner.not-passed {
+    background: var(--accent-shu-wash);
+  }
+
   .banner h2 {
     margin: 0;
     font-size: var(--text-xl);
     text-align: center;
+  }
+
+  .banner.not-passed p {
+    margin: var(--space-2) 0 0;
+    text-align: center;
+    color: var(--text-bokashi);
+    font-weight: var(--weight-medium);
   }
 
   .stats {
@@ -218,23 +251,5 @@
     justify-content: center;
     gap: var(--space-3);
     flex-wrap: wrap;
-  }
-
-  .btn-outline {
-    background: transparent;
-    border: 1.5px solid var(--border-sumi);
-    color: var(--text-sumi);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-weight: 500;
-    transition:
-      background 0.15s,
-      border-color 0.15s;
-  }
-
-  .btn-outline:hover {
-    background: var(--bg-washi);
-    border-color: var(--accent-shu);
   }
 </style>

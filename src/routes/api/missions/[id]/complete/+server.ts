@@ -43,6 +43,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const exchanges = userMission.exchanges;
     const correctResponses = userMission.correctResponses;
     const score = exchanges > 0 ? Math.round((correctResponses / exchanges) * 100) : 0;
+    const passed = score >= 80;
 
     const completion = await processMissionCompletion(userId, userMission.missionId, {
       mode: userMission.mode,
@@ -54,7 +55,7 @@ export const POST: RequestHandler = async ({ request }) => {
     let earnedBadge = null;
     let badgeAlreadyEarned = false;
 
-    if (userMission.mode === 'immersion') {
+    if (userMission.mode === 'immersion' && passed) {
       badgeAlreadyEarned = await hasCompletedMissionInMode(
         userId,
         userMission.missionId,
@@ -88,6 +89,7 @@ export const POST: RequestHandler = async ({ request }) => {
       exchanges,
       correctResponses,
       score,
+      passed,
       xpBreakdown: completion.xpBreakdown,
       badgeEarned: earnedBadge,
       confidenceStatement: earnedBadge?.badgeStatement ?? null,

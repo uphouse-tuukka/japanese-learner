@@ -387,7 +387,7 @@ function buildEvaluationSystemPrompt(input: {
     'Respond in JSON:',
     '{',
     '  "correct": true/false (true if contextually appropriate, even with minor grammar issues),',
-    '  "message": "..." (brief encouraging feedback in English, e.g., "Good! Natural response." or "Almost! Try using ください when ordering."),',
+    '  "message": "..." (brief encouraging feedback in English; if you include any Japanese text, always add romaji in parentheses immediately after it, e.g., "Good! Natural response." or "Almost! Try using ください (kudasai) when ordering."),',
     '  "naturalPhrasing": true/false (true only if the phrasing sounds natural to a native speaker)',
     '}',
   ].join('\n');

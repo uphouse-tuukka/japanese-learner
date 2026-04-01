@@ -396,6 +396,7 @@ export interface MissionCompleteResponse {
   exchanges: number;
   correctResponses: number;
   score: number;
+  passed: boolean;
   xpBreakdown: {
     missionCompletion: number;
     correctResponses: number;

@@ -116,7 +116,7 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-const SESSION_MODEL = 'gpt-5.2';
+const SESSION_MODEL = 'gpt-5.4';
 
 export const TOPIC_CATEGORIES = [
   {
@@ -793,7 +793,7 @@ export async function generateSessionPlan(input: {
           ...exerciseFieldRequirements(input.userLevel),
           '',
           '3) Translation robustness:',
-          'For every translation exercise, acceptedAnswers must include AT LEAST 5 valid English variants. Include formal, casual, polite, concise, and natural conversational phrasings; include variants with and without "please"; include variants with and without contractions (e.g., "it is" / "it\'s"); and include both minimal/direct forms and fuller natural English phrasings. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
+          'For every translation exercise, acceptedAnswers must include AT LEAST 3 valid English variants. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
           '',
           '4) CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output must include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
           '',

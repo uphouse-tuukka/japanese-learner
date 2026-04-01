@@ -15,7 +15,7 @@ type ExerciseTypeBreakdown = {
   type: string;
   totalCount: number;
   correctCount: number;
-  accuracy: number; // percentage in range 0-100
+  accuracy: number;
 };
 
 type DailyXpEntry = {
@@ -29,10 +29,9 @@ function normalizePercentage(value: number): number {
   return Math.max(0, Math.min(100, Math.round(scaled)));
 }
 
-type ProgressPageData = {
-  selectedUserId: string | null;
+export type ProgressData = {
   user: { id: string; level: UserLevel } | null;
-  history: Awaited<ReturnType<typeof getSessionHistory>>;
+  history: Array<Awaited<ReturnType<typeof getSessionHistory>>[number] & { accuracy: number }>;
   gamification: GamificationStats;
   unlockedMilestones: UserMilestone[];
   milestones: Milestone[];
@@ -50,19 +49,21 @@ const EMPTY_GAMIFICATION_STATS: GamificationStats = {
   xpToNextMilestone: 0,
 };
 
-export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPageData> => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
   const selectedUserId = cookies.get('selected_user');
   if (!selectedUserId) {
     return {
-      selectedUserId: null,
-      user: null,
-      history: [],
-      gamification: EMPTY_GAMIFICATION_STATS,
-      unlockedMilestones: [],
-      milestones: MILESTONES,
-      activityDates: [],
-      exerciseTypeBreakdown: [],
-      dailyXpHistory: [],
+      selectedUserId: null as string | null,
+      lazy: Promise.resolve({
+        user: null,
+        history: [],
+        gamification: EMPTY_GAMIFICATION_STATS,
+        unlockedMilestones: [],
+        milestones: MILESTONES,
+        activityDates: [],
+        exerciseTypeBreakdown: [],
+        dailyXpHistory: [],
+      } as ProgressData),
     };
   }
 
@@ -70,15 +71,8 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
   const fallbackDate = new Date().toLocaleDateString('sv-SE', { timeZone: HELSINKI_TIME_ZONE });
   const todayDateStr = /^\d{4}-\d{2}-\d{2}$/.test(localDate) ? localDate : fallbackDate;
 
-  const [
-    rawHistory,
-    gamification,
-    unlockedMilestones,
-    activityDates,
-    rawExerciseTypeBreakdown,
-    dailyXpHistory,
-    user,
-  ] = await Promise.all([
+  // Return the promise WITHOUT awaiting — SvelteKit streams it after instant navigation
+  const lazy = Promise.all([
     getSessionHistory(selectedUserId),
     getGamificationStats(selectedUserId, todayDateStr),
     getUnlockedMilestones(selectedUserId),
@@ -86,35 +80,43 @@ export const load: PageServerLoad = async ({ cookies, url }): Promise<ProgressPa
     getExerciseTypeBreakdown(selectedUserId),
     getDailyXpHistory(selectedUserId),
     getUserById(selectedUserId),
-  ]);
+  ]).then(
+    ([
+      rawHistory,
+      gamification,
+      unlockedMilestones,
+      activityDates,
+      rawExerciseTypeBreakdown,
+      dailyXpHistory,
+      user,
+    ]): ProgressData => {
+      const history = rawHistory.map((entry) => ({
+        ...entry,
+        accuracy: normalizePercentage(entry.accuracy),
+      }));
 
-  const history = rawHistory.map((entry) => ({
-    ...entry,
-    accuracy: normalizePercentage(entry.accuracy),
-  }));
+      const exerciseTypeBreakdown = rawExerciseTypeBreakdown.map((entry) => ({
+        ...entry,
+        accuracy: normalizePercentage(entry.accuracy),
+      }));
 
-  const exerciseTypeBreakdown = rawExerciseTypeBreakdown.map((entry) => ({
-    ...entry,
-    accuracy: normalizePercentage(entry.accuracy),
-  }));
+      return {
+        user: user
+          ? { id: user.id, level: user.level }
+          : { id: selectedUserId, level: 'absolute_beginner' },
+        history,
+        gamification,
+        unlockedMilestones,
+        milestones: MILESTONES,
+        activityDates,
+        exerciseTypeBreakdown,
+        dailyXpHistory,
+      };
+    },
+  );
 
   return {
     selectedUserId,
-    user: user
-      ? {
-          id: user.id,
-          level: user.level,
-        }
-      : {
-          id: selectedUserId,
-          level: 'absolute_beginner',
-        },
-    history,
-    gamification,
-    unlockedMilestones,
-    milestones: MILESTONES,
-    activityDates,
-    exerciseTypeBreakdown,
-    dailyXpHistory,
+    lazy,
   };
 };
