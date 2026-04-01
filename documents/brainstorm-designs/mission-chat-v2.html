@@ -1,0 +1,590 @@
+<!-- Mission Chat — Immersive RPG Style -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  .mission-chat-wrapper {
+    --bg-dark: #1a1a1a;
+    --bg-card: #3a3632;
+    --bg-card-hover: #46423c;
+    --accent-gold: #c4a35a;
+    --accent-gold-glow: rgba(196, 163, 90, 0.25);
+    --cream: #faf6ef;
+    --cream-muted: #d4cfc6;
+    --text-muted: #9a9489;
+    --text-romaji: #8a8478;
+    --green-check: #7cb87c;
+    --header-bg: #faf6ef;
+    --option-bg: #faf6ef;
+    --option-border: #e8e2d6;
+    --option-hover-bg: #f0ebe2;
+    --dot-empty: rgba(196, 163, 90, 0.25);
+    --dot-filled: #c4a35a;
+
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    max-width: 420px;
+    margin: 0 auto;
+    background: var(--bg-dark);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow:
+      0 20px 60px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    height: 880px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Title above mockup ── */
+  .mockup-title {
+    text-align: center;
+    padding: 32px 20px 8px;
+    font-family: 'Inter', sans-serif;
+  }
+  .mockup-title h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #e8e2d6;
+    margin: 0 0 6px;
+    letter-spacing: -0.3px;
+  }
+  .mockup-title p {
+    font-size: 13px;
+    color: #8a8478;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* ── Header Bar ── */
+  .mission-header {
+    background: var(--header-bg);
+    padding: 14px 16px 0;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .mission-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .header-back {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: transparent;
+    color: #4a4640;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .header-back:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d2a26;
+    letter-spacing: -0.2px;
+  }
+
+  .header-progress {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .header-progress-label {
+    font-size: 11px;
+    color: #8a8478;
+    margin-right: 4px;
+    font-weight: 500;
+  }
+
+  .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+  .progress-dot.filled {
+    background: var(--dot-filled);
+    box-shadow: 0 0 4px var(--accent-gold-glow);
+  }
+  .progress-dot.current {
+    background: var(--dot-filled);
+    box-shadow: 0 0 8px var(--accent-gold-glow);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+  .progress-dot.empty {
+    background: transparent;
+    border: 1.5px solid var(--accent-gold);
+    opacity: 0.4;
+  }
+
+  @keyframes dotPulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 6px var(--accent-gold-glow);
+    }
+    50% {
+      transform: scale(1.3);
+      box-shadow: 0 0 14px var(--accent-gold-glow);
+    }
+  }
+
+  /* ── Mode Banner ── */
+  .mode-banner {
+    background: #f2ede4;
+    margin: 0 -16px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-top: 1px solid #e8e2d6;
+  }
+  .mode-banner-text {
+    font-size: 11.5px;
+    color: #8a8478;
+    letter-spacing: 0.01em;
+  }
+  .mode-banner-link {
+    font-size: 11.5px;
+    color: var(--accent-gold);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .mode-banner-link:hover {
+    text-decoration: underline;
+  }
+
+  /* ── Conversation Area ── */
+  .conversation-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #3a3632 transparent;
+  }
+  .conversation-area::-webkit-scrollbar {
+    width: 4px;
+  }
+  .conversation-area::-webkit-scrollbar-thumb {
+    background: #3a3632;
+    border-radius: 2px;
+  }
+
+  /* ── Scene Context Card ── */
+  .scene-context {
+    background: rgba(58, 54, 50, 0.5);
+    border: 1px solid rgba(196, 163, 90, 0.12);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .scene-context p {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.6;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Past Exchange (Completed Turn) ── */
+  .past-exchange {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .past-exchange:last-of-type {
+    border-bottom: none;
+  }
+
+  .past-waiter-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .past-role-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .past-waiter-text {
+    flex: 1;
+  }
+  .past-jp {
+    font-size: 14px;
+    color: var(--cream-muted);
+    font-family: 'Noto Sans JP', sans-serif;
+    line-height: 1.5;
+  }
+  .past-romaji-inline {
+    color: var(--text-romaji);
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+  }
+  .past-speaker-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+    margin-top: 1px;
+  }
+  .past-speaker-btn:hover {
+    opacity: 1;
+  }
+
+  .past-user-response {
+    margin-left: 28px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .past-user-arrow {
+    color: var(--text-muted);
+    font-size: 11px;
+    opacity: 0.5;
+  }
+  .past-user-text {
+    font-size: 13px;
+    color: var(--cream-muted);
+    opacity: 0.85;
+    font-family: 'Noto Sans JP', 'Inter', sans-serif;
+  }
+
+  .past-feedback {
+    margin-left: 28px;
+    margin-top: 3px;
+    font-size: 11.5px;
+    color: var(--green-check);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* ── Current Turn (Active Dialogue Card) ── */
+  .current-turn {
+    margin-top: 4px;
+  }
+  .current-turn-card {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    border-left: 3px solid var(--accent-gold);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.2),
+      0 0 30px rgba(196, 163, 90, 0.06);
+    position: relative;
+  }
+
+  .current-role {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .current-role-icon {
+    font-size: 18px;
+  }
+  .current-role-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-gold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .current-jp {
+    font-size: 22px;
+    color: #f5f0e6;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  .current-romaji {
+    font-size: 13.5px;
+    color: var(--text-romaji);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.4;
+    margin-bottom: 14px;
+  }
+
+  .audio-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(196, 163, 90, 0.12);
+    border: 1px solid rgba(196, 163, 90, 0.2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--accent-gold);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .audio-btn:hover {
+    background: rgba(196, 163, 90, 0.2);
+  }
+  .audio-btn-icon {
+    font-size: 14px;
+  }
+
+  /* ── Response Input Area ── */
+  .response-area {
+    flex-shrink: 0;
+    background: var(--bg-dark);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 16px 16px 18px;
+  }
+
+  .response-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .response-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .response-option {
+    background: var(--option-bg);
+    border: 1.5px solid var(--option-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .response-option::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: var(--accent-gold);
+    transition: width 0.2s;
+    border-radius: 12px 0 0 12px;
+  }
+  .response-option:hover {
+    background: var(--option-hover-bg);
+    border-color: var(--accent-gold);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .response-option:hover::before {
+    width: 3px;
+  }
+
+  .option-jp {
+    font-size: 15px;
+    color: #2d2a26;
+    font-family: 'Noto Sans JP', 'Inter', sans-serif;
+    font-weight: 500;
+    margin-bottom: 1px;
+    line-height: 1.4;
+  }
+  .option-romaji {
+    font-size: 12px;
+    color: #8a8478;
+    margin-bottom: 3px;
+    font-family: 'Inter', sans-serif;
+  }
+  .option-english {
+    font-size: 11.5px;
+    color: #a8a198;
+    font-style: italic;
+  }
+
+  /* ── Bottom CTA link ── */
+  .immersion-cta {
+    text-align: center;
+    padding-top: 12px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .immersion-cta a {
+    font-size: 11.5px;
+    color: var(--accent-gold);
+    text-decoration: none;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .immersion-cta a:hover {
+    opacity: 1;
+    text-decoration: underline;
+  }
+</style>
+
+<!-- Title -->
+<div
+  class="mockup-title"
+  style="background: #1a1a1a; border-radius: 20px 20px 0 0; padding-bottom: 0"
+>
+  <h2>Mission Chat — Immersive RPG Style</h2>
+  <p>
+    Japanese + romaji only from the AI. You figure it out.<br />Badges earned in Immersion Mode
+    only.
+  </p>
+</div>
+
+<!-- Phone Frame -->
+<div class="mission-chat-wrapper" style="border-radius: 0 0 20px 20px">
+  <!-- ═══ 1. Mission Header Bar ═══ -->
+  <div class="mission-header">
+    <div class="mission-header-top">
+      <div class="header-back">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </div>
+      <div class="header-title">🍜 Order at a Restaurant</div>
+      <div class="header-progress">
+        <span class="header-progress-label">3/5</span>
+        <div class="progress-dot filled"></div>
+        <div class="progress-dot filled"></div>
+        <div class="progress-dot current"></div>
+        <div class="progress-dot empty"></div>
+        <div class="progress-dot empty"></div>
+      </div>
+    </div>
+    <div class="mode-banner">
+      <span class="mode-banner-text">Practice Mode —</span>
+      <a class="mode-banner-link" href="#">switch to Immersion Mode to earn badges</a>
+    </div>
+  </div>
+
+  <!-- ═══ 2–3. Conversation Area ═══ -->
+  <div class="conversation-area">
+    <!-- Scene Context Card -->
+    <div class="scene-context">
+      <p>
+        You've been seated at a cozy ramen shop. The waiter approaches with a menu and a warm
+        greeting.
+      </p>
+    </div>
+
+    <!-- ── Past Exchange 1 ── -->
+    <div class="past-exchange">
+      <div class="past-waiter-line">
+        <span class="past-role-icon">🧑‍🍳</span>
+        <div class="past-waiter-text">
+          <span class="past-jp">いらっしゃいませ！何名様ですか？</span><br />
+          <span class="past-romaji-inline">(irasshaimase! nanmeisama desu ka?)</span>
+        </div>
+        <button class="past-speaker-btn" title="Play audio">🔊</button>
+      </div>
+      <div class="past-user-response">
+        <span class="past-user-arrow">↳</span>
+        <span class="past-user-text">You said: 二人です (futari desu)</span>
+      </div>
+      <div class="past-feedback"><span>✓</span> Good response</div>
+    </div>
+
+    <!-- ── Past Exchange 2 ── -->
+    <div class="past-exchange">
+      <div class="past-waiter-line">
+        <span class="past-role-icon">🧑‍🍳</span>
+        <div class="past-waiter-text">
+          <span class="past-jp">かしこまりました。こちらへどうぞ。</span><br />
+          <span class="past-romaji-inline">(kashikomarimashita. kochira e douzo.)</span>
+        </div>
+        <button class="past-speaker-btn" title="Play audio">🔊</button>
+      </div>
+      <div class="past-user-response">
+        <span class="past-user-arrow">↳</span>
+        <span class="past-user-text">You said: ありがとうございます (arigatou gozaimasu)</span>
+      </div>
+      <div class="past-feedback"><span>✓</span> Natural!</div>
+    </div>
+
+    <!-- ── Current Turn (Active) ── -->
+    <div class="current-turn">
+      <div class="current-turn-card">
+        <div class="current-role">
+          <span class="current-role-icon">🧑‍🍳</span>
+          <span class="current-role-label">Waiter</span>
+        </div>
+        <div class="current-jp">ご注文はお決まりですか？</div>
+        <div class="current-romaji">(gochuumon wa okimari desu ka?)</div>
+        <button class="audio-btn">
+          <span class="audio-btn-icon">🔊</span>
+          Play audio
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 4. Response Input Area ═══ -->
+  <div class="response-area">
+    <div class="response-label">Choose your response:</div>
+    <div class="response-options">
+      <div class="response-option">
+        <div class="option-jp">ラーメンをください</div>
+        <div class="option-romaji">(raamen o kudasai)</div>
+        <div class="option-english">Ramen, please</div>
+      </div>
+
+      <div class="response-option">
+        <div class="option-jp">メニューを見せてください</div>
+        <div class="option-romaji">(menyuu o misete kudasai)</div>
+        <div class="option-english">Can I see the menu?</div>
+      </div>
+
+      <div class="response-option">
+        <div class="option-jp">おすすめは何ですか</div>
+        <div class="option-romaji">(osusume wa nan desu ka)</div>
+        <div class="option-english">What do you recommend?</div>
+      </div>
+    </div>
+
+    <div class="immersion-cta">
+      <a href="#">Want to earn badges? Try Immersion Mode →</a>
+    </div>
+  </div>
+</div>

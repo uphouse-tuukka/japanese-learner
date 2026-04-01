@@ -87,3 +87,42 @@ export function consumeInkAnimation(id: string): void {
     (animation) => animation.id !== id,
   );
 }
+
+const GAMIFICATION_STORAGE_PREFIX = 'jp-gamification:';
+
+export function saveGamificationToStorage(key: string): void {
+  try {
+    const data = {
+      sessionXp: stateInternal.sessionXp,
+      comboCount: stateInternal.comboCount,
+      maxCombo: stateInternal.maxCombo,
+      pendingInkAnimations: stateInternal.pendingInkAnimations,
+    };
+    sessionStorage.setItem(GAMIFICATION_STORAGE_PREFIX + key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+export function restoreGamificationFromStorage(key: string): boolean {
+  try {
+    const raw = sessionStorage.getItem(GAMIFICATION_STORAGE_PREFIX + key);
+    if (!raw) return false;
+    const data = JSON.parse(raw) as Partial<GamificationState>;
+    stateInternal.comboCount = data.comboCount ?? 0;
+    stateInternal.maxCombo = data.maxCombo ?? 0;
+    stateInternal.sessionXp = data.sessionXp ?? null;
+    stateInternal.pendingInkAnimations = data.pendingInkAnimations ?? [];
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearGamificationStorage(key: string): void {
+  try {
+    sessionStorage.removeItem(GAMIFICATION_STORAGE_PREFIX + key);
+  } catch {
+    // ignore
+  }
+}

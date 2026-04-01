@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
   import {
     LEVEL_LABELS,
     LEVEL_ORDER,
@@ -41,6 +43,7 @@
     const milestones = xpBreakdown?.newMilestones ?? [];
     return milestones.length > 2 ? milestones.length - 1 : 0;
   });
+  const isOnPracticePage = $derived($page.url.pathname === '/practice');
 
   let displayScore = $state(0);
   let displayXp = $state(0);
@@ -302,7 +305,19 @@
 
   <div class="actions">
     <a class="btn btn-secondary" href="/">Return Home</a>
-    <a class="btn btn-primary" href="/practice">Try Practice Mode</a>
+    {#if isOnPracticePage}
+      <button
+        class="btn btn-primary"
+        onclick={async () => {
+          await invalidateAll();
+          window.location.reload();
+        }}
+      >
+        Practice Again
+      </button>
+    {:else}
+      <a class="btn btn-primary" href="/practice">Try Practice Mode</a>
+    {/if}
   </div>
 </section>
 

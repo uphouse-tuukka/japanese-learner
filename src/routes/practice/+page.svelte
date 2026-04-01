@@ -14,6 +14,11 @@
     nextExercise,
     completeSession,
     resetSession,
+    saveSessionToStorage,
+    restoreSessionFromStorage,
+    hasSavedSession,
+    getSavedSessionAt,
+    clearSessionStorage,
   } from '$lib/stores/session.svelte';
   import {
     recordCorrectAnswer,
@@ -21,6 +26,9 @@
     resetGamification,
     sessionXp,
     setSessionXp,
+    saveGamificationToStorage,
+    restoreGamificationFromStorage,
+    clearGamificationStorage,
   } from '$lib/stores/gamification.svelte';
   import type { Exercise, ExerciseAnswerPayload, ExerciseType, Session } from '$lib/types';
   import type { PageData } from './$types';
@@ -44,6 +52,54 @@
   let { data } = $props<{ data: PageData }>();
   let uiState = $state<UiState>('idle');
   let errorMessage = $state('');
+
+  const STORAGE_KEY = 'practice';
+  let showContinuePrompt = $state(false);
+  let continueSavedAtLabel = $state('');
+
+  function saveState(): void {
+    saveSessionToStorage(STORAGE_KEY);
+    saveGamificationToStorage(STORAGE_KEY);
+  }
+
+  function clearAllStorage(): void {
+    clearSessionStorage(STORAGE_KEY);
+    clearGamificationStorage(STORAGE_KEY);
+  }
+
+  function continuePracticeSession(): void {
+    const restored = restoreSessionFromStorage(STORAGE_KEY);
+    if (!restored) {
+      showContinuePrompt = false;
+      continueSavedAtLabel = '';
+      return;
+    }
+    restoreGamificationFromStorage(STORAGE_KEY);
+    uiState = 'active';
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
+  }
+
+  function startFresh(): void {
+    clearAllStorage();
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
+    resetSession();
+    resetGamification();
+  }
+
+  function formatSavedAt(savedAt: string | null): string {
+    if (!savedAt) return '';
+    const date = new Date(savedAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  }
 
   /* — Loading animation state — */
   const loadingMessages = [
@@ -82,10 +138,11 @@
     };
   });
 
-  /* Reset shared session store on mount to clear stale state from other modes */
   $effect(() => {
-    resetSession();
-    resetGamification();
+    if (hasSavedSession(STORAGE_KEY) && uiState === 'idle') {
+      showContinuePrompt = true;
+      continueSavedAtLabel = formatSavedAt(getSavedSessionAt(STORAGE_KEY));
+    }
   });
 
   const totalExercises = $derived($exercises.length);
@@ -98,6 +155,9 @@
   }): Promise<void> {
     uiState = 'loading';
     errorMessage = '';
+    clearAllStorage();
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
     resetSession();
     resetGamification();
 
@@ -115,6 +175,7 @@
           'No practice exercises available. Complete a learning session first to build your review pool.',
         );
       startSession(payload.session, payload.exercises);
+      saveState();
       uiState = 'active';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -133,6 +194,7 @@
   async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
     if (!currentExercise) return;
     answerExercise($currentIndex, payload);
+    saveState();
     if (payload.isCorrect) {
       recordCorrectAnswer(10);
     } else {
@@ -171,6 +233,9 @@
         setSessionXp(payload.xp);
       }
       completeSession(payload.summary);
+      clearAllStorage();
+      showContinuePrompt = false;
+      continueSavedAtLabel = '';
       uiState = 'done';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -183,6 +248,20 @@
   {#if uiState === 'idle'}
     <section class="card">
       <h1>Practice</h1>
+      {#if showContinuePrompt}
+        <div class="continue-prompt">
+          <p>
+            Continue your previous practice session?
+            {#if continueSavedAtLabel}Last saved on {continueSavedAtLabel}.{/if}
+          </p>
+          <div class="continue-actions">
+            <button class="btn btn-primary" onclick={continuePracticeSession}
+              >Continue session</button
+            >
+            <button class="btn btn-secondary" onclick={startFresh}>Start new session</button>
+          </div>
+        </div>
+      {/if}
       <p>
         Run a focused review session with weighted practice exercises drawn from your past learning
         sessions.
@@ -338,5 +417,21 @@
     transition: opacity 0.4s var(--ease-in-out);
     min-height: 1.6em;
     margin: 0;
+  }
+
+  .continue-prompt {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .continue-prompt p {
+    margin: 0;
+    color: var(--text-bokashi);
+  }
+
+  .continue-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
   }
 </style>

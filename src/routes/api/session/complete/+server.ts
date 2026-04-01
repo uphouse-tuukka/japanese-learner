@@ -181,6 +181,9 @@ export const POST: RequestHandler = async ({ request }) => {
           keyPhrases: s.keyPhrases.slice(0, 5),
           exerciseTypes: s.exerciseTypes,
         }));
+        const recentlyRecommendedPromotion = recentSessions.some(
+          (s) => s.hadLevelUpRecommendation === true,
+        );
         const summaryInput = {
           sessionId,
           userId,
@@ -191,6 +194,7 @@ export const POST: RequestHandler = async ({ request }) => {
           recentSessions: recentSessionsCompact,
           exercises,
           results,
+          suppressPromotion: recentlyRecommendedPromotion,
         };
         const aiResult = await generateSessionSummary(summaryInput);
         summary = aiResult.summary;
@@ -254,6 +258,7 @@ export const POST: RequestHandler = async ({ request }) => {
         nextSteps: summary.nextSteps,
         exerciseTypes,
         keyPhrases,
+        hadLevelUpRecommendation: !!summary.levelUpRecommendation,
       } satisfies SessionMeta),
       tokenInput: summaryTokenInput,
       tokenOutput: summaryTokenOutput,

@@ -17,6 +17,11 @@
     nextExercise,
     completeSession,
     resetSession,
+    saveSessionToStorage,
+    restoreSessionFromStorage,
+    hasSavedSession,
+    getSavedSessionAt,
+    clearSessionStorage,
   } from '$lib/stores/session.svelte';
   import {
     maxCombo,
@@ -25,6 +30,9 @@
     resetGamification,
     sessionXp,
     setSessionXp,
+    saveGamificationToStorage,
+    restoreGamificationFromStorage,
+    clearGamificationStorage,
   } from '$lib/stores/gamification.svelte';
   import type { Exercise, ExerciseAnswerPayload, ExerciseType, Lesson, Session } from '$lib/types';
   import type { PageData } from './$types';
@@ -60,6 +68,99 @@
   let uiState = $state<UiState>('idle');
   let errorMessage = $state('');
   let lesson = $state<Lesson | null>(null);
+
+  const STORAGE_KEY = 'learn';
+  const LESSON_STORAGE_KEY = 'jp-lesson:learn';
+  const UI_STATE_STORAGE_KEY = 'jp-uistate:learn';
+  let showContinuePrompt = $state(false);
+  let continueSavedAtLabel = $state('');
+
+  function saveLessonToStorage(lessonData: Lesson | null): void {
+    try {
+      if (lessonData) {
+        sessionStorage.setItem(LESSON_STORAGE_KEY, JSON.stringify(lessonData));
+      } else {
+        sessionStorage.removeItem(LESSON_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function restoreLessonFromStorage(): Lesson | null {
+    try {
+      const raw = sessionStorage.getItem(LESSON_STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as Lesson;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveState(targetUiState: UiState): void {
+    saveSessionToStorage(STORAGE_KEY);
+    saveGamificationToStorage(STORAGE_KEY);
+    saveLessonToStorage(lesson);
+    try {
+      sessionStorage.setItem(UI_STATE_STORAGE_KEY, targetUiState);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function clearAllStorage(): void {
+    clearSessionStorage(STORAGE_KEY);
+    clearGamificationStorage(STORAGE_KEY);
+    saveLessonToStorage(null);
+    try {
+      sessionStorage.removeItem(UI_STATE_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function continueSession(): void {
+    const restored = restoreSessionFromStorage(STORAGE_KEY);
+    if (!restored) {
+      showContinuePrompt = false;
+      return;
+    }
+    restoreGamificationFromStorage(STORAGE_KEY);
+    lesson = restoreLessonFromStorage();
+    try {
+      const savedState = sessionStorage.getItem(UI_STATE_STORAGE_KEY) as UiState | null;
+      if (savedState === 'lesson' || savedState === 'active') {
+        uiState = savedState;
+      } else {
+        uiState = 'active';
+      }
+    } catch {
+      uiState = 'active';
+    }
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
+  }
+
+  function startFresh(): void {
+    clearAllStorage();
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
+    resetSession();
+    resetGamification();
+  }
+
+  function formatSavedAt(savedAt: string | null): string {
+    if (!savedAt) return '';
+    const date = new Date(savedAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  }
 
   /* — Loading animation state — */
   const loadingMessages = [
@@ -164,6 +265,13 @@
     }
   });
 
+  $effect(() => {
+    if (hasSavedSession(STORAGE_KEY) && uiState === 'idle') {
+      showContinuePrompt = true;
+      continueSavedAtLabel = formatSavedAt(getSavedSessionAt(STORAGE_KEY));
+    }
+  });
+
   const totalExercises = $derived($exercises.length);
   const currentExercise = $derived($exercises[$currentIndex] ?? null);
   const progressCurrent = $derived(Math.min($currentIndex + 1, Math.max($exercises.length, 1)));
@@ -190,6 +298,9 @@
     uiState = 'loading';
     errorMessage = '';
     lesson = null;
+    clearAllStorage();
+    showContinuePrompt = false;
+    continueSavedAtLabel = '';
     resetSession();
     resetGamification();
 
@@ -218,6 +329,7 @@
 
       lesson = payload.lesson;
       startSession(payload.session, shuffleArray(payload.exercises));
+      saveState('lesson');
       uiState = 'lesson';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -263,11 +375,13 @@
       return;
     }
     uiState = 'active';
+    saveState('active');
   }
 
   async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
     if (!currentExercise) return;
     answerExercise($currentIndex, payload);
+    saveState('active');
     if (payload.isCorrect) {
       recordCorrectAnswer(10);
     } else {
@@ -310,6 +424,9 @@
         setSessionXp(payload.xp);
       }
       completeSession(payload.summary);
+      clearAllStorage();
+      showContinuePrompt = false;
+      continueSavedAtLabel = '';
       uiState = 'done';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -319,12 +436,23 @@
 </script>
 
 <main class="learn-page page-transition">
-  <section class="card">
-    <h1>Learn</h1>
-    <p>Start an AI teaching session: learn one practical topic, then answer focused questions.</p>
-  </section>
-
   {#if uiState === 'idle'}
+    <section class="card">
+      <h1>Learn</h1>
+      <p>Start an AI teaching session: learn one practical topic, then answer focused questions.</p>
+      {#if showContinuePrompt}
+        <div class="continue-prompt">
+          <p>
+            Continue your previous learning session?
+            {#if continueSavedAtLabel}Last saved on {continueSavedAtLabel}.{/if}
+          </p>
+          <div class="continue-actions">
+            <button class="btn btn-primary" onclick={continueSession}>Continue session</button>
+            <button class="btn btn-secondary" onclick={startFresh}>Start new session</button>
+          </div>
+        </div>
+      {/if}
+    </section>
     <section class="card">
       <button class="btn btn-primary" onclick={startLearning}>Start learning</button>
     </section>
@@ -618,5 +746,21 @@
 
   .loading-fact-text-container {
     display: grid;
+  }
+
+  .continue-prompt {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .continue-prompt p {
+    margin: 0;
+    color: var(--text-bokashi);
+  }
+
+  .continue-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
   }
 </style>

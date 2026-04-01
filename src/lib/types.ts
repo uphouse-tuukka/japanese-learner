@@ -210,6 +210,7 @@ export interface SessionMeta {
   nextSteps: string[];
   exerciseTypes: string[];
   keyPhrases: string[];
+  hadLevelUpRecommendation?: boolean;
 }
 
 export type ExerciseAnswerPayload = {
@@ -225,7 +226,10 @@ export type XpReason =
   | 'session_complete'
   | 'perfect_score'
   | 'streak_bonus'
-  | 'combo_bonus';
+  | 'combo_bonus'
+  | 'mission_complete'
+  | 'mission_correct_response'
+  | 'mission_natural_phrasing';
 
 export interface XpTransaction {
   id: string;
@@ -279,4 +283,125 @@ export interface GamificationStats {
   dailyGoalMet: boolean;
   nextMilestone: Milestone | null;
   xpToNextMilestone: number;
+}
+
+// Mission types
+export type MissionDifficulty = 'easy' | 'medium' | 'hard';
+export type MissionMode = 'practice' | 'immersion';
+export type MissionStatus = 'in_progress' | 'completed';
+
+export interface Mission {
+  id: string;
+  title: string;
+  category: string;
+  difficulty: MissionDifficulty;
+  sequence: number;
+  scenarioPrompt: string;
+  badgeEmoji: string;
+  badgeName: string;
+  badgeStatement: string;
+  unlockSessionsRequired: number;
+  startUnlocked: boolean;
+}
+
+export interface MissionWithProgress extends Mission {
+  unlocked: boolean;
+  completedPractice: boolean;
+  completedImmersion: boolean;
+  badgeEarned: boolean;
+}
+
+export interface UserMission {
+  id: string;
+  userId: string;
+  missionId: string;
+  mode: MissionMode;
+  status: MissionStatus;
+  exchanges: number;
+  correctResponses: number;
+  score: number;
+  xpEarned: number;
+  badgeEarned: boolean;
+  conversationLog: MissionTurn[];
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface MissionTurn {
+  turnNumber: number;
+  npcDialogue: {
+    japanese: string;
+    romaji: string;
+  };
+  userResponse: {
+    japanese: string;
+    romaji?: string;
+  } | null;
+  feedback: {
+    correct: boolean;
+    message: string;
+  } | null;
+  choices?: MissionChoice[]; // Practice mode only
+  hint?: string; // Immersion mode only
+}
+
+export interface MissionChoice {
+  japanese: string;
+  romaji: string;
+  english: string;
+  isCorrect: boolean;
+}
+
+export interface UserBadge {
+  id: string;
+  userId: string;
+  missionId: string;
+  badgeEmoji: string;
+  badgeName: string;
+  badgeStatement: string;
+  earnedAt: string;
+}
+
+export interface MissionCatalogResponse {
+  missions: MissionWithProgress[];
+  badges: UserBadge[];
+}
+
+export interface MissionStartResponse {
+  userMissionId: string;
+  turn: MissionTurn;
+  sceneDescription: string;
+  characterName: string;
+  characterEmoji: string;
+  totalTurns: number;
+}
+
+export interface MissionRespondRequest {
+  userId: string;
+  userMissionId: string;
+  response: string;
+  turnNumber: number;
+}
+
+export interface MissionRespondResponse {
+  feedback: {
+    correct: boolean;
+    message: string;
+  };
+  nextTurn: MissionTurn | null; // null if last turn
+  isComplete: boolean;
+}
+
+export interface MissionCompleteResponse {
+  exchanges: number;
+  correctResponses: number;
+  score: number;
+  xpBreakdown: {
+    missionCompletion: number;
+    correctResponses: number;
+    naturalPhrasing: number;
+    total: number;
+  };
+  badgeEarned: UserBadge | null; // null if practice mode
+  confidenceStatement: string | null;
 }

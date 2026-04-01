@@ -78,89 +78,9 @@
     </div>
   </section>
 
-  <section>
+  <section class="mb-12">
     <h2 class="text-xl mb-4 border-b border-light pb-2">Hero Card Variants</h2>
-
-    <div class="grid md-grid-cols-3 gap-8">
-      <!-- Variant A -->
-      <div class="flex flex-col gap-4">
-        <h3 class="text-sm font-medium text-bokashi uppercase tracking-wide">
-          A: Horizontal Split
-        </h3>
-        <div class="p-6 rounded-lg border border-light bg-white flex flex-col gap-6 shadow-sm">
-          <div class="flex flex-row justify-between items-start">
-            <div class="flex flex-row items-baseline gap-2">
-              <span class="text-3xl font-light" style="color: var(--accent-shu)">3</span>
-              <span class="text-sm text-bokashi">day streak</span>
-            </div>
-            <div class="flex flex-row items-center gap-2 text-sm text-matcha">
-              <span>✓</span>
-              <span>Goal met</span>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-3">
-            <button class="btn-primary w-full">Start Session</button>
-            <button type="button" class="link-button text-sm text-center text-bokashi">
-              Practice weak points →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Variant B -->
-      <div class="flex flex-col gap-4">
-        <h3 class="text-sm font-medium text-bokashi uppercase tracking-wide">B: Large Hero</h3>
-        <div
-          class="p-6 rounded-lg border border-light bg-white flex flex-col items-center gap-6 shadow-sm text-center"
-        >
-          <div class="flex flex-col items-center">
-            <span class="text-5xl font-light mb-2" style="color: var(--accent-shu)">3</span>
-            <span class="text-base text-sumi font-medium">day streak</span>
-            <div class="flex flex-row items-center gap-2 text-sm text-matcha mt-2">
-              <span>✓</span>
-              <span>Today's goal complete</span>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-3 w-full">
-            <button class="btn-primary w-full">Start Today's Session</button>
-            <button type="button" class="link-button text-sm text-center text-bokashi">
-              Practice weak points →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Variant C -->
-      <div class="flex flex-col gap-4">
-        <h3 class="text-sm font-medium text-bokashi uppercase tracking-wide">C: Side Accent</h3>
-        <div class="p-6 rounded-lg border border-light bg-white flex flex-col gap-6 shadow-sm">
-          <div class="flex flex-row items-center gap-4">
-            <div
-              class="rounded-full flex items-center justify-center w-16 h-16"
-              style="background-color: var(--accent-shu-wash); color: var(--accent-shu)"
-            >
-              <span class="text-2xl font-medium">3</span>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-base font-medium text-sumi">Day Streak</span>
-              <div class="flex flex-row items-center gap-1 text-sm text-matcha">
-                <span>✓</span>
-                <span>Goal complete</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-3">
-            <button class="btn-primary w-full">Start Session</button>
-            <button type="button" class="link-button text-sm text-center text-bokashi">
-              Practice weak points →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <p class="text-bokashi">No variants currently defined.</p>
   </section>
 </div>
 

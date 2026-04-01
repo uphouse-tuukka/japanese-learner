@@ -1,0 +1,511 @@
+<style>
+  .missions-wrapper {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    font-family:
+      'Segoe UI',
+      system-ui,
+      -apple-system,
+      sans-serif;
+    color: #2d2d2d;
+    background: #faf6ef;
+    min-height: 100vh;
+  }
+
+  /* ── Page header ── */
+  .missions-page-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8a8175;
+    margin: 0 0 4px;
+  }
+  .missions-page-subtitle {
+    font-size: 14px;
+    color: #9e9589;
+    margin: 0 0 28px;
+  }
+
+  .missions-hero-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: #2d2d2d;
+  }
+  .missions-hero-sub {
+    font-size: 15px;
+    color: #7a7067;
+    margin: 0 0 8px;
+    line-height: 1.5;
+  }
+  .missions-overall-progress {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b8f71;
+    background: rgba(107, 143, 113, 0.1);
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 28px;
+  }
+
+  /* ── Category card ── */
+  .category-card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow:
+      0 1px 4px rgba(0, 0, 0, 0.06),
+      0 2px 12px rgba(0, 0, 0, 0.03);
+    padding: 20px 24px 24px;
+    margin-bottom: 20px;
+  }
+
+  /* Header row */
+  .category-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .category-name {
+    font-size: 17px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .category-name .emoji {
+    font-size: 20px;
+  }
+  .category-progress {
+    font-size: 12px;
+    font-weight: 600;
+    color: #a09889;
+    white-space: nowrap;
+  }
+  .category-progress.done {
+    color: #6b8f71;
+  }
+
+  /* ── Progression track ── */
+  .track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  /* Node + connector wrapper */
+  .track-segment {
+    display: flex;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+
+  /* Connector line */
+  .track-connector {
+    width: 40px;
+    display: flex;
+    align-items: center;
+    padding-top: 20px; /* vertically centre on node circle */
+  }
+  .track-connector .line {
+    width: 100%;
+    height: 2px;
+    border-radius: 1px;
+  }
+  .track-connector .line.solid {
+    background: #6b8f71;
+  }
+  .track-connector .line.dashed {
+    background: repeating-linear-gradient(
+      90deg,
+      #c5bfb6 0px,
+      #c5bfb6 5px,
+      transparent 5px,
+      transparent 10px
+    );
+  }
+
+  /* Node */
+  .track-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 72px;
+    flex-shrink: 0;
+  }
+  .node-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    position: relative;
+    transition: transform 0.15s ease;
+  }
+  .node-circle:hover {
+    transform: scale(1.08);
+  }
+
+  /* Available state */
+  .track-node.available .node-circle {
+    background: #fff;
+    border: 2.5px solid #d4a24e;
+    box-shadow: 0 2px 8px rgba(212, 162, 78, 0.2);
+  }
+
+  /* Completed state */
+  .track-node.completed .node-circle {
+    background: rgba(107, 143, 113, 0.12);
+    border: 2.5px solid #6b8f71;
+  }
+  .track-node.completed .node-circle .check-overlay {
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #6b8f71;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+    border: 2px solid #fff;
+    line-height: 1;
+  }
+
+  /* Locked state */
+  .track-node.locked .node-circle {
+    background: #edeae5;
+    border: 2px solid #d8d3cb;
+  }
+  .track-node.locked .node-circle .node-emoji {
+    opacity: 0.35;
+  }
+  .track-node.locked .node-circle .lock-overlay {
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #bbb5ab;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #fff;
+    border: 2px solid #fff;
+    line-height: 1;
+  }
+
+  .node-label {
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.3;
+    color: #2d2d2d;
+    max-width: 80px;
+  }
+  .track-node.locked .node-label {
+    color: #b0a99e;
+  }
+
+  /* ── Mastery badge ── */
+  .mastery-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 96px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .mastery-badge .badge-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    position: relative;
+  }
+  .mastery-badge.unlocked .badge-icon {
+    background: linear-gradient(135deg, #f6e9c8, #e8d8a8);
+    border: 2px solid #d4b96a;
+    box-shadow: 0 2px 8px rgba(212, 185, 106, 0.25);
+  }
+  .mastery-badge.locked .badge-icon {
+    background: #edeae5;
+    border: 2px solid #d8d3cb;
+    opacity: 0.55;
+  }
+  .mastery-badge .badge-title {
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .mastery-badge.unlocked .badge-title {
+    color: #9e7e2e;
+  }
+  .mastery-badge.locked .badge-title {
+    color: #b8b1a7;
+  }
+  .mastery-badge .badge-desc {
+    font-size: 10px;
+    color: #8a8175;
+    text-align: center;
+    line-height: 1.3;
+    margin-top: 2px;
+  }
+  .mastery-badge.locked .badge-desc {
+    display: none;
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 480px) {
+    .missions-wrapper {
+      padding: 16px 10px 40px;
+    }
+    .category-card {
+      padding: 16px 14px 18px;
+    }
+    .track-connector {
+      width: 24px;
+    }
+    .track-node {
+      width: 60px;
+    }
+    .node-circle {
+      width: 40px;
+      height: 40px;
+      font-size: 18px;
+    }
+    .mastery-badge {
+      width: 80px;
+    }
+    .mastery-badge .badge-icon {
+      width: 40px;
+      height: 40px;
+    }
+  }
+</style>
+
+<div class="missions-wrapper">
+  <!-- Page-level header -->
+  <p class="missions-page-title">Missions Page — Polished Design</p>
+  <p class="missions-page-subtitle">Here's how the progression layout would look</p>
+
+  <h1 class="missions-hero-title">Travel Missions</h1>
+  <p class="missions-hero-sub">
+    Practice real conversations. Complete Learn sessions to unlock new missions.
+  </p>
+  <span class="missions-overall-progress">✦ 3 / 10 missions completed</span>
+
+  <!-- ═══════════════════════════════════════════
+       Category 1 — Greetings & Basics (complete)
+       ═══════════════════════════════════════════ -->
+  <div class="category-card">
+    <div class="category-header">
+      <span class="category-name"><span class="emoji">🗣</span> Greetings &amp; Basics</span>
+      <span class="category-progress done">2/2 completed ✓</span>
+    </div>
+
+    <div class="track">
+      <!-- Node 1 — completed -->
+      <div class="track-segment">
+        <div class="track-node completed">
+          <div class="node-circle">
+            <span class="node-emoji">🤝</span>
+            <span class="check-overlay">✓</span>
+          </div>
+          <span class="node-label">First Meeting</span>
+        </div>
+      </div>
+
+      <!-- connector (solid — completed→completed) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line solid"></div></div>
+      </div>
+
+      <!-- Node 2 — completed -->
+      <div class="track-segment">
+        <div class="track-node completed">
+          <div class="node-circle">
+            <span class="node-emoji">🙏</span>
+            <span class="check-overlay">✓</span>
+          </div>
+          <span class="node-label">Ask for Help</span>
+        </div>
+      </div>
+
+      <!-- connector to mastery -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line solid"></div></div>
+      </div>
+
+      <!-- Mastery badge — unlocked -->
+      <div class="track-segment">
+        <div class="mastery-badge unlocked">
+          <div class="badge-icon">🏅</div>
+          <span class="badge-title">Conversation Starter</span>
+          <span class="badge-desc">You can introduce yourself confidently!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       Category 2 — Food & Dining
+       ═══════════════════════════════════════ -->
+  <div class="category-card">
+    <div class="category-header">
+      <span class="category-name"><span class="emoji">🍜</span> Food &amp; Dining</span>
+      <span class="category-progress">0/2 completed</span>
+    </div>
+
+    <div class="track">
+      <!-- Node 1 — available -->
+      <div class="track-segment">
+        <div class="track-node available">
+          <div class="node-circle">
+            <span class="node-emoji">🍱</span>
+          </div>
+          <span class="node-label">Order at a Restaurant</span>
+        </div>
+      </div>
+
+      <!-- connector (dashed — available→locked) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line dashed"></div></div>
+      </div>
+
+      <!-- Node 2 — locked -->
+      <div class="track-segment">
+        <div class="track-node locked">
+          <div class="node-circle">
+            <span class="node-emoji">🍢</span>
+            <span class="lock-overlay">🔒</span>
+          </div>
+          <span class="node-label">Street Food Stand</span>
+        </div>
+      </div>
+
+      <!-- connector to mastery (dashed) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line dashed"></div></div>
+      </div>
+
+      <!-- Mastery badge — locked -->
+      <div class="track-segment">
+        <div class="mastery-badge locked">
+          <div class="badge-icon">🍜</div>
+          <span class="badge-title">Restaurant Ready</span>
+          <span class="badge-desc">Order with confidence at any restaurant!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       Category 3 — Transport
+       ═══════════════════════════════════════ -->
+  <div class="category-card">
+    <div class="category-header">
+      <span class="category-name"><span class="emoji">🚃</span> Transport</span>
+      <span class="category-progress">0/1 completed</span>
+    </div>
+
+    <div class="track">
+      <!-- Node 1 — locked -->
+      <div class="track-segment">
+        <div class="track-node locked">
+          <div class="node-circle">
+            <span class="node-emoji">🎫</span>
+            <span class="lock-overlay">🔒</span>
+          </div>
+          <span class="node-label">Buy a Train Ticket</span>
+        </div>
+      </div>
+
+      <!-- connector to mastery (dashed) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line dashed"></div></div>
+      </div>
+
+      <!-- Mastery badge — locked -->
+      <div class="track-segment">
+        <div class="mastery-badge locked">
+          <div class="badge-icon">🚃</div>
+          <span class="badge-title">Navigator</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       Category 4 — Bars & Nightlife
+       ═══════════════════════════════════════ -->
+  <div class="category-card">
+    <div class="category-header">
+      <span class="category-name"><span class="emoji">🍺</span> Bars &amp; Nightlife</span>
+      <span class="category-progress">0/2 completed</span>
+    </div>
+
+    <div class="track">
+      <!-- Node 1 — locked -->
+      <div class="track-segment">
+        <div class="track-node locked">
+          <div class="node-circle">
+            <span class="node-emoji">🏮</span>
+            <span class="lock-overlay">🔒</span>
+          </div>
+          <span class="node-label">Izakaya Night</span>
+        </div>
+      </div>
+
+      <!-- connector (dashed — locked→locked) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line dashed"></div></div>
+      </div>
+
+      <!-- Node 2 — locked -->
+      <div class="track-segment">
+        <div class="track-node locked">
+          <div class="node-circle">
+            <span class="node-emoji">🍸</span>
+            <span class="lock-overlay">🔒</span>
+          </div>
+          <span class="node-label">Bar Conversation</span>
+        </div>
+      </div>
+
+      <!-- connector to mastery (dashed) -->
+      <div class="track-segment">
+        <div class="track-connector"><div class="line dashed"></div></div>
+      </div>
+
+      <!-- Mastery badge — locked -->
+      <div class="track-segment">
+        <div class="mastery-badge locked">
+          <div class="badge-icon">🍺</div>
+          <span class="badge-title">Night Owl</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

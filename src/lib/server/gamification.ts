@@ -17,6 +17,10 @@ export const XP_PERFECT_SCORE = 25;
 export const XP_STREAK_BONUS_PER_DAY = 5;
 export const XP_COMBO_BONUS_THRESHOLD = 5;
 export const XP_PER_COMBO_ANSWER = 2;
+export const XP_MISSION_IMMERSION_COMPLETE = 100;
+export const XP_MISSION_PRACTICE_COMPLETE = 25;
+export const XP_MISSION_CORRECT_RESPONSE = 10;
+export const XP_MISSION_NATURAL_PHRASING = 15;
 
 export const MILESTONES: Milestone[] = [
   {
@@ -383,6 +387,37 @@ export function calculateSessionXp(
   };
 }
 
+export function calculateMissionXp(input: {
+  mode: 'practice' | 'immersion';
+  correctResponses: number;
+  totalExchanges: number;
+  naturalPhrasings: number;
+}): {
+  missionCompletion: number;
+  correctResponses: number;
+  naturalPhrasing: number;
+  total: number;
+} {
+  const mode = input.mode;
+  const normalizedCorrectResponses = Math.max(0, Math.floor(input.correctResponses));
+  const normalizedNaturalPhrasings = Math.max(0, Math.floor(input.naturalPhrasings));
+  const _normalizedTotalExchanges = Math.max(0, Math.floor(input.totalExchanges));
+
+  const missionCompletion =
+    mode === 'immersion' ? XP_MISSION_IMMERSION_COMPLETE : XP_MISSION_PRACTICE_COMPLETE;
+  const correctResponses = normalizedCorrectResponses * XP_MISSION_CORRECT_RESPONSE;
+  const naturalPhrasing =
+    mode === 'immersion' ? normalizedNaturalPhrasings * XP_MISSION_NATURAL_PHRASING : 0;
+  const total = missionCompletion + correctResponses + naturalPhrasing;
+
+  return {
+    missionCompletion,
+    correctResponses,
+    naturalPhrasing,
+    total,
+  };
+}
+
 export async function updateStreakAndGoal(
   userId: string,
   todayDateStr: string,
@@ -552,6 +587,82 @@ export async function processSessionCompletion(
     streakBonusXp: streak.streakBonusXp,
     comboBonusXp: baseXp.comboBonusXp,
     totalXp,
+    newMilestones,
+  };
+}
+
+export async function processMissionCompletion(
+  userId: string,
+  missionId: string,
+  input: {
+    mode: 'practice' | 'immersion';
+    correctResponses: number;
+    totalExchanges: number;
+    naturalPhrasings: number;
+  },
+): Promise<{
+  xpBreakdown: {
+    missionCompletion: number;
+    correctResponses: number;
+    naturalPhrasing: number;
+    total: number;
+  };
+  newMilestones: Milestone[];
+}> {
+  const xpBreakdown = calculateMissionXp(input);
+  const todayDateStr = toYyyyMmDd(new Date().toISOString());
+  const streak = await updateStreakAndGoal(userId, todayDateStr);
+
+  const transactions: Array<{
+    userId: string;
+    sessionId?: string | null;
+    amount: number;
+    reason: XpReason;
+  }> = [];
+
+  if (xpBreakdown.missionCompletion > 0) {
+    transactions.push({
+      userId,
+      sessionId: missionId,
+      amount: xpBreakdown.missionCompletion,
+      reason: 'mission_complete',
+    });
+  }
+
+  if (xpBreakdown.correctResponses > 0) {
+    transactions.push({
+      userId,
+      sessionId: missionId,
+      amount: xpBreakdown.correctResponses,
+      reason: 'mission_correct_response',
+    });
+  }
+
+  if (xpBreakdown.naturalPhrasing > 0) {
+    transactions.push({
+      userId,
+      sessionId: missionId,
+      amount: xpBreakdown.naturalPhrasing,
+      reason: 'mission_natural_phrasing',
+    });
+  }
+
+  if (streak.streakBonusXp > 0) {
+    transactions.push({
+      userId,
+      sessionId: null,
+      amount: streak.streakBonusXp,
+      reason: 'streak_bonus',
+    });
+  }
+
+  await addXpTransactions(transactions);
+
+  const newTotalXp = await getTotalXp(userId);
+  const newMilestones = await checkAndUnlockMilestones(userId, newTotalXp);
+
+  return {
+    xpBreakdown,
     newMilestones,
   };
 }

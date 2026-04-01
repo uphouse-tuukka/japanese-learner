@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { config } from '$lib/config';
 import { getDb } from '$lib/server/db';
@@ -144,10 +144,7 @@ export const actions: Actions = {
     const user = await createUser({ name, level });
     setSelectedUserCookie(cookies, user.id);
 
-    return {
-      success: true,
-      selectedUserId: user.id,
-    };
+    throw redirect(303, '/');
   },
   selectUser: async ({ request, cookies }) => {
     const formData = await request.formData();

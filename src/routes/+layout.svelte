@@ -89,6 +89,10 @@
             <span class="nav-en">Practice</span>
             <span class="nav-ja">練習</span>
           </a>
+          <a href="/missions" class="nav-link" class:active={isActive('/missions')}>
+            <span class="nav-en">Missions</span>
+            <span class="nav-ja">ミッション</span>
+          </a>
           <a href="/progress" class="nav-link" class:active={isActive('/progress')}>
             <span class="nav-en">Progress</span>
             <span class="nav-ja">進捗</span>

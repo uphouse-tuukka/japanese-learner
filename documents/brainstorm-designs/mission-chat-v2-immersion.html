@@ -1,0 +1,713 @@
+<style>
+  .mc-root {
+    --bg: #1a1a1a;
+    --card: #3a3632;
+    --card-elevated: #2e2a26;
+    --gold: #c4a35a;
+    --gold-dim: #8a7340;
+    --text: #e8e0d4;
+    --text-muted: #9a9080;
+    --text-dim: #6a6258;
+    --success: #7ecf8a;
+    --border: #4a4540;
+    font-family:
+      'Segoe UI',
+      system-ui,
+      -apple-system,
+      sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1.5rem;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  .mc-root *,
+  .mc-root *::before,
+  .mc-root *::after {
+    box-sizing: border-box;
+  }
+
+  /* Page title */
+  .mc-page-title {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  .mc-page-title h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gold);
+    margin: 0 0 0.35rem;
+    letter-spacing: 0.02em;
+  }
+  .mc-page-title p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* Side-by-side grid */
+  .mc-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    max-width: 960px;
+    margin: 0 auto 2.5rem;
+  }
+  @media (max-width: 700px) {
+    .mc-compare {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Panel cards */
+  .mc-panel {
+    background: var(--card-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .mc-panel.--immersion {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 18px rgba(196, 163, 90, 0.12);
+  }
+
+  /* Panel header */
+  .mc-panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .mc-panel-header h2 {
+    font-size: 1.05rem;
+    margin: 0 0 0.25rem;
+    font-weight: 700;
+  }
+  .mc-panel-header p {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.45;
+  }
+  .mc-panel.--immersion .mc-panel-header {
+    background: linear-gradient(135deg, rgba(196, 163, 90, 0.12) 0%, transparent 60%);
+  }
+
+  /* Mode banner (immersion) */
+  .mc-mode-banner {
+    background: linear-gradient(90deg, rgba(196, 163, 90, 0.18), rgba(196, 163, 90, 0.06));
+    color: var(--gold);
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.45rem 0.75rem;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(196, 163, 90, 0.2);
+  }
+
+  /* Panel body */
+  .mc-panel-body {
+    padding: 1.25rem;
+    flex: 1;
+  }
+
+  /* — Practice mode: multiple choice cards — */
+  .mc-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .mc-choice {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+  .mc-choice:hover {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 8px rgba(196, 163, 90, 0.1);
+  }
+  .mc-choice .jp {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+  .mc-choice .romaji {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+    font-style: italic;
+  }
+  .mc-choice .en {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  /* — Immersion mode: dialogue + input — */
+  .mc-dialogue {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.1rem;
+    border: 1px solid var(--border);
+  }
+  .mc-dialogue .speaker {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .mc-dialogue .line-jp {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+  .mc-dialogue .line-romaji {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 0.35rem;
+  }
+  .mc-dialogue .audio-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .mc-dialogue .audio-btn:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+
+  /* Text input area */
+  .mc-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .mc-text-input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    font-size: 0.92rem;
+    color: var(--text);
+    outline: none;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+    font-family: inherit;
+  }
+  .mc-text-input::placeholder {
+    color: var(--text-dim);
+  }
+  .mc-text-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 10px rgba(196, 163, 90, 0.15);
+  }
+
+  /* Hint toggle */
+  .mc-hint-area {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.6rem;
+  }
+  .mc-hint-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .mc-hint-toggle:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .mc-hint-toggle.--active {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .mc-hint-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition:
+      opacity 0.3s,
+      max-height 0.3s;
+  }
+  .mc-hint-text.--visible {
+    opacity: 1;
+    max-height: 3rem;
+  }
+
+  /* Send button */
+  .mc-send-btn {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--gold), #d4b56a);
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1.5rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      transform 0.15s,
+      box-shadow 0.2s;
+    letter-spacing: 0.02em;
+  }
+  .mc-send-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(196, 163, 90, 0.3);
+  }
+
+  /* Badge teaser */
+  .mc-badge-teaser {
+    font-size: 0.72rem;
+    color: var(--gold-dim);
+    text-align: center;
+    padding-top: 0.4rem;
+    line-height: 1.5;
+  }
+
+  /* =============== COMPLETION CARD =============== */
+  .mc-completion {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .mc-completion-label {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .mc-completion-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 700px) {
+    .mc-completion-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .mc-comp-card {
+    background: var(--card-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .mc-comp-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    pointer-events: none;
+  }
+  .mc-comp-card.--earned {
+    border-color: var(--gold-dim);
+    box-shadow:
+      0 0 24px rgba(196, 163, 90, 0.12),
+      0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+  .mc-comp-card.--earned::before {
+    background: linear-gradient(160deg, rgba(196, 163, 90, 0.08) 0%, transparent 50%);
+  }
+  .mc-comp-card.--locked {
+    opacity: 0.7;
+  }
+
+  .mc-comp-celebration {
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+  }
+  .mc-comp-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+  }
+  .mc-comp-mission {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+  .mc-comp-mode-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    margin-bottom: 1rem;
+  }
+  .mc-comp-mode-tag.--immersion {
+    background: rgba(196, 163, 90, 0.15);
+    color: var(--gold);
+  }
+  .mc-comp-mode-tag.--practice {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+  }
+
+  /* Stats row */
+  .mc-stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.1rem;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .mc-stat {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .mc-stat strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* XP breakdown */
+  .mc-xp-breakdown {
+    margin-bottom: 1.2rem;
+  }
+  .mc-xp-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+    color: var(--text-muted);
+  }
+  .mc-xp-line .xp-val {
+    color: var(--success);
+    font-weight: 600;
+  }
+  .mc-xp-total {
+    border-top: 1px solid var(--border);
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    font-weight: 700;
+    color: var(--text) !important;
+  }
+  .mc-xp-total .xp-val {
+    color: var(--gold) !important;
+    font-size: 0.85rem;
+  }
+
+  /* Badge area */
+  .mc-badge-area {
+    margin-bottom: 1rem;
+  }
+  .mc-badge-icon {
+    font-size: 2.2rem;
+    margin-bottom: 0.3rem;
+    display: inline-block;
+  }
+  .mc-badge-icon.--glow {
+    filter: drop-shadow(0 0 12px rgba(196, 163, 90, 0.5))
+      drop-shadow(0 0 24px rgba(196, 163, 90, 0.25));
+    animation: mc-badge-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes mc-badge-pulse {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 10px rgba(196, 163, 90, 0.4))
+        drop-shadow(0 0 20px rgba(196, 163, 90, 0.2));
+    }
+    50% {
+      filter: drop-shadow(0 0 18px rgba(196, 163, 90, 0.6))
+        drop-shadow(0 0 32px rgba(196, 163, 90, 0.35));
+    }
+  }
+  .mc-badge-icon.--locked {
+    filter: grayscale(1) opacity(0.4);
+  }
+  .mc-badge-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  .mc-badge-name.--gold {
+    color: var(--gold);
+  }
+  .mc-badge-name.--gray {
+    color: var(--text-dim);
+  }
+  .mc-badge-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    max-width: 280px;
+    margin: 0 auto 0.3rem;
+  }
+  .mc-badge-profile-note {
+    font-size: 0.65rem;
+    color: var(--gold-dim);
+    font-style: italic;
+  }
+  .mc-badge-locked-note {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+  }
+
+  /* Buttons */
+  .mc-comp-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  .mc-comp-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1.2rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 0.15s,
+      box-shadow 0.2s;
+    letter-spacing: 0.01em;
+  }
+  .mc-comp-btn:hover {
+    transform: translateY(-1px);
+  }
+  .mc-comp-btn.--secondary {
+    background: var(--card);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .mc-comp-btn.--primary {
+    background: linear-gradient(135deg, var(--gold), #d4b56a);
+    color: #1a1a1a;
+    box-shadow: 0 2px 10px rgba(196, 163, 90, 0.2);
+  }
+  .mc-comp-btn.--primary:hover {
+    box-shadow: 0 4px 16px rgba(196, 163, 90, 0.35);
+  }
+  .mc-comp-btn.--muted {
+    background: var(--card);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+</style>
+
+<div class="mc-root">
+  <!-- Page Title -->
+  <div class="mc-page-title">
+    <h1>Mission Chat — Mode Comparison &amp; Completion</h1>
+    <p>Practice Mode vs Immersion Mode · Same mission, different experience</p>
+  </div>
+
+  <!-- ============ SIDE-BY-SIDE COMPARISON ============ -->
+  <div class="mc-compare">
+    <!-- LEFT: Practice Mode -->
+    <div class="mc-panel">
+      <div class="mc-panel-header">
+        <h2>Practice Mode</h2>
+        <p>Multiple choice responses · English hints · No badges</p>
+      </div>
+      <div class="mc-panel-body">
+        <div
+          style="
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.65rem;
+          "
+        >
+          Your Response
+        </div>
+        <div class="mc-choice-list">
+          <div class="mc-choice">
+            <div class="jp">ラーメンをください</div>
+            <div class="romaji">raamen o kudasai</div>
+            <div class="en">"Ramen, please"</div>
+          </div>
+          <div class="mc-choice">
+            <div class="jp">味噌ラーメンをお願いします</div>
+            <div class="romaji">miso raamen o onegai shimasu</div>
+            <div class="en">"I'd like miso ramen, please"</div>
+          </div>
+          <div class="mc-choice">
+            <div class="jp">おすすめは何ですか？</div>
+            <div class="romaji">osusume wa nan desu ka?</div>
+            <div class="en">"What do you recommend?"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Immersion Mode -->
+    <div class="mc-panel --immersion">
+      <div class="mc-mode-banner">Immersion Mode 🏆 — Badges &amp; XP earned here</div>
+      <div class="mc-panel-header">
+        <h2>Immersion Mode 🏆</h2>
+        <p>Free-type responses · No English anywhere · Earn badges &amp; rewards</p>
+      </div>
+      <div class="mc-panel-body">
+        <!-- Current dialogue line -->
+        <div class="mc-dialogue">
+          <div class="speaker">🧑‍🍳 Waiter</div>
+          <div class="line-jp">ご注文はお決まりですか？</div>
+          <div class="line-romaji">(gochuumon wa okimari desu ka?)</div>
+          <button class="audio-btn">🔊 Listen</button>
+        </div>
+
+        <!-- Text input area -->
+        <div class="mc-input-area">
+          <input
+            type="text"
+            class="mc-text-input"
+            placeholder="Type your response in Japanese..."
+          />
+
+          <div class="mc-hint-area">
+            <button
+              class="mc-hint-toggle"
+              onclick="
+                this.classList.toggle('--active');
+                var hint = this.nextElementSibling;
+                hint.classList.toggle('--visible');
+                this.textContent = hint.classList.contains('--visible') ? 'Hide hint' : 'Show hint';
+              "
+            >
+              Show hint
+            </button>
+            <span class="mc-hint-text">💡 Hint: They're asking about your order</span>
+          </div>
+
+          <button class="mc-send-btn">Send →</button>
+
+          <div class="mc-badge-teaser">
+            ✨ Complete this mission in Immersion Mode to earn the 🍜 Ramen Master badge
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ COMPLETION SCREENS ============ -->
+  <div class="mc-completion">
+    <div class="mc-completion-label">Mission Completion</div>
+
+    <div class="mc-completion-grid">
+      <!-- Immersion Mode — Earned -->
+      <div class="mc-comp-card --earned">
+        <div class="mc-comp-celebration">🎉</div>
+        <div class="mc-comp-title">Mission Complete!</div>
+        <div class="mc-comp-mission">Order at a Restaurant</div>
+        <div class="mc-comp-mode-tag --immersion">Immersion Mode 🏆</div>
+
+        <div class="mc-stats-row">
+          <span class="mc-stat"><strong>5/5</strong> exchanges</span>
+          <span class="mc-stat"><strong>3</strong> correct</span>
+          <span class="mc-stat">Score: <strong>78%</strong></span>
+        </div>
+
+        <div class="mc-xp-breakdown">
+          <div class="mc-xp-line">
+            <span>Mission completion</span><span class="xp-val">+100 XP</span>
+          </div>
+          <div class="mc-xp-line">
+            <span>Correct responses</span><span class="xp-val">+30 XP</span>
+          </div>
+          <div class="mc-xp-line">
+            <span>Natural phrasing bonus</span><span class="xp-val">+15 XP</span>
+          </div>
+          <div class="mc-xp-line mc-xp-total">
+            <span>Total</span><span class="xp-val">+145 XP</span>
+          </div>
+        </div>
+
+        <div class="mc-badge-area">
+          <div class="mc-badge-icon --glow">🍜</div>
+          <div class="mc-badge-name --gold">Ramen Regular</div>
+          <div class="mc-badge-desc">You can now order basic dishes at a Japanese restaurant!</div>
+          <div class="mc-badge-profile-note">This badge is displayed on your profile</div>
+        </div>
+
+        <div class="mc-comp-buttons">
+          <button class="mc-comp-btn --secondary">Back to Missions</button>
+          <button class="mc-comp-btn --primary">Try Next Mission →</button>
+        </div>
+      </div>
+
+      <!-- Practice Mode — Locked -->
+      <div class="mc-comp-card --locked">
+        <div class="mc-comp-celebration">🎉</div>
+        <div class="mc-comp-title">Mission Complete!</div>
+        <div class="mc-comp-mission">Order at a Restaurant</div>
+        <div class="mc-comp-mode-tag --practice">Practice Mode</div>
+
+        <div class="mc-stats-row">
+          <span class="mc-stat"><strong>5/5</strong> exchanges</span>
+          <span class="mc-stat"><strong>3</strong> correct</span>
+          <span class="mc-stat">Score: <strong>78%</strong></span>
+        </div>
+
+        <div class="mc-xp-breakdown">
+          <div class="mc-xp-line">
+            <span>Mission completion</span><span class="xp-val">+100 XP</span>
+          </div>
+          <div class="mc-xp-line">
+            <span>Correct responses</span><span class="xp-val">+30 XP</span>
+          </div>
+          <div class="mc-xp-line">
+            <span>Natural phrasing bonus</span><span class="xp-val">+15 XP</span>
+          </div>
+          <div class="mc-xp-line mc-xp-total">
+            <span>Total</span><span class="xp-val">+145 XP</span>
+          </div>
+        </div>
+
+        <div class="mc-badge-area">
+          <div class="mc-badge-icon --locked">🍜</div>
+          <div class="mc-badge-name --gray">Ramen Regular</div>
+          <div class="mc-badge-locked-note">
+            Complete in Immersion Mode to earn the 🍜 Ramen Regular badge
+          </div>
+        </div>
+
+        <div class="mc-comp-buttons">
+          <button class="mc-comp-btn --secondary">Back to Missions</button>
+          <button class="mc-comp-btn --muted">Try in Immersion Mode →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -220,6 +220,50 @@ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 UNIQUE(user_id, milestone_key),
 FOREIGN KEY (user_id) REFERENCES users(id)
 );`,
+        `CREATE TABLE IF NOT EXISTS missions (
+id TEXT PRIMARY KEY,
+title TEXT NOT NULL,
+category TEXT NOT NULL,
+difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard')),
+sequence INTEGER NOT NULL,
+scenario_prompt TEXT NOT NULL,
+badge_emoji TEXT NOT NULL,
+badge_name TEXT NOT NULL,
+badge_statement TEXT NOT NULL,
+unlock_sessions_required INTEGER NOT NULL DEFAULT 0,
+start_unlocked INTEGER NOT NULL DEFAULT 0
+);`,
+        `CREATE TABLE IF NOT EXISTS user_missions (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+mission_id TEXT NOT NULL,
+mode TEXT NOT NULL CHECK(mode IN ('practice', 'immersion')),
+status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed')) DEFAULT 'in_progress',
+exchanges INTEGER NOT NULL DEFAULT 0,
+correct_responses INTEGER NOT NULL DEFAULT 0,
+score REAL NOT NULL DEFAULT 0,
+xp_earned INTEGER NOT NULL DEFAULT 0,
+badge_earned INTEGER NOT NULL DEFAULT 0,
+conversation_log TEXT NOT NULL DEFAULT '[]',
+completed_at TEXT,
+created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`,
+        `CREATE TABLE IF NOT EXISTS user_badges (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+mission_id TEXT NOT NULL,
+badge_emoji TEXT NOT NULL,
+badge_name TEXT NOT NULL,
+badge_statement TEXT NOT NULL,
+earned_at TEXT NOT NULL DEFAULT (datetime('now')),
+UNIQUE(user_id, mission_id)
+);`,
+        `CREATE TABLE IF NOT EXISTS user_mission_limits (
+user_id TEXT NOT NULL,
+date TEXT NOT NULL,
+missions_used INTEGER NOT NULL DEFAULT 0,
+PRIMARY KEY (user_id, date)
+);`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_user_created_at ON sessions(user_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_exercises_seed ON exercises(is_seed);`,
         `CREATE INDEX IF NOT EXISTS idx_results_user_created_at ON user_exercise_results(user_id, created_at);`,
@@ -229,9 +273,15 @@ FOREIGN KEY (user_id) REFERENCES users(id)
         `CREATE INDEX IF NOT EXISTS idx_user_xp_user_id ON user_xp(user_id);`,
         `CREATE INDEX IF NOT EXISTS idx_user_xp_session_id ON user_xp(session_id);`,
         `CREATE INDEX IF NOT EXISTS idx_user_milestones_user_id ON user_milestones(user_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_missions_user ON user_missions(user_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_missions_mission ON user_missions(mission_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);`,
+        `CREATE INDEX IF NOT EXISTS idx_missions_category ON missions(category);`,
       ];
 
       await db.batch(schemaStatements);
+      const { seedMissions } = await import('./missions-seed');
+      await seedMissions(db);
       console.warn('[db] schema initialized');
     })();
   }

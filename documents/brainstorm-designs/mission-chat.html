@@ -1,0 +1,790 @@
+<style>
+  .mockup-root {
+    --cream: #faf6ef;
+    --green: #6b8f71;
+    --green-light: #e8f0e9;
+    --green-dark: #4a6b4f;
+    --ink: #2d2d2d;
+    --muted: #8a8578;
+    --user-bg: #e3eddf;
+    --ai-bg: #ffffff;
+    --border: #e0dbd2;
+    --shadow: rgba(45, 45, 45, 0.08);
+    font-family:
+      'Segoe UI',
+      system-ui,
+      -apple-system,
+      sans-serif;
+    color: var(--ink);
+    background: var(--cream);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 48px;
+  }
+
+  .mockup-title {
+    font-size: 1.65rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+
+  .mockup-subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.97rem;
+    margin-bottom: 36px;
+  }
+
+  /* Options container & selection */
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .option-block {
+    border: 2.5px solid var(--border);
+    border-radius: 16px;
+    padding: 0;
+    cursor: pointer;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s,
+      transform 0.15s;
+    background: var(--cream);
+    overflow: hidden;
+  }
+
+  .option-block:hover {
+    border-color: var(--green);
+    box-shadow: 0 4px 20px var(--shadow);
+    transform: translateY(-1px);
+  }
+
+  .option-block.selected {
+    border-color: var(--green);
+    box-shadow:
+      0 0 0 3px rgba(107, 143, 113, 0.18),
+      0 4px 24px var(--shadow);
+  }
+
+  .option-block.selected .option-header .option-badge {
+    background: var(--green);
+    color: #fff;
+  }
+
+  .option-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+  }
+
+  .option-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--green-light);
+    color: var(--green-dark);
+    font-weight: 800;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    transition:
+      background 0.2s,
+      color 0.2s;
+  }
+
+  .option-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .option-desc {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .option-body {
+    padding: 24px;
+  }
+
+  /* ─── Mission header (shared) ─── */
+  .mission-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 18px;
+    font-size: 0.88rem;
+  }
+
+  .mission-bar .mission-title-text {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .progress-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green-light);
+    color: var(--green-dark);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .progress-pill .bar-track {
+    width: 48px;
+    height: 5px;
+    background: #d4ddd5;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-pill .bar-fill {
+    height: 100%;
+    width: 60%;
+    background: var(--green);
+    border-radius: 4px;
+  }
+
+  /* ═══════════════════════════════════
+     OPTION A — Classic Chat Bubbles
+     ═══════════════════════════════════ */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .chat-row {
+    display: flex;
+    gap: 10px;
+    max-width: 88%;
+  }
+
+  .chat-row.ai {
+    align-self: flex-start;
+  }
+
+  .chat-row.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .chat-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .chat-row.ai .chat-avatar {
+    background: var(--green-light);
+  }
+
+  .chat-row.user .chat-avatar {
+    background: #e8e4dc;
+  }
+
+  .chat-bubble {
+    border-radius: 16px;
+    padding: 12px 16px;
+    line-height: 1.55;
+    position: relative;
+  }
+
+  .chat-row.ai .chat-bubble {
+    background: var(--ai-bg);
+    border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+  }
+
+  .chat-row.user .chat-bubble {
+    background: var(--user-bg);
+    border: 1px solid #c8d8c3;
+    border-top-right-radius: 4px;
+  }
+
+  .jp-text {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-bottom: 2px;
+  }
+
+  .romaji {
+    font-size: 0.82rem;
+    color: var(--green-dark);
+    font-style: italic;
+    margin-bottom: 2px;
+  }
+
+  .en-text {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* Input area */
+  .input-area {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .input-area-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .guided-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--green-dark);
+    background: var(--green-light);
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+
+  .guided-badge .dot {
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+  }
+
+  .guided-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .response-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .response-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--cream);
+    border: 1.5px solid var(--border);
+    border-radius: 11px;
+    padding: 11px 15px;
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      box-shadow 0.15s;
+    line-height: 1.45;
+  }
+
+  .response-btn:hover {
+    border-color: var(--green);
+    background: var(--green-light);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+
+  .response-btn .jp-text {
+    font-size: 1.02rem;
+    margin-bottom: 1px;
+  }
+
+  .response-btn .romaji {
+    font-size: 0.76rem;
+  }
+
+  .response-btn .en-text {
+    font-size: 0.73rem;
+  }
+
+  /* ═══════════════════════════════════
+     OPTION B — Split Scene Layout
+     ═══════════════════════════════════ */
+  .scene-area {
+    background: linear-gradient(135deg, #f5f0e6 0%, #eae5d8 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .scene-icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .scene-text {
+    font-size: 0.88rem;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+
+  .scene-text strong {
+    display: block;
+    font-size: 0.92rem;
+    margin-bottom: 2px;
+  }
+
+  .dialogue-card {
+    background: #fff;
+    border: 2px solid var(--green);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    position: relative;
+    box-shadow: 0 4px 16px var(--shadow);
+  }
+
+  .dialogue-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dialogue-role {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--green-dark);
+  }
+
+  .dialogue-role-avatar {
+    width: 30px;
+    height: 30px;
+    background: var(--green-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .tts-btn {
+    background: var(--green-light);
+    border: 1px solid #c8d8c3;
+    border-radius: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--green-dark);
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+
+  .tts-btn:hover {
+    background: #d4e6d6;
+  }
+
+  .dialogue-jp {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  .dialogue-romaji {
+    font-size: 0.88rem;
+    color: var(--green-dark);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+
+  .dialogue-en {
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+
+  /* Response cards for option B */
+  .response-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .response-card {
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 13px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      transform 0.12s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .response-card:hover {
+    border-color: var(--green);
+    box-shadow: 0 3px 12px var(--shadow);
+    transform: translateY(-1px);
+  }
+
+  .response-card-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--green-light);
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+  }
+
+  .response-card-text {
+    flex: 1;
+  }
+
+  .response-card-text .jp-text {
+    font-size: 1.05rem;
+    margin-bottom: 1px;
+  }
+
+  /* Timeline / history log for option B */
+  .history-log {
+    margin-bottom: 16px;
+  }
+
+  .history-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 6px 0;
+    font-weight: 600;
+    border: none;
+    background: none;
+  }
+
+  .history-toggle:hover {
+    color: var(--green-dark);
+  }
+
+  .history-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-left: 2px solid var(--border);
+    margin-left: 8px;
+    padding-left: 14px;
+  }
+
+  .history-entry {
+    padding: 7px 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    position: relative;
+  }
+
+  .history-entry::before {
+    content: '';
+    position: absolute;
+    left: -19px;
+    top: 12px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  .history-entry.ai::before {
+    background: var(--green);
+  }
+
+  .history-entry .h-role {
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 1px;
+  }
+
+  .history-entry.ai .h-role {
+    color: var(--green-dark);
+  }
+
+  .history-entry .h-jp {
+    font-weight: 600;
+    font-size: 0.82rem;
+  }
+
+  .history-entry .h-en {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  /* Your response label for option B */
+  .your-response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .your-response-label {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--ink);
+  }
+</style>
+
+<div class="mockup-root">
+  <div class="mockup-title">Mission Chat — Which conversation format?</div>
+  <div class="mockup-subtitle">How should the roleplay conversation look during a mission?</div>
+
+  <div class="options">
+    <!-- ════════════════════════════════════════════
+         OPTION A — Classic Chat Bubbles
+         ════════════════════════════════════════════ -->
+    <div class="option-block" data-choice="a" onclick="toggleSelect(this)">
+      <div class="option-header">
+        <span class="option-badge">A</span>
+        <span class="option-label">Classic Chat Bubbles</span>
+        <span class="option-desc">Familiar iMessage / WhatsApp style</span>
+      </div>
+      <div class="option-body">
+        <!-- Mission bar -->
+        <div class="mission-bar">
+          <span class="mission-title-text">🍜 Order at a Restaurant</span>
+          <span class="progress-pill">
+            Exchange 3/5
+            <span class="bar-track"><span class="bar-fill"></span></span>
+          </span>
+        </div>
+
+        <!-- Chat bubbles -->
+        <div class="chat-container">
+          <!-- Exchange 1 — AI -->
+          <div class="chat-row ai">
+            <div class="chat-avatar">🧑‍🍳</div>
+            <div class="chat-bubble">
+              <div class="jp-text">いらっしゃいませ！何名様ですか？</div>
+              <div class="romaji">(irasshaimase! nanmeisama desu ka?)</div>
+              <div class="en-text">Welcome! How many people?</div>
+            </div>
+          </div>
+
+          <!-- Exchange 1 — User -->
+          <div class="chat-row user">
+            <div class="chat-avatar">👤</div>
+            <div class="chat-bubble">
+              <div class="jp-text">二人です</div>
+              <div class="romaji">(futari desu)</div>
+              <div class="en-text">Two people</div>
+            </div>
+          </div>
+
+          <!-- Exchange 2 — AI -->
+          <div class="chat-row ai">
+            <div class="chat-avatar">🧑‍🍳</div>
+            <div class="chat-bubble">
+              <div class="jp-text">かしこまりました。こちらへどうぞ。</div>
+              <div class="romaji">(kashikomarimashita. kochira e dōzo.)</div>
+              <div class="en-text">Understood. Right this way, please.</div>
+              <div class="jp-text" style="margin-top: 8px">ご注文はお決まりですか？</div>
+              <div class="romaji">(gochūmon wa okimari desu ka?)</div>
+              <div class="en-text">Have you decided on your order?</div>
+            </div>
+          </div>
+
+          <!-- Exchange 3 — User's turn (current) -->
+          <div class="chat-row user" style="opacity: 0.5; max-width: 60%">
+            <div class="chat-avatar">👤</div>
+            <div class="chat-bubble" style="border-style: dashed; background: transparent">
+              <div
+                class="en-text"
+                style="font-style: italic; font-size: 0.82rem; color: var(--muted)"
+              >
+                Your turn…
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Response input area -->
+        <div class="input-area">
+          <div class="input-area-label">
+            <span class="guided-badge"><span class="dot"></span> Guided Mode</span>
+            <span class="guided-hint">Switch to free-type in settings</span>
+          </div>
+          <div class="response-options">
+            <button class="response-btn">
+              <div class="jp-text">すみません、メニューをお願いします</div>
+              <div class="romaji">(sumimasen, menyū o onegai shimasu)</div>
+              <div class="en-text">Excuse me, may I have the menu please?</div>
+            </button>
+            <button class="response-btn">
+              <div class="jp-text">はい、ラーメンをください</div>
+              <div class="romaji">(hai, rāmen o kudasai)</div>
+              <div class="en-text">Yes, I'll have ramen please</div>
+            </button>
+            <button class="response-btn">
+              <div class="jp-text">おすすめは何ですか？</div>
+              <div class="romaji">(osusume wa nan desu ka?)</div>
+              <div class="en-text">What do you recommend?</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         OPTION B — Split Scene Layout
+         ════════════════════════════════════════════ -->
+    <div class="option-block" data-choice="b" onclick="toggleSelect(this)">
+      <div class="option-header">
+        <span class="option-badge">B</span>
+        <span class="option-label">Split Scene Layout</span>
+        <span class="option-desc">Immersive RPG-style dialogue</span>
+      </div>
+      <div class="option-body">
+        <!-- Mission bar -->
+        <div class="mission-bar">
+          <span class="mission-title-text">🍜 Order at a Restaurant</span>
+          <span class="progress-pill">
+            Exchange 3/5
+            <span class="bar-track"><span class="bar-fill"></span></span>
+          </span>
+        </div>
+
+        <!-- Scene description -->
+        <div class="scene-area">
+          <span class="scene-icon">🍜</span>
+          <div class="scene-text">
+            <strong>Restaurant — Ordering</strong>
+            You've been seated at a small table near the window. The waiter approaches with a
+            notebook, ready to take your order.
+          </div>
+        </div>
+
+        <!-- Previous exchanges — timeline log -->
+        <div class="history-log">
+          <button class="history-toggle">▾ Previous exchanges (2)</button>
+          <div class="history-entries">
+            <div class="history-entry ai">
+              <div class="h-role">🧑‍🍳 Waiter</div>
+              <div class="h-jp">いらっしゃいませ！何名様ですか？</div>
+              <div class="h-en">Welcome! How many people?</div>
+            </div>
+            <div class="history-entry">
+              <div class="h-role">👤 You</div>
+              <div class="h-jp">二人です</div>
+              <div class="h-en">Two people</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Waiter's current dialogue card -->
+        <div class="dialogue-card">
+          <div class="dialogue-card-header">
+            <div class="dialogue-role">
+              <span class="dialogue-role-avatar">🧑‍🍳</span>
+              Waiter
+            </div>
+            <button class="tts-btn">🔊 Listen</button>
+          </div>
+          <div class="dialogue-jp">かしこまりました。こちらへどうぞ。ご注文はお決まりですか？</div>
+          <div class="dialogue-romaji">
+            (kashikomarimashita. kochira e dōzo. gochūmon wa okimari desu ka?)
+          </div>
+          <div class="dialogue-en">
+            Understood. Right this way, please. Have you decided on your order?
+          </div>
+        </div>
+
+        <!-- Your response area -->
+        <div class="your-response-header">
+          <span class="your-response-label">Your Response</span>
+          <span class="guided-badge"><span class="dot"></span> Guided Mode</span>
+        </div>
+        <div class="response-cards">
+          <div class="response-card">
+            <span class="response-card-num">1</span>
+            <div class="response-card-text">
+              <div class="jp-text">すみません、メニューをお願いします</div>
+              <div class="romaji">(sumimasen, menyū o onegai shimasu)</div>
+              <div class="en-text">Excuse me, may I have the menu please?</div>
+            </div>
+          </div>
+          <div class="response-card">
+            <span class="response-card-num">2</span>
+            <div class="response-card-text">
+              <div class="jp-text">はい、ラーメンをください</div>
+              <div class="romaji">(hai, rāmen o kudasai)</div>
+              <div class="en-text">Yes, I'll have ramen please</div>
+            </div>
+          </div>
+          <div class="response-card">
+            <span class="response-card-num">3</span>
+            <div class="response-card-text">
+              <div class="jp-text">おすすめは何ですか？</div>
+              <div class="romaji">(osusume wa nan desu ka?)</div>
+              <div class="en-text">What do you recommend?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- /.options -->
+</div>
+
+<script>
+  function toggleSelect(el) {
+    const wasSelected = el.classList.contains('selected');
+    el.closest('.options')
+      .querySelectorAll('.option-block')
+      .forEach((b) => b.classList.remove('selected'));
+    if (!wasSelected) el.classList.add('selected');
+  }
+</script>

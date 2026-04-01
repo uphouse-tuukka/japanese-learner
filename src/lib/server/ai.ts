@@ -340,6 +340,15 @@ function normalizeLesson(raw: unknown): Lesson {
   };
 }
 
+const EXERCISE_TYPE_TITLES: Record<string, string> = {
+  multiple_choice: 'Multiple Choice',
+  translation: 'Translation',
+  fill_blank: 'Fill in the Blank',
+  reorder: 'Word Order',
+  reading: 'Reading Comprehension',
+  listening: 'Listening Exercise',
+};
+
 function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exercise {
   if (!raw || typeof raw !== 'object') {
     throw new Error(`[ai] Exercise at index ${index} is not an object`);
@@ -354,10 +363,7 @@ function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exerc
   const base = {
     id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : `ai-${randomUUID()}`,
     type: typeRaw,
-    title:
-      typeof row.title === 'string' && row.title.trim()
-        ? row.title.trim()
-        : `Exercise ${index + 1}`,
+    title: EXERCISE_TYPE_TITLES[typeRaw] ?? `Exercise ${index + 1}`,
     japanese: requireString(row, 'japanese', 'japanese', 'jp', 'ja', 'text_ja'),
     romaji: requireString(row, 'romaji', 'romaji', 'romanji', 'romanization'),
     englishContext: flexString(
@@ -794,7 +800,7 @@ export async function generateSessionPlan(input: {
           '5) Exercise quality:',
           '- Vary exercise types within level constraints.',
           '- Cover at least 5 distinct phrases per session; do not reuse the same phrase in more than 2 exercises.',
-          '- Use generic titles (e.g., "Translate the phrase", "Choose the meaning").',
+          '- CRITICAL: The "title" field is ignored and overridden. Do NOT include the answer or any hint to the answer in the "question" field. The question must test the learner WITHOUT revealing what the correct answer is.',
           levelInstructions(input.userLevel),
           ...(allowWritingExercises
             ? [
@@ -956,6 +962,7 @@ export async function generateSessionSummary(input: {
   japaneseWritingEnabled?: boolean;
   lessonTopic?: string;
   progressJournal?: string | null;
+  suppressPromotion?: boolean;
   recentSessions?: Array<{
     topic: string;
     accuracy: number;
@@ -1054,7 +1061,9 @@ export async function generateSessionSummary(input: {
           '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
           '4) next_focus: Written as friendly collaborative statements the LEARNER sees (e.g., "Next time we\'ll focus on…", "Let\'s add these to your vocabulary…"). These also feed back to the session generator, so be specific about topics/grammar. Do NOT suggest external activities like flashcards or real-life practice.',
           '5) All Japanese must include romaji in parentheses. Example: こんにちは (konnichiwa).',
-          '6) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence). Never promote ready_for_japan.',
+          input.suppressPromotion
+            ? '6) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.'
+            : '6) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
           '',
           "TRANSLATION ACCURACY: The 'isCorrect' field uses string matching which may be imperfect. Answers conveying the same meaning ARE correct. Do not penalize natural phrasings, added politeness, contractions, or word order differences. If an 'incorrect' answer was actually correct, acknowledge it as a strength.",
           'Keep feedback encouraging, concise, and travel-focused.',
