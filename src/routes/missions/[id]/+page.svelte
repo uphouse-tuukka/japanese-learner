@@ -49,6 +49,7 @@
   let hintsEnabled = $state(true);
   let userInput = $state('');
   let completionData = $state<MissionCompleteResponse | null>(null);
+  let awaitingCompletion = $state(false);
 
   let errorMessage = $state('');
   let selectedChoiceIndex = $state<number | null>(null);
@@ -71,6 +72,7 @@
     correctCount: number;
     naturalCount: number;
     hintsEnabled: boolean;
+    awaitingCompletion: boolean;
   };
 
   function saveMissionState(): void {
@@ -87,6 +89,7 @@
         correctCount,
         naturalCount,
         hintsEnabled,
+        awaitingCompletion,
       };
       sessionStorage.setItem(getMissionStorageKey(), JSON.stringify(stateData));
     } catch {
@@ -111,6 +114,7 @@
       correctCount = saved.correctCount;
       naturalCount = saved.naturalCount;
       hintsEnabled = saved.hintsEnabled ?? true;
+      awaitingCompletion = saved.awaitingCompletion ?? false;
       return true;
     } catch {
       return false;
@@ -175,6 +179,7 @@
     userInput = '';
     completionData = null;
     selectedChoiceIndex = null;
+    awaitingCompletion = false;
   }
 
   function toggleMode(): void {
@@ -284,7 +289,11 @@
       }
 
       if (payload.isComplete) {
-        await completeMission();
+        awaitingCompletion = true;
+        userInput = '';
+        selectedChoiceIndex = null;
+        uiState = 'active';
+        saveMissionState();
         return;
       }
 
@@ -321,6 +330,7 @@
       }
 
       completionData = payload;
+      awaitingCompletion = false;
       uiState = 'complete';
       clearMissionStorage();
     } catch (error) {
@@ -418,7 +428,16 @@
         {/each}
       </div>
 
-      {#if currentTurn && mode === 'practice' && currentTurn.choices}
+      {#if awaitingCompletion && uiState === 'active'}
+        <div class="finish-mission">
+          <p class="finish-message">
+            Great work — review your final feedback, then finish your mission.
+          </p>
+          <button type="button" class="btn-primary finish-button" onclick={completeMission}>
+            Complete Mission ✨
+          </button>
+        </div>
+      {:else if currentTurn && mode === 'practice' && currentTurn.choices}
         <MissionChoices
           choices={currentTurn.choices}
           onselect={handlePracticeSelect}
@@ -656,6 +675,25 @@
     margin: 0;
     color: var(--text-usuzumi);
     font-size: var(--text-sm);
+  }
+
+  .finish-mission {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--accent-shu-soft);
+    border-radius: var(--radius-md);
+    background: var(--accent-shu-wash);
+  }
+
+  .finish-message {
+    margin: 0;
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
+  }
+
+  .finish-button {
+    justify-self: start;
   }
 
   .actions {
