@@ -4,7 +4,7 @@
   import MissionCompletion from '$lib/components/missions/MissionCompletion.svelte';
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
   import { beforeNavigate } from '$app/navigation';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -57,6 +57,15 @@
   let selectedChoiceIndex = $state<number | null>(null);
 
   let showContinuePrompt = $state(false);
+  let threadContainer = $state<HTMLDivElement | null>(null);
+
+  async function scrollToLatestTurn(): Promise<void> {
+    if (uiState !== 'active') return;
+    await tick();
+    const latestTurnElement = threadContainer?.lastElementChild;
+    if (!(latestTurnElement instanceof HTMLElement)) return;
+    latestTurnElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function getMissionStorageKey(): string {
     return `jp-mission:${data.mission.id}`;
@@ -312,6 +321,7 @@
         userInput = '';
         selectedChoiceIndex = null;
         uiState = 'active';
+        await scrollToLatestTurn();
         saveMissionState();
         return;
       }
@@ -324,6 +334,7 @@
       userInput = '';
       selectedChoiceIndex = null;
       uiState = 'active';
+      await scrollToLatestTurn();
       saveMissionState();
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Failed to process response.';
@@ -435,15 +446,17 @@
 
       <p class="progress">Turn {currentTurnIndex + 1} / {totalTurns}</p>
 
-      <div class="thread">
+      <div class="thread" bind:this={threadContainer}>
         {#each turns as turn, index (turn.turnNumber)}
-          <MissionChatTurn
-            {turn}
-            {characterName}
-            {characterEmoji}
-            isCurrentTurn={index === currentTurnIndex}
-            turnIndex={index}
-          />
+          <div class="turn-anchor">
+            <MissionChatTurn
+              {turn}
+              {characterName}
+              {characterEmoji}
+              isCurrentTurn={index === currentTurnIndex}
+              turnIndex={index}
+            />
+          </div>
         {/each}
       </div>
 

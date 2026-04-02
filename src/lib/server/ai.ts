@@ -1053,6 +1053,7 @@ export async function generateSessionSummary(input: {
         role: 'system',
         content: [
           'You are a Japanese tutor providing a concise handoff note for the next session.',
+          'Write ALL summary text in English. The summary, patterns_strong, patterns_weak, and next_focus fields must be in English. Japanese example words/phrases can be referenced inline, but surrounding analysis text must be English.',
           'Return JSON only with keys: summary, patterns_strong, patterns_weak, next_focus, levelUpRecommendation.',
           '',
           'RULES:',
@@ -1229,6 +1230,7 @@ export async function generateUpdatedJournal(input: {
         role: 'system',
         content: [
           'Maintain a cumulative learner journal for a Japanese learning app. This journal is read by AI models to generate future sessions — optimize for machine readability, not human presentation.',
+          'Write ALL journal text in English. Japanese should only appear within Vocabulary bank entries (the Japanese words/phrases themselves and their translations). Category names, topic descriptions, weak spot analysis, trajectory commentary, and progress snapshots must all be in English.',
           'Return plain text only, under 500 words.',
           'Merge the existing journal with the new session data.',
           'Use these exact headings in this order:',
