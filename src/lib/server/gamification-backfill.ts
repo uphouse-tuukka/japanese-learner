@@ -1,4 +1,4 @@
-import { getDb } from '$lib/server/db';
+import { getDb, getUserById } from '$lib/server/db';
 import {
   XP_PER_CORRECT_ANSWER,
   XP_SESSION_COMPLETE,
@@ -95,6 +95,11 @@ export async function backfillGamificationForUser(userId: string): Promise<{
   skipped: boolean;
   totalXp: number;
 }> {
+  const user = await getUserById(userId);
+  if (!user) {
+    return { skipped: true, totalXp: 0 };
+  }
+
   if (await hasExistingXpRows(userId)) {
     const totalXp = await getTotalXp(userId);
     return { skipped: true, totalXp };

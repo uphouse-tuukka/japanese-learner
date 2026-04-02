@@ -50,6 +50,11 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   const localDate = url.searchParams.get('localDate')?.trim() ?? '';
   const fallbackDate = new Date().toLocaleDateString('sv-SE', { timeZone: HELSINKI_TIME_ZONE });
   const todayDateStr = /^\d{4}-\d{2}-\d{2}$/.test(localDate) ? localDate : fallbackDate;
+  const user = await getUserById(selectedUserId);
+  if (!user) {
+    cookies.delete('selected_user', { path: '/' });
+    throw redirect(302, '/');
+  }
 
   // Return the promise WITHOUT awaiting — SvelteKit streams it after instant navigation
   const lazy = Promise.all([
@@ -59,7 +64,6 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     getActivityDates(selectedUserId),
     getExerciseTypeBreakdown(selectedUserId),
     getDailyXpHistory(selectedUserId),
-    getUserById(selectedUserId),
   ]).then(
     ([
       rawHistory,
@@ -68,7 +72,6 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
       activityDates,
       rawExerciseTypeBreakdown,
       dailyXpHistory,
-      user,
     ]): ProgressData => {
       const history = rawHistory.map((entry) => ({
         ...entry,
@@ -81,9 +84,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
       }));
 
       return {
-        user: user
-          ? { id: user.id, level: user.level }
-          : { id: selectedUserId, level: 'absolute_beginner' },
+        user: { id: user.id, level: user.level },
         history,
         gamification,
         unlockedMilestones,

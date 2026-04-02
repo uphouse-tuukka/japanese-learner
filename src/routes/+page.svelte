@@ -1,10 +1,10 @@
 <script lang="ts">
   import MilestoneProgress from '$lib/components/MilestoneProgress.svelte';
   import UserSelector from '$lib/components/UserSelector.svelte';
-  import { LEVEL_LABELS, LEVEL_ORDER, type GamificationStats } from '$lib/types';
-  import type { ActionData, PageData } from './$types';
+  import { type GamificationStats } from '$lib/types';
+  import type { PageData } from './$types';
 
-  let { data, form } = $props<{ data: PageData; form?: ActionData }>();
+  let { data } = $props<{ data: PageData }>();
   let writingEnabled = $state(false);
   let writingTogglePending = $state(false);
   let writingToggleError = $state<string | null>(null);
@@ -79,37 +79,7 @@
 </script>
 
 <section class="home page-transition">
-  {#if data.users.length === 0}
-    <article class="card block">
-      <h1 class="text-japanese">ようこそ！</h1>
-      <p>Create your first learner profile to begin.</p>
-
-      {#if form?.error}
-        <p class="error-message">{form.error}</p>
-      {/if}
-
-      <form method="POST" action="?/createUser" class="create-form">
-        <div>
-          <label for="name">Name</label>
-          <input id="name" name="name" required minlength="1" maxlength="64" />
-        </div>
-
-        <fieldset class="level-group">
-          <legend>Level</legend>
-          {#each LEVEL_ORDER as level, index}
-            <label>
-              <input type="radio" name="level" value={level} checked={index === 0} />
-              {LEVEL_LABELS[level]}
-            </label>
-          {/each}
-        </fieldset>
-
-        <div class="submit-row">
-          <button type="submit" class="btn-primary">Create profile</button>
-        </div>
-      </form>
-    </article>
-  {:else if !data.selectedUser}
+  {#if !data.selectedUser}
     <article class="card block">
       <h1>Select learner</h1>
       <p>Choose who is studying today.</p>
@@ -229,41 +199,6 @@
   .block {
     display: grid;
     gap: var(--space-3);
-  }
-
-  .create-form {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .level-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    background: var(--bg-kinu, var(--bg-washi));
-  }
-
-  .level-group label {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-    font-size: var(--text-base);
-  }
-
-  .level-group input[type='radio'] {
-    margin: 0;
-    width: 1rem;
-    height: 1rem;
-    accent-color: var(--accent-shu);
-  }
-
-  .submit-row {
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--border-light);
   }
 
   .error-message {

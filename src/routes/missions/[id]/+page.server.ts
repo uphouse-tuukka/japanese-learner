@@ -2,10 +2,17 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { config } from '$lib/server/config';
 import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db';
+import { getUserById } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
   const selectedUserId = cookies.get('selected_user');
   if (!selectedUserId) {
+    throw redirect(302, '/');
+  }
+
+  const user = await getUserById(selectedUserId);
+  if (!user) {
+    cookies.delete('selected_user', { path: '/' });
     throw redirect(302, '/');
   }
 
