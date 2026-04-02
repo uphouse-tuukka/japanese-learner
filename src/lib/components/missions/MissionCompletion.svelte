@@ -33,16 +33,16 @@
 <section class="completion card">
   {#if isImmersion && passed}
     <header class="banner success">
-      <h2>🎉 Mission Complete!</h2>
+      <h2>Mission Complete!</h2>
     </header>
   {:else if isImmersion && !passed}
     <header class="banner not-passed">
-      <h2>😔 Not Quite...</h2>
+      <h2>Not Quite...</h2>
       <p>You need 80% correct to pass and earn the badge.</p>
     </header>
   {:else}
     <header class="banner practice">
-      <h2>📖 Practice Complete</h2>
+      <h2>Practice Complete</h2>
     </header>
   {/if}
 
