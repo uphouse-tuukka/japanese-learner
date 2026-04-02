@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { MultipleChoiceExercise, OnAnswer } from '$lib/types';
-  import InlineAudio from '$lib/components/InlineAudio.svelte';
 
   let { exercise, onAnswer }: { exercise: MultipleChoiceExercise; onAnswer: OnAnswer } = $props();
   let selected = $state('');
@@ -31,11 +30,6 @@
 
 <section class="card">
   <h2>{exercise.title}</h2>
-  <p class="text-japanese text-japanese-lg">
-    {exercise.japanese}
-    <InlineAudio japanese={exercise.japanese} size="md" />
-  </p>
-  <p class="romaji">{exercise.romaji}</p>
   <p>{exercise.question}</p>
   <div class="choices">
     {#each exercise.choices as choice}
@@ -119,12 +113,6 @@
     color: var(--state-error);
     font-weight: var(--weight-medium, 600);
     font-size: var(--text-lg, 1.1rem);
-  }
-
-  .romaji {
-    color: var(--text-usuzumi);
-    font-size: var(--text-sm);
-    margin: 0;
   }
 
   .explanation {

@@ -832,7 +832,7 @@
     opacity: 0.6;
   }
   .c1 {
-    top: 20%;
+    top: 10%;
     left: 10%;
     transform: rotate(15deg);
     background: var(--accent-shu);
