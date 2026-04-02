@@ -3,6 +3,8 @@
   import MissionChoices from '$lib/components/missions/MissionChoices.svelte';
   import MissionCompletion from '$lib/components/missions/MissionCompletion.svelte';
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
+  import { beforeNavigate } from '$app/navigation';
+  import { onDestroy } from 'svelte';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -181,6 +183,23 @@
     selectedChoiceIndex = null;
     awaitingCompletion = false;
   }
+
+  function resetCompletionState(): void {
+    completionData = null;
+    awaitingCompletion = false;
+    if (uiState === 'complete') {
+      uiState = 'ready';
+    }
+  }
+
+  beforeNavigate((navigation) => {
+    if (navigation.to?.route?.id === '/missions/[id]') return;
+    resetCompletionState();
+  });
+
+  onDestroy(() => {
+    resetCompletionState();
+  });
 
   function toggleMode(): void {
     if (uiState !== 'ready') return;
@@ -434,7 +453,7 @@
             Great work — review your final feedback, then finish your mission.
           </p>
           <button type="button" class="btn-primary finish-button" onclick={completeMission}>
-            Complete Mission ✨
+            Complete Mission
           </button>
         </div>
       {:else if currentTurn && mode === 'practice' && currentTurn.choices}

@@ -185,7 +185,7 @@ SELECT
   m.unlock_sessions_required,
   m.start_unlocked,
   MAX(CASE WHEN um.mode = 'practice' AND um.status = 'completed' THEN 1 ELSE 0 END) AS completed_practice,
-  MAX(CASE WHEN um.mode = 'immersion' AND um.status = 'completed' THEN 1 ELSE 0 END) AS completed_immersion,
+  MAX(CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END) AS completed_immersion,
   MAX(CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END) AS badge_earned
 FROM missions m
 LEFT JOIN user_missions um ON um.mission_id = m.id AND um.user_id = ?
