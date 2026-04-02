@@ -398,7 +398,7 @@
 
       {#if mode === 'immersion'}
         <div class="hints-toggle-row">
-          <span class="hints-label">💡 Hints</span>
+          <span class="hints-label">Hints</span>
           <button
             type="button"
             class="hints-toggle"
@@ -416,7 +416,7 @@
 
       {#if !data.unlocked}
         <p class="locked-message">
-          🔒 This mission is locked. Complete {data.mission.unlockSessionsRequired} learn sessions in
+          This mission is locked. Complete {data.mission.unlockSessionsRequired} learn sessions in
           {CATEGORY_LABELS[data.mission.category] ?? 'this category'} to unlock.
         </p>
       {/if}
@@ -488,7 +488,7 @@
           />
 
           {#if hintsEnabled && currentTurn.hint}
-            <p class="hint">💡 {currentTurn.hint}</p>
+            <p class="hint">{currentTurn.hint}</p>
           {/if}
 
           <button

@@ -347,7 +347,7 @@
     font-size: var(--text-sm);
   }
 
-  @media (max-width: 700px) {
+  @media (max-width: 48rem) /* --bp-md */ {
     .header-inner {
       flex-direction: column;
       align-items: flex-start;

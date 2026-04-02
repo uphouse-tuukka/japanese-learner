@@ -196,7 +196,7 @@
     color: #fff;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 37.5rem) /* --bp-sm */ {
     .debug-root {
       right: var(--space-3);
       bottom: var(--space-3);

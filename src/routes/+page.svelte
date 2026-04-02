@@ -252,7 +252,7 @@
   }
 
   .streak-number {
-    font-size: 3rem;
+    font-size: var(--text-4xl);
     font-weight: var(--weight-bold);
     color: var(--accent-shu);
     line-height: 1;
@@ -487,7 +487,7 @@
 
   .switch-text {
     width: 100%;
-    padding: 0 0.8rem 0 0.8rem;
+    padding: 0 var(--space-3) 0 var(--space-3);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     text-align: right;
@@ -513,7 +513,7 @@
     }
   }
 
-  @media (max-width: 44rem) {
+  @media (max-width: 48rem) /* --bp-md */ {
     .toggle-row {
       align-items: flex-start;
       flex-direction: column;

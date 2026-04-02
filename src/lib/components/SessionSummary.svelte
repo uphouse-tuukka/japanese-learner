@@ -133,7 +133,7 @@
     </div>
 
     {#if celebrate}
-      <p class="celebrate-text">🎉 Excellent work. Great consistency.</p>
+      <p class="celebrate-text">Excellent work. Great consistency.</p>
     {/if}
   </header>
 
@@ -160,19 +160,19 @@
         {/if}
         {#if xpBreakdown.perfectBonusXp > 0}
           <div class="xp-row highlight">
-            <span>Perfect score ✦</span>
+            <span>Perfect score</span>
             <span>+{xpBreakdown.perfectBonusXp}墨</span>
           </div>
         {/if}
         {#if xpBreakdown.streakBonusXp > 0}
           <div class="xp-row highlight">
-            <span>Streak bonus 🔥</span>
+            <span>Streak bonus</span>
             <span>+{xpBreakdown.streakBonusXp}墨</span>
           </div>
         {/if}
         {#if xpBreakdown.comboBonusXp > 0}
           <div class="xp-row highlight">
-            <span>Combo bonus ⚡</span>
+            <span>Combo bonus</span>
             <span>+{xpBreakdown.comboBonusXp}墨</span>
           </div>
         {/if}
@@ -221,23 +221,15 @@
             <p class="milestone-extra-note">+{hiddenMilestoneCount} more milestones unlocked</p>
           {/if}
         </div>
-        <div class="milestone-decoration">✦</div>
       </section>
     {/each}
   {/if}
 
   {#if recommendation && levelUpStatus !== 'declined'}
     <section class="level-up-card stagger-5 stagger-item" aria-label="Level up recommendation">
-      <div class="confetti-container" aria-hidden="true">
-        <div class="confetti c1"></div>
-        <div class="confetti c2"></div>
-        <div class="confetti c3"></div>
-        <div class="confetti c4"></div>
-      </div>
-
       <div class="level-up-content">
         <div class="level-up-header">
-          <span class="level-up-icon">🎉</span>
+          <span class="level-up-icon" aria-hidden="true"></span>
           <h3>Promotion Available!</h3>
         </div>
 
@@ -250,7 +242,7 @@
             <span class="label">Current</span>
             <span class="value">{currentLevelLabel}</span>
           </div>
-          <div class="level-arrow">➜</div>
+          <div class="level-arrow" aria-hidden="true">→</div>
           <div class="level-box new">
             <span class="label">Next Level</span>
             <span class="value">
@@ -259,8 +251,6 @@
                 🇯🇵
               {/if}
             </span>
-            <div class="sparkle s1">✦</div>
-            <div class="sparkle s2">✦</div>
           </div>
         </div>
 
@@ -359,7 +349,7 @@
   }
 
   .score {
-    font-size: 4rem;
+    font-size: var(--text-3xl);
     font-weight: var(--weight-bold);
     color: var(--text-sumi);
     z-index: 2;
@@ -402,7 +392,7 @@
   h3 {
     margin-bottom: var(--space-3);
     color: var(--text-sumi);
-    font-size: 1.125rem;
+    font-size: var(--text-md);
   }
 
   .actions {
@@ -441,7 +431,7 @@
 
   .xp-total {
     font-family: 'Noto Sans JP', sans-serif;
-    font-size: 2.5rem;
+    font-size: var(--text-2xl);
     font-weight: var(--weight-bold);
     color: var(--text-sumi);
     line-height: 1;
@@ -482,7 +472,7 @@
     position: relative;
     overflow: hidden;
     text-align: center;
-    box-shadow: 0 4px 12px rgba(216, 181, 97, 0.2);
+    box-shadow: var(--shadow-md);
   }
 
   .milestone-header {
@@ -491,20 +481,20 @@
 
   .milestone-label {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--accent-gold);
     border: 1px solid var(--accent-gold);
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
     margin-top: var(--space-2);
-    background: #fff;
+    background: var(--bg-white);
   }
 
   .milestone-jp {
     font-family: 'Noto Sans JP', serif;
-    font-size: 2rem;
+    font-size: var(--text-xl);
     font-weight: var(--weight-bold);
     color: var(--text-sumi);
     margin: 0;
@@ -512,28 +502,19 @@
   }
 
   .milestone-en {
-    font-size: 1.1rem;
+    font-size: var(--text-md);
     color: var(--text-bokashi);
     font-weight: var(--weight-medium);
     margin: 0 0 var(--space-3) 0;
   }
 
   .milestone-desc {
-    font-size: 0.95rem;
+    font-size: var(--text-base);
     color: var(--text-sumi);
     margin: 0;
     line-height: 1.5;
     max-width: 80%;
     margin: 0 auto;
-  }
-
-  .milestone-decoration {
-    position: absolute;
-    top: var(--space-2);
-    right: var(--space-2);
-    color: var(--accent-gold);
-    font-size: 1.5rem;
-    opacity: 0.5;
   }
 
   .milestone-extra-note {
@@ -546,13 +527,13 @@
   .level-up-card {
     margin-top: var(--space-6);
     margin-bottom: var(--space-2);
-    background: linear-gradient(to bottom, #fffdf5, #fff);
+    background: linear-gradient(to bottom, var(--bg-shoji), var(--bg-white));
     border: 2px solid var(--accent-shu);
     border-radius: var(--radius-lg);
     padding: var(--space-5);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 8px 20px rgba(194, 59, 34, 0.15);
+    box-shadow: var(--shadow-lg);
   }
 
   .level-up-card::before {
@@ -562,18 +543,7 @@
     left: 0;
     right: 0;
     height: 6px;
-    background: linear-gradient(90deg, var(--accent-shu), #e6b422, var(--accent-shu));
-    background-size: 200% 100%;
-    animation: shimmer 3s infinite linear;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 100% 0;
-    }
-    100% {
-      background-position: -100% 0;
-    }
+    background: linear-gradient(90deg, var(--accent-shu), var(--accent-gold), var(--accent-shu));
   }
 
   .level-up-header {
@@ -585,23 +555,17 @@
   }
 
   .level-up-icon {
-    font-size: 1.5rem;
-    animation: bounce 1s infinite alternate ease-in-out;
-  }
-
-  @keyframes bounce {
-    0% {
-      transform: translateY(0);
-    }
-    100% {
-      transform: translateY(-4px);
-    }
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-shu);
   }
 
   .level-up-card h3 {
     margin: 0;
     color: var(--accent-shu);
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
     font-weight: 800;
     letter-spacing: -0.02em;
   }
@@ -616,7 +580,7 @@
     color: var(--text-sumi);
     margin-bottom: var(--space-6);
     line-height: 1.6;
-    font-size: 1.05rem;
+    font-size: var(--text-md);
   }
 
   .level-transition {
@@ -644,56 +608,27 @@
   .level-box.new {
     background: var(--accent-shu);
     color: white;
-    box-shadow: 0 4px 12px rgba(194, 59, 34, 0.3);
+    box-shadow: var(--shadow-md);
     transform: scale(1.1);
   }
 
   .label {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     opacity: 0.8;
-    margin-bottom: 2px;
+    margin-bottom: var(--space-1);
   }
 
   .value {
     font-weight: 800;
-    font-size: 1.1rem;
+    font-size: var(--text-md);
   }
 
   .level-arrow {
-    color: #e6b422;
-    font-size: 1.5rem;
+    color: var(--accent-gold);
+    font-size: var(--text-xl);
     font-weight: bold;
-  }
-
-  .sparkle {
-    position: absolute;
-    color: #ffd700;
-    font-size: 0.8rem;
-    animation: twinkle 1.5s infinite ease-in-out;
-  }
-  .sparkle.s1 {
-    top: -5px;
-    right: -5px;
-    animation-delay: 0s;
-  }
-  .sparkle.s2 {
-    bottom: -5px;
-    left: -5px;
-    animation-delay: 0.5s;
-  }
-
-  @keyframes twinkle {
-    0%,
-    100% {
-      transform: scale(0.8) rotate(0deg);
-      opacity: 0.6;
-    }
-    50% {
-      transform: scale(1.3) rotate(180deg);
-      opacity: 1;
-    }
   }
 
   .level-actions {
@@ -707,33 +642,15 @@
     background: var(--accent-shu);
     color: white;
     font-weight: bold;
-    font-size: 1.1rem;
-    padding: 0.8rem 2rem;
+    font-size: var(--text-md);
+    padding: var(--space-3) var(--space-8);
     border-radius: var(--radius-full, 9999px);
     border: none;
     cursor: pointer;
-    box-shadow:
-      0 4px 0 #9a2b16,
-      0 8px 10px rgba(0, 0, 0, 0.1);
-    transition:
-      transform 0.1s,
-      box-shadow 0.1s;
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.1s;
     width: 100%;
     max-width: 280px;
-  }
-
-  .btn-celebrate:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow:
-      0 6px 0 #9a2b16,
-      0 12px 16px rgba(0, 0, 0, 0.15);
-  }
-
-  .btn-celebrate:active {
-    transform: translateY(4px);
-    box-shadow:
-      0 0 0 #9a2b16,
-      inset 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
   .btn-gentle {
@@ -741,7 +658,7 @@
     border: none;
     color: var(--text-bokashi);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     padding: var(--space-2);
   }
   .btn-gentle:hover {
@@ -753,8 +670,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    background: #fffdf5;
-    border: 1px solid #e6b422;
+    background: var(--bg-shoji);
+    border: 1px solid var(--accent-gold);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-md);
     animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -782,24 +699,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     transform: rotate(-10deg);
   }
 
   .success-message strong {
     display: block;
     color: var(--accent-shu);
-    font-size: 1.1rem;
+    font-size: var(--text-md);
   }
 
   .success-message .sub {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--text-bokashi);
   }
 
   .error-message {
     color: var(--accent-shu);
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     text-align: center;
   }
 
@@ -810,50 +727,7 @@
     cursor: pointer;
     text-decoration: underline;
     padding: 0 var(--space-2);
-    font-size: 0.9rem;
-  }
-
-  /* Confetti decoration */
-  .confetti-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 0;
-  }
-  .confetti {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    background: #ffd700;
-    opacity: 0.6;
-  }
-  .c1 {
-    top: 10%;
-    left: 10%;
-    transform: rotate(15deg);
-    background: var(--accent-shu);
-  }
-  .c2 {
-    top: 15%;
-    right: 15%;
-    transform: rotate(-30deg);
-    background: #e6b422;
-  }
-  .c3 {
-    bottom: 30%;
-    left: 20%;
-    transform: rotate(45deg);
-    background: #e6b422;
-  }
-  .c4 {
-    bottom: 25%;
-    right: 10%;
-    transform: rotate(-10deg);
-    background: var(--accent-shu);
+    font-size: var(--text-base);
   }
 
   /* Animations and Elements */
@@ -868,10 +742,10 @@
     width: 54px;
     height: 54px;
     border: 3px solid var(--accent-shu);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--accent-shu);
     font-weight: var(--weight-bold);
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -888,7 +762,7 @@
     top: -5px;
     color: var(--text-usuzumi);
     font-weight: var(--weight-light);
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
     font-family: 'Noto Sans JP', serif;
     z-index: 3;
     opacity: 0.6;

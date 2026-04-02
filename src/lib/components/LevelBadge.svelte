@@ -45,7 +45,7 @@
   }
 
   .level-badge span {
-    font-size: 9px;
+    font-size: var(--text-2xs);
     line-height: 1.15;
     font-weight: var(--weight-medium);
     color: var(--text-sumi);

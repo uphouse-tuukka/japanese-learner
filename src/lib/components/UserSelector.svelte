@@ -97,40 +97,40 @@
 <style>
   .selector-card {
     display: grid;
-    gap: var(--space-4, 1rem);
-    padding: var(--space-5, 1.25rem);
-    border-radius: var(--radius-lg, 1rem);
-    background: #fff;
-    border: 1px solid var(--border-light, #d9d9de);
-    box-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border-radius: var(--radius-lg);
+    background: var(--bg-white);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-card);
   }
 
   .selector-header h2 {
     margin: 0;
-    font-size: var(--text-lg, 1.2rem);
+    font-size: var(--text-lg);
   }
 
   .selector-header p {
-    margin: 0.35rem 0 0;
-    color: var(--text-usuzumi, #5f6570);
-    font-size: var(--text-sm, 0.9rem);
+    margin: var(--space-1) 0 0;
+    color: var(--text-usuzumi);
+    font-size: var(--text-sm);
   }
 
   .selector-form,
   .create-form {
     display: grid;
-    gap: var(--space-3, 0.75rem);
+    gap: var(--space-3);
   }
 
   h3 {
     margin: 0;
-    font-size: var(--text-base, 1rem);
+    font-size: var(--text-base);
   }
 
   label {
-    font-size: var(--text-sm, 0.88rem);
-    color: var(--text-usuzumi, #5f6570);
-    font-weight: var(--weight-medium, 500);
+    font-size: var(--text-sm);
+    color: var(--text-usuzumi);
+    font-weight: var(--weight-medium);
   }
 
   input,
@@ -142,21 +142,21 @@
 
   input,
   select {
-    padding: 0.625rem 0.875rem;
-    border-radius: var(--radius-md, 0.65rem);
-    border: 1.5px solid var(--border-light, #cfd6e0);
-    background: #fff;
-    color: var(--text-sumi, #1a1a1a);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-white);
+    color: var(--text-sumi);
     transition:
-      border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
-      box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
   }
 
   input:focus,
   select:focus {
     outline: none;
-    border-color: var(--accent-shu, #c1440e);
-    box-shadow: 0 0 0 3px var(--accent-shu-wash, rgba(193, 68, 14, 0.1));
+    border-color: var(--accent-shu);
+    box-shadow: 0 0 0 3px var(--accent-shu-wash);
   }
 
   select {
@@ -171,20 +171,20 @@
   }
 
   button {
-    padding: 0.625rem 1rem;
+    padding: var(--space-2) var(--space-4);
     border: none;
     border-radius: 999px;
     cursor: pointer;
-    background: var(--accent-shu, #c1440e);
-    color: var(--bg-shoji, white);
-    font-weight: var(--weight-medium, 600);
+    background: var(--accent-shu);
+    color: var(--bg-shoji);
+    font-weight: var(--weight-medium);
     transition:
-      background var(--duration-fast, 150ms) var(--ease-out, ease-out),
-      transform var(--duration-fast, 150ms) var(--ease-out, ease-out);
+      background var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
   }
 
   button:hover:not([disabled]) {
-    background: var(--accent-shu-deep, #a33b0c);
+    background: var(--accent-shu-deep);
   }
 
   button:active:not([disabled]) {
@@ -198,24 +198,24 @@
 
   .alert {
     margin: 0;
-    padding: 0.625rem 0.75rem;
-    border-radius: var(--radius-md, 0.6rem);
-    font-size: var(--text-sm, 0.9rem);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
   }
 
   .alert.error {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--state-error-wash);
+    color: var(--state-error-text);
   }
 
   .alert.success {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--state-success-wash);
+    color: var(--state-success-text);
   }
 
   .limit-text {
     margin: 0;
-    font-size: var(--text-xs, 0.84rem);
-    color: var(--text-usuzumi, #5f6570);
+    font-size: var(--text-xs);
+    color: var(--text-usuzumi);
   }
 </style>

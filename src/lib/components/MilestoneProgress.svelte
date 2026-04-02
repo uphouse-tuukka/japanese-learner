@@ -61,7 +61,7 @@
 
     <div class="xp-remaining">{xpRemaining} ink left</div>
   {:else}
-    <div class="all-achieved">All milestones achieved! 🎉</div>
+    <div class="all-achieved">All milestones achieved.</div>
   {/if}
 </div>
 

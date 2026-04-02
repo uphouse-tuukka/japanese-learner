@@ -84,13 +84,13 @@
     </section>
   {:else if isImmersion && !passed}
     <section class="badge-card locked">
-      <p class="badge-emoji">🔒</p>
+      <p class="badge-locked-label">Locked</p>
       <p class="badge-name muted">{mission.badgeEmoji} {mission.badgeName}</p>
       <p class="badge-statement muted">Score 80% or higher to earn this badge</p>
     </section>
   {:else}
     <section class="badge-card locked">
-      <p class="badge-emoji">🔒</p>
+      <p class="badge-locked-label">Locked</p>
       <p class="badge-name muted">{mission.badgeEmoji} {mission.badgeName}</p>
       <p class="badge-statement muted">Complete in Immersion Mode to unlock</p>
     </section>
@@ -228,6 +228,14 @@
 
   .badge-emoji {
     font-size: var(--text-2xl);
+  }
+
+  .badge-locked-label {
+    font-size: var(--text-sm);
+    color: var(--text-usuzumi);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    font-weight: var(--weight-medium);
   }
 
   .badge-name {

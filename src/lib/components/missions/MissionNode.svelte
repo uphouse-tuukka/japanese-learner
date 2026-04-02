@@ -29,7 +29,7 @@
     {#if mission.completedImmersion}
       <span class="overlay completed-overlay" aria-hidden="true">✓</span>
     {:else if !mission.unlocked}
-      <span class="overlay locked-overlay" aria-hidden="true">🔒</span>
+      <span class="overlay locked-overlay" aria-hidden="true"></span>
     {/if}
   </button>
 
@@ -112,6 +112,15 @@
   .locked-overlay {
     background: var(--bg-washi);
     color: var(--text-bokashi);
+  }
+
+  .locked-overlay::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-mid);
   }
 
   .mission-title {

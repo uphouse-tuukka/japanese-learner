@@ -19,12 +19,13 @@
   --bg-washi: #f5f1ea; /* washi paper — slightly warmer */
   --bg-kinu: #eee9df; /* silk — cards, elevated surfaces */
   --bg-suna: #e6e0d4; /* sand — deeper surface, hover states */
+  --bg-white: #ffffff; /* white surface — forms, cards */
 
   /* — Color: Text —
      Sumi ink tones — deep but not harsh. */
   --text-sumi: #2c2a26; /* primary text — dense ink */
   --text-bokashi: #5c5750; /* secondary text — diluted ink */
-  --text-usuzumi: #8a847a; /* tertiary / placeholder — faint ink */
+  --text-usuzumi: #6e6860; /* tertiary / placeholder — faint ink */
 
   /* — Color: Accent — Vermillion (朱色 shu-iro) —
      The red of torii gates and hanko stamps. */
@@ -52,12 +53,17 @@
   --state-warning: #c49a2a;
   --state-info: #4a6e8a;
   --state-disabled: #c5bfb3;
+  --state-error-wash: #fee2e2;
+  --state-error-text: #991b1b;
+  --state-success-wash: #dcfce7;
+  --state-success-text: #166534;
 
   /* — Typography — */
   --font-sans:
     'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui,
     -apple-system, sans-serif;
 
+  --text-2xs: 0.5625rem; /* 9px — badge inscriptions */
   --text-xs: 0.75rem; /* 12px */
   --text-sm: 0.8125rem; /* 13px */
   --text-base: 0.9375rem; /* 15px — slightly larger for readability */
@@ -66,6 +72,7 @@
   --text-xl: 1.5rem; /* 24px */
   --text-2xl: 1.875rem; /* 30px */
   --text-3xl: 2.25rem; /* 36px */
+  --text-4xl: 3rem; /* 48px — for special headings */
 
   --weight-light: 300;
   --weight-regular: 400;
@@ -102,6 +109,10 @@
   --content-width: 52rem; /* 832px — comfortable reading */
   --content-wide: 68rem; /* 1088px — wider layouts */
   --nav-height: 3.5rem; /* 56px */
+  /* — Breakpoints (reference only — CSS @media cannot use var()) —
+     Standardise all @media queries to these two values: */
+  --bp-sm: 37.5rem; /* 600px — narrow / stacked layout */
+  --bp-md: 48rem; /* 768px — mid / side-by-side layout */
 
   /* — Border Radius —
      Minimal — Japanese design favors clean edges,
@@ -305,7 +316,7 @@ button:disabled,
    Vermillion fill — bold, decisive, like a hanko stamp. */
 .btn-primary {
   background-color: var(--accent-shu);
-  color: #fff;
+  color: var(--bg-white);
   border-color: var(--accent-shu);
   box-shadow: 0 1px 3px rgba(194, 59, 34, 0.2);
 }
@@ -314,7 +325,7 @@ button:disabled,
 .btn-primary:hover:not(:disabled) {
   background-color: var(--accent-shu-deep);
   border-color: var(--accent-shu-deep);
-  color: #fff;
+  color: var(--bg-white);
   text-decoration: none;
   box-shadow: 0 3px 10px rgba(194, 59, 34, 0.25);
 }
@@ -376,7 +387,7 @@ select {
   font-family: var(--font-sans);
   font-size: var(--text-base);
   color: var(--text-sumi);
-  background-color: #fff;
+  background-color: var(--bg-white);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
@@ -412,7 +423,7 @@ label {
    Cards
    ------------------------------------------------------------ */
 .card {
-  background-color: #fff;
+  background-color: var(--bg-white);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   padding: var(--space-6);

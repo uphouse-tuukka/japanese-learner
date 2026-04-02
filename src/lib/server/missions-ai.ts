@@ -299,7 +299,7 @@ export async function generateMissionTurn(input: {
       characterEmoji:
         typeof parsed.characterEmoji === 'string' && parsed.characterEmoji.trim()
           ? parsed.characterEmoji.trim()
-          : '💬',
+          : '',
       tokenUsage: usage,
     };
   } catch (error) {
@@ -354,7 +354,7 @@ export async function generateMissionTurn(input: {
           ? 'You find yourself in a lively setting in Japan, and the conversation begins politely.'
           : undefined,
       characterName: '店員',
-      characterEmoji: '💬',
+      characterEmoji: '',
       tokenUsage: usage,
     };
   }

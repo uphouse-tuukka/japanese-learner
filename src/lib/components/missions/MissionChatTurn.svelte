@@ -63,7 +63,11 @@
   <div class="content">
     <div class="speaker-row">
       <div class="speaker-left">
-        <span class="avatar" aria-hidden="true">{characterEmoji}</span>
+        <span class="avatar" aria-hidden="true">
+          {#if characterEmoji}
+            {characterEmoji}
+          {/if}
+        </span>
         <span class="speaker-name">{characterName}</span>
       </div>
 

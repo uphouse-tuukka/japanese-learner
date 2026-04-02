@@ -729,7 +729,7 @@
     margin: 0;
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 37.5rem) /* --bp-sm */ {
     .header-section {
       align-items: flex-start;
       flex-wrap: wrap;
