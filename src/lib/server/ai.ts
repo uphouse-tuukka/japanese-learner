@@ -599,7 +599,7 @@ function levelInstructions(level: UserLevel): string {
 
 const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
   multiple_choice:
-    '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional). For multiple_choice exercises, every choice that contains Japanese must include romaji in parentheses. Example choice: "すみません (sumimasen)". This applies to ALL choices in the array and to correctAnswer.',
+    '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional). For multiple_choice exercises, every choice that contains Japanese must include romaji in parentheses. Example choice: "すみません (sumimasen)". This applies to ALL choices in the array and to correctAnswer. For multiple_choice exercises, the question MUST provide clear context and be self-contained so the learner understands exactly what is being tested. Use one of these patterns: (a) ask what a Japanese phrase means, e.g. "What does [phrase] mean?"; (b) present a real-life scenario and ask which phrase fits, e.g. "You are at a restaurant and want to get the waiter\'s attention. What would you say?"; (c) ask the learner to identify the correct translation/usage, e.g. "Which phrase means [English meaning]?". NEVER write a vague question like "Which phrase is most appropriate?" without a scenario.',
   translation:
     '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
   fill_blank:
@@ -800,6 +800,8 @@ export async function generateSessionPlan(input: {
           '5) Exercise quality:',
           '- Vary exercise types within level constraints.',
           '- Cover at least 5 distinct phrases per session; do not reuse the same phrase in more than 2 exercises.',
+          '- Do NOT generate two exercises that test the same phrase in the same way. If ありがとうございます (arigatou gozaimasu) appears in one multiple_choice exercise, do not create another multiple_choice that tests the same concept for that phrase.',
+          '- For multiple_choice exercises: the "question" field MUST provide clear context and be self-contained. Use one of these patterns: (a) "What does [phrase] mean?"; (b) a real-life scenario asking what to say; (c) "Which phrase means [English meaning]?". NEVER use a vague question like "Which phrase is most appropriate?" without a scenario.',
           '- CRITICAL: The "title" field is ignored and overridden. Do NOT include the answer or any hint to the answer in the "question" field. The question must test the learner WITHOUT revealing what the correct answer is.',
           levelInstructions(input.userLevel),
           ...(allowWritingExercises
