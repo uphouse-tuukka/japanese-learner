@@ -1,4 +1,5 @@
 import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 import {
   getActivityDates,
   getDailyXpHistory,
@@ -40,31 +41,10 @@ export type ProgressData = {
   dailyXpHistory: DailyXpEntry[];
 };
 
-const EMPTY_GAMIFICATION_STATS: GamificationStats = {
-  totalXp: 0,
-  currentStreak: 0,
-  longestStreak: 0,
-  dailyGoalMet: false,
-  nextMilestone: null,
-  xpToNextMilestone: 0,
-};
-
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const selectedUserId = cookies.get('selected_user');
   if (!selectedUserId) {
-    return {
-      selectedUserId: null as string | null,
-      lazy: Promise.resolve({
-        user: null,
-        history: [],
-        gamification: EMPTY_GAMIFICATION_STATS,
-        unlockedMilestones: [],
-        milestones: MILESTONES,
-        activityDates: [],
-        exerciseTypeBreakdown: [],
-        dailyXpHistory: [],
-      } as ProgressData),
-    };
+    throw redirect(302, '/');
   }
 
   const localDate = url.searchParams.get('localDate')?.trim() ?? '';
