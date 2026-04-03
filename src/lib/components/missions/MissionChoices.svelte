@@ -12,7 +12,6 @@
     if (selectedIndex === null) return '';
     if (choice.isCorrect) return 'correct';
     if (selectedIndex === index && !choice.isCorrect) return 'incorrect';
-    if (selectedIndex === index) return 'selected';
     return '';
   }
 </script>

@@ -21,7 +21,18 @@
     <ReorderExercise {exercise} {onAnswer} />
   {:else if exercise.type === 'reading'}
     <ReadingExercise {exercise} {onAnswer} />
-  {:else}
+  {:else if exercise.type === 'listening'}
     <ListeningExercise {exercise} {onAnswer} />
+  {:else}
+    <p class="exercise-error">
+      Unknown exercise type: {(exercise as Record<string, unknown>).type}
+    </p>
   {/if}
 {/key}
+
+<style>
+  .exercise-error {
+    color: #dc2626;
+    padding: 0.5rem;
+  }
+</style>

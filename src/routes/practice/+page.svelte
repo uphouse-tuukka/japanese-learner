@@ -52,7 +52,7 @@
   let uiState = $state<UiState>('idle');
   let errorMessage = $state('');
 
-  const STORAGE_KEY = 'practice';
+  const STORAGE_KEY = $derived(`practice:${data.selectedUserId}`);
   let showContinuePrompt = $state(false);
 
   function saveState(): void {

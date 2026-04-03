@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ListeningExercise, OnAnswer } from '$lib/types';
   import { isSpeaking, speak, stop } from '$lib/utils/tts';
+  import { stripParentheticalRomaji } from '$lib/utils/text';
 
   let { exercise, onAnswer }: { exercise: ListeningExercise; onAnswer: OnAnswer } = $props();
   let selected = $state('');
@@ -9,10 +10,6 @@
   let answered = $state(false);
   let isCorrect = $state(false);
   let submittedAnswer = $state('');
-
-  function stripParentheticalRomaji(text: string): string {
-    return text.replace(/\s*\([^)]*\)/g, '').trim();
-  }
 
   async function playAudio(): Promise<void> {
     loading = true;

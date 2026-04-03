@@ -54,3 +54,8 @@ export function normalizeForComparison(text: string): string {
     .trim()
     .toLowerCase();
 }
+
+/** Remove parenthetical romaji annotations, e.g. "こんにちは (konnichiwa)" → "こんにちは" */
+export function stripParentheticalRomaji(text: string): string {
+  return text.replace(/\s*\([^)]*\)/g, '').trim();
+}

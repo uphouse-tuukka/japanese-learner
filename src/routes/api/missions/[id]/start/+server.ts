@@ -73,7 +73,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       userLevel: undefined,
     });
 
-    await recordMissionTokenUsage(userId, mission.id, generated.tokenUsage);
+    await recordMissionTokenUsage(userId, generated.tokenUsage);
     await updateUserMission(userMissionId, { conversationLog: [generated.turn] });
 
     const response: MissionStartResponse = {

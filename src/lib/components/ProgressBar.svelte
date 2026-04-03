@@ -5,21 +5,20 @@
     label = 'Progress',
   } = $props<{ current: number; total: number; label?: string }>();
 
-  const safeTotal = $derived(total > 0 ? total : 1);
-  const clampedCurrent = $derived(Math.min(Math.max(current, 0), safeTotal));
-  const percent = $derived(Math.round((clampedCurrent / safeTotal) * 100));
+  const clampedCurrent = $derived(total > 0 ? Math.min(Math.max(current, 0), total) : 0);
+  const percent = $derived(total > 0 ? Math.round((clampedCurrent / total) * 100) : 0);
 </script>
 
 <div class="progress-wrap" aria-label={label} role="group">
   <div class="progress-label-row">
     <span>{label}</span>
-    <span>{clampedCurrent} / {safeTotal}</span>
+    <span>{clampedCurrent} / {total}</span>
   </div>
   <div
     class="progress-track"
     role="progressbar"
     aria-valuemin={0}
-    aria-valuemax={safeTotal}
+    aria-valuemax={total}
     aria-valuenow={clampedCurrent}
   >
     <div class="progress-fill" style={`width: ${percent}%`}></div>

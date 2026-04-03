@@ -68,7 +68,7 @@
   }
 
   function getMissionStorageKey(): string {
-    return `jp-mission:${data.mission.id}`;
+    return `jp-mission:${data.mission.id}:${data.selectedUserId}`;
   }
 
   type MissionStorageState = {
@@ -343,6 +343,9 @@
   }
 
   async function completeMission(): Promise<void> {
+    if (awaitingCompletion) return;
+    awaitingCompletion = true;
+
     try {
       const res = await fetch(`/api/missions/${data.mission.id}/complete`, {
         method: 'POST',
@@ -360,10 +363,10 @@
       }
 
       completionData = payload;
-      awaitingCompletion = false;
       uiState = 'complete';
       clearMissionStorage();
     } catch (error) {
+      awaitingCompletion = false;
       errorMessage = error instanceof Error ? error.message : 'Failed to complete mission.';
       uiState = 'error';
     }

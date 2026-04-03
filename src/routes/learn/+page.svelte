@@ -69,9 +69,9 @@
   let errorMessage = $state('');
   let lesson = $state<Lesson | null>(null);
 
-  const STORAGE_KEY = 'learn';
-  const LESSON_STORAGE_KEY = 'jp-lesson:learn';
-  const UI_STATE_STORAGE_KEY = 'jp-uistate:learn';
+  const STORAGE_KEY = $derived(`learn:${data.selectedUserId}`);
+  const LESSON_STORAGE_KEY = $derived(`jp-lesson:learn:${data.selectedUserId}`);
+  const UI_STATE_STORAGE_KEY = $derived(`jp-uistate:learn:${data.selectedUserId}`);
   let showContinuePrompt = $state(false);
   let continueSavedAtLabel = $state('');
 

@@ -114,7 +114,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         conversationHistory: userMission.conversationLog,
       });
 
-      await recordMissionTokenUsage(userId, mission.id, evaluation.tokenUsage);
+      await recordMissionTokenUsage(userId, evaluation.tokenUsage);
       feedback = {
         correct: evaluation.correct,
         message: evaluation.message,
@@ -147,7 +147,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         userLevel: undefined,
       });
 
-      await recordMissionTokenUsage(userId, mission.id, generated.tokenUsage);
+      await recordMissionTokenUsage(userId, generated.tokenUsage);
       nextTurn = generated.turn;
       conversationLog.push(nextTurn);
     }

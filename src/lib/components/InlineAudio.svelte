@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { speak, stop, isSpeaking } from '$lib/utils/tts';
+  import { stripParentheticalRomaji } from '$lib/utils/text';
 
   let { japanese, size = 'sm' }: { japanese: string; size?: 'sm' | 'md' } = $props();
 
@@ -9,10 +10,6 @@
 
   function cleanup() {
     if (pollInterval) clearInterval(pollInterval);
-  }
-
-  function stripParentheticalRomaji(text: string): string {
-    return text.replace(/\s*\([^)]*\)/g, '').trim();
   }
 
   onDestroy(() => {

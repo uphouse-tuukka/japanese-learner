@@ -382,19 +382,30 @@ function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exerc
     const choices = shuffleArray(
       toStringArray(row.choices ?? row.options ?? row.answers, 'choices'),
     );
+    const normalizedCorrectAnswer = requireString(
+      row,
+      'correctAnswer',
+      'correctAnswer',
+      'correct_answer',
+      'answer',
+      'correct',
+    );
+    const correctAnswer = choices.includes(normalizedCorrectAnswer)
+      ? normalizedCorrectAnswer
+      : choices[0];
+    if (correctAnswer !== normalizedCorrectAnswer) {
+      console.warn('[ai] multiple_choice correctAnswer not in choices; using first choice', {
+        exerciseIndex: index,
+        type: typeRaw,
+        providedCorrectAnswer: normalizedCorrectAnswer,
+      });
+    }
     return {
       ...base,
       type: 'multiple_choice',
       question: requireString(row, 'question', 'question', 'prompt', 'title', 'text'),
       choices,
-      correctAnswer: requireString(
-        row,
-        'correctAnswer',
-        'correctAnswer',
-        'correct_answer',
-        'answer',
-        'correct',
-      ),
+      correctAnswer,
       explanation: typeof row.explanation === 'string' ? row.explanation : undefined,
     };
   }
@@ -474,13 +485,27 @@ function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exerc
     };
   }
 
+  const listeningChoices = shuffleArray(
+    toStringArray(row.choices ?? row.options ?? row.answers, 'choices'),
+  );
+  const normalizedListeningCorrectAnswer = assertString(row.correctAnswer, 'correctAnswer');
+  const listeningCorrectAnswer = listeningChoices.includes(normalizedListeningCorrectAnswer)
+    ? normalizedListeningCorrectAnswer
+    : listeningChoices[0];
+  if (listeningCorrectAnswer !== normalizedListeningCorrectAnswer) {
+    console.warn('[ai] listening correctAnswer not in choices; using first choice', {
+      exerciseIndex: index,
+      type: typeRaw,
+      providedCorrectAnswer: normalizedListeningCorrectAnswer,
+    });
+  }
   return {
     ...base,
     type: 'listening',
     prompt: assertString(row.prompt, 'prompt'),
     audioText: assertString(row.audioText, 'audioText'),
-    choices: shuffleArray(toStringArray(row.choices ?? row.options ?? row.answers, 'choices')),
-    correctAnswer: assertString(row.correctAnswer, 'correctAnswer'),
+    choices: listeningChoices,
+    correctAnswer: listeningCorrectAnswer,
   };
 }
 
@@ -1095,9 +1120,14 @@ export async function generateSessionSummary(input: {
     responseId: response.id,
     status: response.status,
   });
+  const summaryOutputTextPreview =
+    response.output_text.length > 100
+      ? `${response.output_text.slice(0, 100)}[truncated]`
+      : response.output_text;
   console.warn('[ai] raw session summary output_text', {
     sessionId: input.sessionId,
-    outputText: response.output_text,
+    outputTextPreview: summaryOutputTextPreview,
+    outputTextLength: response.output_text.length,
   });
 
   const parsed = JSON.parse(response.output_text) as Record<string, unknown>;

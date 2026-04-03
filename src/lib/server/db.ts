@@ -328,7 +328,10 @@ SELECT id, user_id, session_id, amount, reason, created_at FROM user_xp_old;`,
       const { seedMissions } = await import('./missions-seed');
       await seedMissions(db);
       console.warn('[db] schema initialized');
-    })();
+    })().catch((error) => {
+      databaseInitPromise = null;
+      throw error;
+    });
   }
 
   await databaseInitPromise;
@@ -596,14 +599,19 @@ export async function createSessionExercises(
 
   for (const row of normalized) {
     await upsertExercise(row.exercise, false);
-    await db.execute({
-      sql: `
+  }
+
+  const statements: InStatement[] = normalized.map((row) => ({
+    sql: `
 INSERT INTO session_exercises (session_id, exercise_id, order_index)
 VALUES (?, ?, ?)
 ON CONFLICT(session_id, order_index) DO UPDATE SET exercise_id = excluded.exercise_id
-`,
-      args: [sessionId, row.exerciseId, row.orderIndex],
-    });
+ `,
+    args: [sessionId, row.exerciseId, row.orderIndex],
+  }));
+
+  if (statements.length > 0) {
+    await db.batch(statements);
   }
 }
 
@@ -687,23 +695,25 @@ export async function createExerciseResults(input: {
   mode?: SessionMode;
 }): Promise<void> {
   const db = await getDb();
-  for (const result of input.results) {
-    await db.execute({
-      sql: `
+  const statements: InStatement[] = input.results.map((result) => ({
+    sql: `
 INSERT INTO user_exercise_results (id, user_id, session_id, exercise_id, mode, is_correct, answer_text, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`,
-      args: [
-        `result-${randomUUID()}`,
-        input.userId,
-        input.sessionId,
-        result.exerciseId,
-        result.mode ?? input.mode ?? 'ai',
-        result.isCorrect ? 1 : 0,
-        result.answerText,
-        result.createdAt ?? nowIso(),
-      ],
-    });
+ `,
+    args: [
+      `result-${randomUUID()}`,
+      input.userId,
+      input.sessionId,
+      result.exerciseId,
+      result.mode ?? input.mode ?? 'ai',
+      result.isCorrect ? 1 : 0,
+      result.answerText,
+      result.createdAt ?? nowIso(),
+    ],
+  }));
+
+  if (statements.length > 0) {
+    await db.batch(statements);
   }
 }
 
@@ -765,33 +775,33 @@ export async function deleteStaleGhostSessions(userId: string): Promise<void> {
   const staleWhereClause =
     "user_id = ? AND status = 'planned' AND datetime(created_at) < datetime('now', '-60 minutes')";
 
-  await db.execute({
-    sql: `
+  await db.batch([
+    {
+      sql: `
 DELETE FROM session_exercises
 WHERE session_id IN (
   SELECT id FROM sessions WHERE ${staleWhereClause}
 )
 `,
-    args: [userId],
-  });
-
-  await db.execute({
-    sql: `
+      args: [userId],
+    },
+    {
+      sql: `
 DELETE FROM token_usage
 WHERE session_id IN (
   SELECT id FROM sessions WHERE ${staleWhereClause}
 )
 `,
-    args: [userId],
-  });
-
-  await db.execute({
-    sql: `
+      args: [userId],
+    },
+    {
+      sql: `
 DELETE FROM sessions
 WHERE ${staleWhereClause}
 `,
-    args: [userId],
-  });
+      args: [userId],
+    },
+  ]);
 }
 
 export async function getExerciseResultsForUser(userId: string): Promise<

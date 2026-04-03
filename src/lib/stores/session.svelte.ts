@@ -112,8 +112,8 @@ export function saveSessionToStorage(key: string): void {
       // Don't save summary — completed sessions don't need resuming
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
-  } catch {
-    // sessionStorage may be unavailable
+  } catch (err) {
+    console.warn('[session-store] sessionStorage write failed:', err);
   }
 }
 
@@ -129,7 +129,8 @@ export function restoreSessionFromStorage(key: string): boolean {
     stateInternal.currentIndex = data.currentIndex ?? 0;
     stateInternal.summary = null;
     return true;
-  } catch {
+  } catch (err) {
+    console.warn('[session-store] Failed to restore session:', err);
     return false;
   }
 }
@@ -140,7 +141,8 @@ export function hasSavedSession(key: string): boolean {
     if (!raw) return false;
     const data = JSON.parse(raw);
     return !!(data?.session && data?.exercises?.length > 0);
-  } catch {
+  } catch (err) {
+    console.warn('[session-store] sessionStorage read failed:', err);
     return false;
   }
 }
@@ -151,14 +153,15 @@ export function getSavedSessionAt(key: string): string | null {
     if (!raw) return null;
     const data = JSON.parse(raw);
     return typeof data?.savedAt === 'string' ? data.savedAt : null;
-  } catch {
+  } catch (err) {
+    console.warn('[session-store] Failed to read saved session timestamp:', err);
     return null;
   }
 }
 export function clearSessionStorage(key: string): void {
   try {
     sessionStorage.removeItem(STORAGE_PREFIX + key);
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('[session-store] sessionStorage remove failed:', err);
   }
 }

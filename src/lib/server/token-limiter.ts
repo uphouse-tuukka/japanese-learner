@@ -65,7 +65,7 @@ export async function checkBudget(userId: string, bypassKey?: string): Promise<B
 
   const [dailyUsageRows, monthlyUsageRows] = await Promise.all([
     listTokenUsageForRange(dayWindow(now).start, dayWindow(now).end, normalizedUserId),
-    listTokenUsageForRange(monthWindow(now).start, monthWindow(now).end),
+    listTokenUsageForRange(monthWindow(now).start, monthWindow(now).end, normalizedUserId),
   ]);
 
   const dailyUsed = sumTokens(dailyUsageRows);
@@ -136,15 +136,6 @@ export async function checkBudget(userId: string, bypassKey?: string): Promise<B
   };
 }
 
-export const getBudgetStatus = checkBudget;
-
-export async function canGenerateSession(
-  userId: string,
-  bypassKey?: string,
-): Promise<BudgetCheckResult> {
-  return checkBudget(userId, bypassKey);
-}
-
 export async function recordUsageEvent(input: {
   userId: string;
   sessionId?: string | null;
@@ -177,8 +168,6 @@ export async function recordUsageEvent(input: {
 
   return usage;
 }
-
-export const recordUsage = recordUsageEvent;
 
 export async function getUsageStats(): Promise<{
   monthlyLimit: number;

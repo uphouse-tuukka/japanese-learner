@@ -25,23 +25,6 @@ type CompleteRequest = {
   localDate?: string;
 };
 
-function getTodayInHelsinki(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Helsinki',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
-function resolveLocalDate(value: unknown): string {
-  const candidate = typeof value === 'string' ? value.trim() : '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
-    return candidate;
-  }
-  return getTodayInHelsinki();
-}
-
 function calculateMaxCombo(results: ResultPayload[]): number {
   let currentCombo = 0;
   let maxCombo = 0;
@@ -57,14 +40,6 @@ function calculateMaxCombo(results: ResultPayload[]): number {
   }
   return maxCombo;
 }
-
-type ProcessSessionCompletionWithLocalDate = (
-  userId: string,
-  sessionId: string,
-  results: Array<{ isCorrect: boolean }>,
-  maxCombo: number,
-  localDate?: string,
-) => ReturnType<typeof processSessionCompletion>;
 
 function runJournalUpdateInBackground(
   userId: string,
@@ -107,7 +82,7 @@ function runJournalUpdateInBackground(
         userId,
       });
     }
-  })();
+  })().catch((err) => console.error('[practice/complete] Background journal update failed:', err));
 }
 
 function buildSummary(userId: string, sessionId: string, results: ResultPayload[]): SessionSummary {
@@ -137,7 +112,6 @@ export const POST: RequestHandler = async ({ request }) => {
     const userId = String(body.userId ?? '').trim();
     const sessionId = String(body.sessionId ?? '').trim();
     const results = Array.isArray(body.results) ? body.results : [];
-    const localDate = resolveLocalDate(body.localDate);
 
     if (!userId || !sessionId) {
       return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 });
@@ -161,9 +135,7 @@ export const POST: RequestHandler = async ({ request }) => {
     let xpBreakdown: Awaited<ReturnType<typeof processSessionCompletion>> | null = null;
     try {
       const maxCombo = calculateMaxCombo(results);
-      const processCompletion =
-        processSessionCompletion as unknown as ProcessSessionCompletionWithLocalDate;
-      xpBreakdown = await processCompletion(userId, sessionId, results, maxCombo, localDate);
+      xpBreakdown = await processSessionCompletion(userId, sessionId, results, maxCombo);
     } catch (xpError) {
       console.error('[api/practice/complete] xp processing failed (non-fatal)', {
         error: xpError,

@@ -72,14 +72,17 @@ function parseModelJson(text: string): Record<string, unknown> {
   throw new Error('[missions-ai] Could not parse JSON from model response');
 }
 
-function getUsageFromResponse(response: OpenAI.Responses.Response): MissionTokenUsage {
+function getUsageFromResponse(
+  response: OpenAI.Responses.Response,
+  model: string,
+): MissionTokenUsage {
   const usage = response.usage;
   const input = Number(usage?.input_tokens ?? 0);
   const output = Number(usage?.output_tokens ?? 0);
   const total = Number(usage?.total_tokens ?? input + output);
 
   return {
-    model: SESSION_MODEL,
+    model,
     input,
     output,
     total,
@@ -247,7 +250,7 @@ export async function generateMissionTurn(input: {
     },
   });
 
-  const usage = getUsageFromResponse(response);
+  const usage = getUsageFromResponse(response, SESSION_MODEL);
 
   try {
     const parsed = parseModelJson(getResponseText(response));
@@ -265,6 +268,9 @@ export async function generateMissionTurn(input: {
         .slice(0, 3);
 
       if (normalized.length === 3) {
+        if (!normalized.some((choice) => choice.isCorrect)) {
+          normalized[0].isCorrect = true;
+        }
         choices = normalized;
       }
     }
@@ -523,7 +529,7 @@ export async function evaluateUserResponse(input: {
     },
   });
 
-  const usage = getUsageFromResponse(response);
+  const usage = getUsageFromResponse(response, EVALUATION_MODEL);
 
   try {
     const parsed = parseModelJson(getResponseText(response));
@@ -562,10 +568,8 @@ export async function evaluateUserResponse(input: {
 
 async function trackMissionTokenUsage(
   userId: string,
-  missionId: string,
   usage: { model: string; input: number; output: number; total: number },
 ): Promise<void> {
-  void missionId;
   await recordTokenUsage({
     userId,
     sessionId: null,

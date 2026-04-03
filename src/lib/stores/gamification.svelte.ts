@@ -65,8 +65,8 @@ export function saveGamificationToStorage(key: string): void {
       maxCombo: stateInternal.maxCombo,
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('[gamification-store] sessionStorage write failed:', err);
   }
 }
 
@@ -79,7 +79,8 @@ export function restoreGamificationFromStorage(key: string): boolean {
     stateInternal.maxCombo = data.maxCombo ?? 0;
     stateInternal.sessionXp = null;
     return true;
-  } catch {
+  } catch (err) {
+    console.warn('[gamification-store] sessionStorage read failed:', err);
     return false;
   }
 }
@@ -87,7 +88,7 @@ export function restoreGamificationFromStorage(key: string): boolean {
 export function clearGamificationStorage(key: string): void {
   try {
     sessionStorage.removeItem(STORAGE_PREFIX + key);
-  } catch {
-    // ignore
+  } catch (err) {
+    console.warn('[gamification-store] sessionStorage remove failed:', err);
   }
 }
