@@ -74,7 +74,13 @@
   <title>Your own Japanese Tutor!</title>
 </svelte:head>
 
-{#if data.authenticated}
+{#if data.isPortfolio}
+  <div class="portfolio-shell">
+    <main class="portfolio-main">
+      {@render children()}
+    </main>
+  </div>
+{:else if data.authenticated}
   <div class="shell">
     <header class="header">
       <div class="header-inner">
@@ -159,6 +165,16 @@
 {/if}
 
 <style>
+  .portfolio-shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .portfolio-main {
+    flex: 1;
+  }
+
   .shell {
     min-height: 100dvh;
     display: flex;

@@ -15,6 +15,10 @@ function isLoginRequest(pathname: string, method: string): boolean {
   return pathname === '/api/auth/login' && method === 'POST';
 }
 
+function isPortfolioPath(pathname: string): boolean {
+  return pathname.startsWith('/portfolio/') || pathname.startsWith('/api/portfolio/');
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
   const expectedUser = config.siteAccess.basicAuthUser?.trim() ?? '';
 
@@ -36,6 +40,10 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   event.locals.authenticated = false;
+
+  if (isPortfolioPath(pathname)) {
+    return resolve(event);
+  }
 
   if (isLoginRequest(pathname, method) || isStaticAsset(pathname)) {
     return resolve(event);

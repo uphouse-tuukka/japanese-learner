@@ -262,6 +262,15 @@ date TEXT NOT NULL,
 missions_used INTEGER NOT NULL DEFAULT 0,
 PRIMARY KEY (user_id, date)
 );`,
+        `CREATE TABLE IF NOT EXISTS portfolio_challenge_attempts (
+id TEXT PRIMARY KEY,
+cookie_id TEXT NOT NULL,
+ip_hash TEXT NOT NULL,
+status TEXT NOT NULL CHECK(status IN ('started', 'completed', 'blocked', 'expired')),
+started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+completed_at TEXT,
+expires_at TEXT NOT NULL
+);`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_user_created_at ON sessions(user_id, created_at);`,
         `CREATE INDEX IF NOT EXISTS idx_exercises_seed ON exercises(is_seed);`,
         `CREATE INDEX IF NOT EXISTS idx_results_user_created_at ON user_exercise_results(user_id, created_at);`,
@@ -275,6 +284,9 @@ PRIMARY KEY (user_id, date)
         `CREATE INDEX IF NOT EXISTS idx_user_missions_mission ON user_missions(mission_id);`,
         `CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);`,
         `CREATE INDEX IF NOT EXISTS idx_missions_category ON missions(category);`,
+        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_cookie ON portfolio_challenge_attempts(cookie_id, started_at);`,
+        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_ip ON portfolio_challenge_attempts(ip_hash, started_at);`,
+        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_expires ON portfolio_challenge_attempts(expires_at);`,
       ];
 
       await db.batch(schemaStatements);
@@ -1081,4 +1093,57 @@ ORDER BY datetime(created_at) DESC
     args: userId ? [userId, startIso, endIso] : [startIso, endIso],
   });
   return result.rows.map((row) => mapTokenUsageRow(row as Record<string, unknown>));
+}
+
+// --- Portfolio Challenge Attempts ---
+
+export async function recordPortfolioAttempt(input: {
+  cookieId: string;
+  ipHash: string;
+  expiresAt: string;
+}): Promise<{ id: string }> {
+  const db = await getDb();
+  const id = `pca-${randomUUID()}`;
+  await db.execute({
+    sql: `INSERT INTO portfolio_challenge_attempts (id, cookie_id, ip_hash, status, started_at, expires_at) VALUES (?, ?, ?, 'started', ?, ?)`,
+    args: [id, input.cookieId, input.ipHash, nowIso(), input.expiresAt],
+  });
+  return { id };
+}
+
+export async function completePortfolioAttempt(attemptId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE portfolio_challenge_attempts SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'started'`,
+    args: [nowIso(), attemptId],
+  });
+}
+
+export async function countRecentAttemptsByCookie(
+  cookieId: string,
+  since: string,
+): Promise<number> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) as cnt FROM portfolio_challenge_attempts WHERE cookie_id = ? AND started_at >= ? AND status IN ('started', 'completed')`,
+    args: [cookieId, since],
+  });
+  return asNumber((result.rows[0] as Record<string, unknown>)?.cnt, 0);
+}
+
+export async function countRecentAttemptsByIp(ipHash: string, since: string): Promise<number> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) as cnt FROM portfolio_challenge_attempts WHERE ip_hash = ? AND started_at >= ? AND status IN ('started', 'completed')`,
+    args: [ipHash, since],
+  });
+  return asNumber((result.rows[0] as Record<string, unknown>)?.cnt, 0);
+}
+
+export async function cleanupExpiredPortfolioAttempts(): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `DELETE FROM portfolio_challenge_attempts WHERE expires_at < ? AND status = 'started'`,
+    args: [nowIso()],
+  });
 }
