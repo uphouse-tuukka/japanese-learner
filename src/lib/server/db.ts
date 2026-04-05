@@ -337,6 +337,28 @@ SELECT id, user_id, session_id, amount, reason, created_at FROM user_xp_old;`,
         });
       }
 
+      const migrationKey = 'portfolio_v2_session_columns';
+      const migrationResult = await db.execute({
+        sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+        args: [migrationKey],
+      });
+
+      if (migrationResult.rows.length === 0) {
+        await db.batch([
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN scenario TEXT DEFAULT NULL;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN lesson TEXT DEFAULT NULL;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN exercises TEXT DEFAULT NULL;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN answers TEXT DEFAULT NULL;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN current_step INTEGER DEFAULT 0;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN summary TEXT DEFAULT NULL;`,
+          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN supports_browser_voice INTEGER DEFAULT 0;`,
+        ]);
+        await db.execute({
+          sql: `INSERT INTO _migrations (key) VALUES (?);`,
+          args: [migrationKey],
+        });
+      }
+
       const { seedMissions } = await import('./missions-seed');
       await seedMissions(db);
       console.warn('[db] schema initialized');
@@ -1101,12 +1123,26 @@ export async function recordPortfolioAttempt(input: {
   cookieId: string;
   ipHash: string;
   expiresAt: string;
+  scenario?: string;
+  lesson?: string;
+  exercises?: string;
+  supportsBrowserVoice?: boolean;
 }): Promise<{ id: string }> {
   const db = await getDb();
   const id = `pca-${randomUUID()}`;
   await db.execute({
-    sql: `INSERT INTO portfolio_challenge_attempts (id, cookie_id, ip_hash, status, started_at, expires_at) VALUES (?, ?, ?, 'started', ?, ?)`,
-    args: [id, input.cookieId, input.ipHash, nowIso(), input.expiresAt],
+    sql: `INSERT INTO portfolio_challenge_attempts (id, cookie_id, ip_hash, status, started_at, expires_at, scenario, lesson, exercises, supports_browser_voice) VALUES (?, ?, ?, 'started', ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      input.cookieId,
+      input.ipHash,
+      nowIso(),
+      input.expiresAt,
+      input.scenario ?? null,
+      input.lesson ?? null,
+      input.exercises ?? null,
+      input.supportsBrowserVoice ? 1 : 0,
+    ],
   });
   return { id };
 }
@@ -1146,4 +1182,106 @@ export async function cleanupExpiredPortfolioAttempts(): Promise<void> {
     sql: `DELETE FROM portfolio_challenge_attempts WHERE expires_at < ? AND status = 'started'`,
     args: [nowIso()],
   });
+}
+
+export type PortfolioSessionRow = {
+  id: string;
+  cookieId: string;
+  ipHash: string;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  expiresAt: string;
+  scenario: string | null;
+  lesson: string | null;
+  exercises: string | null;
+  answers: string | null;
+  currentStep: number;
+  summary: string | null;
+  supportsBrowserVoice: boolean;
+};
+
+function mapPortfolioSessionRow(row: Record<string, unknown>): PortfolioSessionRow {
+  return {
+    id: asString(row.id),
+    cookieId: asString(row.cookie_id),
+    ipHash: asString(row.ip_hash),
+    status: asString(row.status),
+    startedAt: asIso(row.started_at),
+    completedAt: row.completed_at ? asIso(row.completed_at) : null,
+    expiresAt: asIso(row.expires_at),
+    scenario: row.scenario ? asString(row.scenario) : null,
+    lesson: row.lesson ? asString(row.lesson) : null,
+    exercises: row.exercises ? asString(row.exercises) : null,
+    answers: row.answers ? asString(row.answers) : null,
+    currentStep: asNumber(row.current_step, 0),
+    summary: row.summary ? asString(row.summary) : null,
+    supportsBrowserVoice: row.supports_browser_voice === 1 || row.supports_browser_voice === '1',
+  };
+}
+
+export async function getPortfolioSession(sessionId: string): Promise<PortfolioSessionRow | null> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT id, cookie_id, ip_hash, status, started_at, completed_at, expires_at, scenario, lesson, exercises, answers, current_step, summary, supports_browser_voice FROM portfolio_challenge_attempts WHERE id = ? LIMIT 1`,
+    args: [sessionId],
+  });
+  if (result.rows.length === 0) {
+    return null;
+  }
+  return mapPortfolioSessionRow(result.rows[0] as Record<string, unknown>);
+}
+
+export async function updatePortfolioProgress(
+  sessionId: string,
+  currentStep: number,
+  answers: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE portfolio_challenge_attempts SET current_step = ?, answers = ? WHERE id = ?`,
+    args: [currentStep, answers, sessionId],
+  });
+}
+
+export async function updatePortfolioSummary(sessionId: string, summary: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE portfolio_challenge_attempts SET summary = ?, status = 'completed', completed_at = ? WHERE id = ?`,
+    args: [summary, nowIso(), sessionId],
+  });
+}
+
+export async function invalidateActiveSession(cookieId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE portfolio_challenge_attempts SET status = 'expired' WHERE cookie_id = ? AND status = 'started'`,
+    args: [cookieId],
+  });
+}
+
+export async function countCompletedSessionsByCookie(
+  cookieId: string,
+  since: string,
+): Promise<number> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT COUNT(*) as cnt FROM portfolio_challenge_attempts WHERE cookie_id = ? AND started_at >= ? AND status = 'completed'`,
+    args: [cookieId, since],
+  });
+  return asNumber((result.rows[0] as Record<string, unknown>)?.cnt, 0);
+}
+
+export async function getActiveSessionByCookie(
+  cookieId: string,
+): Promise<PortfolioSessionRow | null> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `SELECT id, cookie_id, ip_hash, status, started_at, completed_at, expires_at, scenario, lesson, exercises, answers, current_step, summary, supports_browser_voice FROM portfolio_challenge_attempts WHERE cookie_id = ? AND status = 'started' AND expires_at > ? ORDER BY datetime(started_at) DESC LIMIT 1`,
+    args: [cookieId, nowIso()],
+  });
+  if (result.rows.length === 0) {
+    return null;
+  }
+  return mapPortfolioSessionRow(result.rows[0] as Record<string, unknown>);
 }

@@ -3,18 +3,10 @@ import { getAuthSecret } from '$lib/server/auth';
 
 const TOKEN_SECRET_SALT = 'portfolio-challenge-token-v1';
 
-export type ChallengeTokenPayload = {
-  challengeId: string;
+export type SessionTokenPayload = {
+  sessionId: string;
+  visitorId: string;
   expiresAt: number;
-  correctAnswer: string;
-  explanation: string;
-  builderView: {
-    prompt: string;
-    choices: string[];
-    correctAnswer: string;
-    explanation: string;
-    note: string;
-  };
 };
 
 function toBuffer(value: string): Buffer {
@@ -40,31 +32,22 @@ function createSignature(payloadPart: string, secret: string): string {
   return createHmac('sha256', secret).update(payloadPart).digest('hex');
 }
 
-function isChallengeTokenPayload(value: unknown): value is ChallengeTokenPayload {
+function isSessionTokenPayload(value: unknown): value is SessionTokenPayload {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   const payload = value as Record<string, unknown>;
-  const builderView = payload.builderView as Record<string, unknown> | undefined;
 
   return (
-    typeof payload.challengeId === 'string' &&
+    typeof payload.sessionId === 'string' &&
+    typeof payload.visitorId === 'string' &&
     typeof payload.expiresAt === 'number' &&
-    Number.isFinite(payload.expiresAt) &&
-    typeof payload.correctAnswer === 'string' &&
-    typeof payload.explanation === 'string' &&
-    !!builderView &&
-    typeof builderView.prompt === 'string' &&
-    Array.isArray(builderView.choices) &&
-    builderView.choices.every((choice) => typeof choice === 'string') &&
-    typeof builderView.correctAnswer === 'string' &&
-    typeof builderView.explanation === 'string' &&
-    typeof builderView.note === 'string'
+    Number.isFinite(payload.expiresAt)
   );
 }
 
-export function signChallengeToken(payload: ChallengeTokenPayload): string {
+export function signSessionToken(payload: SessionTokenPayload): string {
   const payloadJson = JSON.stringify(payload);
   const payloadPart = Buffer.from(payloadJson, 'utf-8').toString('base64url');
   const signature = createSignature(payloadPart, getTokenSecret());
@@ -72,9 +55,9 @@ export function signChallengeToken(payload: ChallengeTokenPayload): string {
   return `${payloadPart}.${signature}`;
 }
 
-export function verifyChallengeToken(
+export function verifySessionToken(
   token: string,
-): { valid: true; payload: ChallengeTokenPayload } | { valid: false; reason: string } {
+): { valid: true; payload: SessionTokenPayload } | { valid: false; reason: string } {
   const parts = token.split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     return { valid: false, reason: 'malformed' };
@@ -95,7 +78,7 @@ export function verifyChallengeToken(
     return { valid: false, reason: 'invalid_payload' };
   }
 
-  if (!isChallengeTokenPayload(parsedPayload)) {
+  if (!isSessionTokenPayload(parsedPayload)) {
     return { valid: false, reason: 'invalid_payload' };
   }
 
