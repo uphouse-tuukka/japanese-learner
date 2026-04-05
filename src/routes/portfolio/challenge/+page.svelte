@@ -837,15 +837,13 @@
 
   .key-phrases {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
   }
 
   .key-phrase {
     border: 1px solid var(--border-light);
     border-radius: var(--radius-md);
-    background: var(--bg-shoji);
-    padding: var(--space-4);
+    padding: var(--space-3);
     display: grid;
     gap: var(--space-1);
   }
@@ -1084,7 +1082,6 @@
       padding-top: var(--space-6);
     }
 
-    .key-phrases,
     .stats-grid {
       grid-template-columns: 1fr;
     }

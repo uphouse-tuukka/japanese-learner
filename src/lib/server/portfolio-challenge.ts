@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { createHmac } from 'crypto';
 import { config } from '$lib/config';
 import { getAuthSecret } from '$lib/server/auth';
-import { generateSessionPlan } from '$lib/server/ai';
+import { generatePublicChallengePlan } from '$lib/server/ai';
 import {
   cleanupExpiredPortfolioAttempts,
   countRecentAttemptsByIp,
@@ -63,7 +63,6 @@ export type PortfolioSummary = {
   celebration: {
     type: 'accuracy_badge';
     label: string;
-    emoji: string;
   };
 };
 
@@ -127,6 +126,10 @@ function scenarioToTopic(scenario: ScenarioId): string {
     shopping: 'shopping',
   };
   return map[scenario];
+}
+
+function scenarioLabel(scenario: ScenarioId): string {
+  return SCENARIOS.find((s) => s.id === scenario)?.label ?? scenario;
 }
 
 function isScenarioId(value: string): value is ScenarioId {
@@ -310,12 +313,12 @@ function computeStats(
 
 function buildCelebration(accuracy: number): PortfolioSummary['celebration'] {
   if (accuracy === 100) {
-    return { type: 'accuracy_badge', label: 'Perfect Score', emoji: '🌟' };
+    return { type: 'accuracy_badge', label: 'Perfect Score' };
   }
   if (accuracy >= 75) {
-    return { type: 'accuracy_badge', label: 'Great Work', emoji: '✨' };
+    return { type: 'accuracy_badge', label: 'Great Work' };
   }
-  return { type: 'accuracy_badge', label: 'Session Complete', emoji: '🎌' };
+  return { type: 'accuracy_badge', label: 'Session Complete' };
 }
 
 function buildDeterministicSummary(
@@ -495,15 +498,10 @@ export async function startSession(
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const plan = await withAbort(
-        generateSessionPlan({
-          userId: 'portfolio-visitor',
-          userName: 'Visitor',
-          userLevel: 'beginner',
-          exerciseCount: 6,
-          sessionHistory: [],
-          recentAccuracy: undefined,
-          coveredTopics: [scenarioToTopic(scenario)],
-          totalSessionCount: 0,
+        generatePublicChallengePlan({
+          scenario: scenarioToTopic(scenario),
+          scenarioLabel: scenarioLabel(scenario),
+          targetExerciseCount: TARGET_EXERCISE_COUNT + 2,
         }),
         controller.signal,
       );

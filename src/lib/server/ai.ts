@@ -984,6 +984,152 @@ export async function generateSessionPlan(input: {
   return plan;
 }
 
+export async function generatePublicChallengePlan(input: {
+  scenario: string;
+  scenarioLabel: string;
+  targetExerciseCount: number;
+}): Promise<SessionPlan> {
+  // eslint-disable-next-line no-console
+  console.log('[ai] Generating public challenge plan for scenario:', input.scenario);
+
+  const client = getOpenAiClient();
+  const targetExerciseCount = Math.max(1, Math.round(input.targetExerciseCount));
+
+  const response = await client.responses.create({
+    model: SESSION_MODEL,
+    temperature: 0.3,
+    input: [
+      {
+        role: 'system',
+        content: [
+          'You are a Japanese tutor creating a short beginner-level travel demo lesson.',
+          'Output valid JSON only with top-level keys: lesson, exercises, focus.',
+          `Create a lesson about: ${input.scenarioLabel}. The lesson category MUST be '${input.scenario}'.`,
+          levelInstructions('beginner'),
+          'Exercise type-specific required fields:',
+          ...exerciseFieldRequirements('beginner'),
+          '',
+          'For every translation exercise, acceptedAnswers must include AT LEAST 3 valid English variants. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
+          '',
+          'CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output must include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
+          '',
+          'Exercise quality:',
+          '- Vary exercise types within level constraints.',
+          '- Cover at least 5 distinct phrases per session; do not reuse the same phrase in more than 2 exercises.',
+          '- Do NOT generate two exercises that test the same phrase in the same way. If ありがとうございます (arigatou gozaimasu) appears in one multiple_choice exercise, do not create another multiple_choice that tests the same concept for that phrase.',
+          '- For multiple_choice exercises: the "japanese" and "romaji" fields are metadata only and will NOT be shown to learners. They should store the key phrase for internal tracking.',
+          '- For multiple_choice exercises: the "question" field is the ONLY text shown above choices and MUST provide clear context and be self-contained. Use one of these patterns: (a) "What does [phrase] mean?"; (b) a real-life scenario asking what to say; (c) "Which phrase means [English meaning]?". If referencing Japanese text, include it directly in the question string. NEVER use a vague question like "Which phrase is most appropriate?" without a scenario.',
+          '- CRITICAL for multiple_choice: the question must NEVER require looking at "japanese"/"romaji" to make sense. The question + choices must form a complete quiz on their own.',
+          'Use practical language the learner can immediately use in Japan.',
+          'Keep content coherent around the requested scenario.',
+        ].join(' '),
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          scenario: input.scenario,
+          scenarioLabel: input.scenarioLabel,
+          targetExerciseCount: input.targetExerciseCount,
+          requiredOutputExample: {
+            lesson: {
+              topic: `Example topic for ${input.scenarioLabel}`,
+              category: input.scenario,
+              explanation: 'Brief explanation of the topic...',
+              culturalNote: 'A relevant cultural note...',
+              keyPhrases: [
+                {
+                  japanese: 'すみません (sumimasen)',
+                  romaji: 'sumimasen',
+                  english: 'Excuse me',
+                  usage: 'Use to politely get attention',
+                },
+              ],
+            },
+            exercises: [
+              {
+                type: 'multiple_choice',
+                title: 'Choose the greeting',
+                japanese: 'こんにちは (konnichiwa)',
+                romaji: 'konnichiwa',
+                englishContext: 'A common daytime greeting',
+                tags: ['greetings'],
+                difficulty: 1,
+                question: 'What does こんにちは (konnichiwa) mean?',
+                choices: ['Good morning', 'Good evening', 'Hello / Good afternoon', 'Goodbye'],
+                correctAnswer: 'Hello / Good afternoon',
+              },
+            ],
+            focus: input.scenario,
+          },
+        }),
+      },
+    ],
+    text: {
+      format: {
+        type: 'json_object',
+      },
+    },
+  });
+
+  if (!response.output_text) {
+    throw new Error('[ai] OpenAI response missing output_text for public challenge generation');
+  }
+
+  const parsed = JSON.parse(response.output_text) as {
+    lesson: unknown;
+    exercises: unknown[];
+    focus: string;
+  };
+
+  const lesson = normalizeLesson(parsed.lesson);
+  const validExercises: Exercise[] = [];
+  const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+  for (let i = 0; i < rawExercises.length; i += 1) {
+    try {
+      validExercises.push(normalizeExercise(rawExercises[i], i, 'beginner'));
+    } catch (err) {
+      console.warn(`[ai] Skipping public challenge exercise ${i}: ${(err as Error).message}`);
+    }
+  }
+  if (validExercises.length === 0) {
+    throw new Error('[ai] No valid exercises could be parsed from public challenge output');
+  }
+
+  const exercises = validateExerciseSet(validExercises, 'beginner');
+  const minExercises = Math.ceil(targetExerciseCount / 2);
+  if (exercises.length < minExercises) {
+    throw new Error(
+      `[ai] expected at least ${minExercises} exercises, received ${exercises.length}`,
+    );
+  }
+
+  const usage = getUsageFromResponse(response);
+  const parsedLesson = parsed.lesson as Record<string, unknown> | null;
+
+  return {
+    id: `session-${randomUUID()}`,
+    userId: 'portfolio-visitor',
+    mode: 'ai',
+    createdAt: nowIso(),
+    model: SESSION_MODEL,
+    lesson,
+    exercises,
+    tokenUsage: {
+      input: usage.input,
+      output: usage.output,
+    },
+    metadata: {
+      focus: assertString(parsed.focus, 'focus'),
+      category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : input.scenario,
+      exerciseCount: exercises.length,
+      teachingFlow: 'lesson_then_quiz',
+      userLevel: 'beginner',
+      scenario: input.scenario,
+      scenarioLabel: input.scenarioLabel,
+    },
+  };
+}
+
 export async function generateSessionSummary(input: {
   sessionId: string;
   userId: string;
