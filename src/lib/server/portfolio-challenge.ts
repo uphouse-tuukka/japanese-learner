@@ -351,8 +351,8 @@ function buildDeterministicSummary(
         ? ['No major misses this round.']
         : ['Review the items marked incorrect and compare them with the lesson key phrases.'],
     nextSteps: [
-      'Repeat this scenario and aim for faster, more confident answers.',
-      'Say each key phrase out loud with romaji to build speaking fluency.',
+      'The app would repeat this scenario and target faster, more confident responses.',
+      'The app would reinforce each key phrase with romaji-guided speaking practice.',
     ],
     celebration,
   };
@@ -387,7 +387,7 @@ async function generatePublicSummary(
         {
           role: 'system',
           content:
-            'You are a Japanese tutor giving a brief, encouraging recap of a short demo session. Return JSON with keys: summary, strengths, misses, nextSteps. Keep it concise — 2-3 items per list. All text in English. Any Japanese references should include romaji in parentheses.',
+            'You are a Japanese tutor giving a brief, encouraging recap of a short demo session. Return JSON with keys: summary, strengths, misses, nextSteps. Keep it concise — 2-3 items per list. All text in English. Any Japanese references should include romaji in parentheses. For nextSteps, write concise bullets framed as hypothetical in-app focus for this learner (e.g., "The app would..."), never as direct advice to the reader.',
         },
         {
           role: 'user',
@@ -432,7 +432,7 @@ async function generatePublicSummary(
       misses: misses.length ? misses : ['Review incorrect answers and retry this scenario.'],
       nextSteps: nextSteps.length
         ? nextSteps
-        : ['Replay this scenario and focus on the missed items.'],
+        : ['The app would replay this scenario and focus on the missed items.'],
     };
   } catch (error) {
     console.warn('[portfolio]', 'Public summary generation failed, using fallback', {

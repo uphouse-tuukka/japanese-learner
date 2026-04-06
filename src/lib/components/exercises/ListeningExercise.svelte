@@ -166,6 +166,5 @@
 
   .btn {
     width: 100%;
-    margin-top: var(--space-4);
   }
 </style>
