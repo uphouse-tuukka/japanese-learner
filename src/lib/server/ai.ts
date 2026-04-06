@@ -117,6 +117,105 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 const SESSION_MODEL = 'gpt-5.4';
+const JAPANESE_SCRIPT_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]/u;
+const INLINE_ROMAJI_PATTERN = /^(?<japanese>.+?)\s*\((?<romaji>[A-Za-z0-9'.,\-\s]+)\)\s*$/u;
+const JAPANESE_CHOICE_WITH_ROMAJI_PATTERN =
+  /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f].*\([A-Za-z0-9'.,\-\s]+\)/u;
+
+function containsJapaneseScript(value: string): boolean {
+  return JAPANESE_SCRIPT_PATTERN.test(value);
+}
+
+function splitInlineRomaji(value: string): { japanese: string; inlineRomaji: string | null } {
+  const trimmed = value.trim();
+  const match = INLINE_ROMAJI_PATTERN.exec(trimmed);
+  if (!match?.groups) {
+    return { japanese: trimmed, inlineRomaji: null };
+  }
+  const japanese = match.groups.japanese?.trim() ?? trimmed;
+  const inlineRomaji = match.groups.romaji?.trim() ?? null;
+  if (!containsJapaneseScript(japanese) || !inlineRomaji) {
+    return { japanese: trimmed, inlineRomaji: null };
+  }
+  return { japanese, inlineRomaji };
+}
+
+function normalizeJapaneseAndRomajiFields(
+  japanese: string,
+  romaji: string,
+): { japanese: string; romaji: string } {
+  const parsed = splitInlineRomaji(japanese);
+  return {
+    japanese: parsed.japanese,
+    romaji: romaji.trim() || parsed.inlineRomaji || '',
+  };
+}
+
+function isJapaneseMeaningStyleMultipleChoiceQuestion(question: string): boolean {
+  const trimmedQuestion = question.trim();
+  return containsJapaneseScript(trimmedQuestion) && /\b(mean|meaning)\b/iu.test(trimmedQuestion);
+}
+
+function isJapaneseChoiceWithRomaji(choice: string): boolean {
+  return JAPANESE_CHOICE_WITH_ROMAJI_PATTERN.test(choice.trim());
+}
+
+function normalizePublicChallengeLesson(lesson: Lesson): Lesson {
+  return {
+    ...lesson,
+    keyPhrases: lesson.keyPhrases.map((phrase) => {
+      const normalized = normalizeJapaneseAndRomajiFields(phrase.japanese, phrase.romaji);
+      return {
+        ...phrase,
+        japanese: normalized.japanese,
+        romaji: normalized.romaji,
+      };
+    }),
+  };
+}
+
+function normalizePublicChallengeExercise(exercise: Exercise): Exercise {
+  const normalized = normalizeJapaneseAndRomajiFields(exercise.japanese, exercise.romaji);
+  if (exercise.type !== 'multiple_choice') {
+    return {
+      ...exercise,
+      japanese: normalized.japanese,
+      romaji: normalized.romaji,
+    };
+  }
+
+  let choices = exercise.choices;
+  const isMeaningStyleQuestion = isJapaneseMeaningStyleMultipleChoiceQuestion(exercise.question);
+
+  if (isMeaningStyleQuestion) {
+    const englishOnlyChoices = choices.filter((choice) => !containsJapaneseScript(choice));
+    if (englishOnlyChoices.length < 2) {
+      throw new Error(
+        '[ai] Public challenge multiple_choice meaning question must use English-only choices',
+      );
+    }
+    choices = englishOnlyChoices;
+  } else {
+    const japaneseChoices = choices.filter((choice) => isJapaneseChoiceWithRomaji(choice));
+    if (japaneseChoices.length < 2) {
+      throw new Error(
+        '[ai] Public challenge multiple_choice scenario question must use Japanese choices with romaji',
+      );
+    }
+    choices = japaneseChoices;
+  }
+
+  const correctAnswer = choices.includes(exercise.correctAnswer)
+    ? exercise.correctAnswer
+    : choices[0];
+  return {
+    ...exercise,
+    japanese: normalized.japanese,
+    romaji: normalized.romaji,
+    choices,
+    correctAnswer,
+  };
+}
 
 export const TOPIC_CATEGORIES = [
   {
@@ -1006,19 +1105,24 @@ export async function generatePublicChallengePlan(input: {
           'Output valid JSON only with top-level keys: lesson, exercises, focus.',
           `Create a lesson about: ${input.scenarioLabel}. The lesson category MUST be '${input.scenario}'.`,
           levelInstructions('beginner'),
+          'Every exercise, regardless of type, MUST include these shared fields: type, japanese, romaji, englishContext, tags, difficulty.',
+          'SCRIPT FORMATTING RULE: In fields named "japanese", output Japanese script only (no inline romaji and no parentheses). Put romanization only in fields named "romaji".',
+          'PUBLIC CHALLENGE MULTIPLE_CHOICE RULE: Only two patterns are allowed. Pattern 1: question is an English scenario asking what to say; all choices must be Japanese and include romaji in parentheses. Pattern 2: question includes a Japanese phrase and asks what it means; all choices must be English only.',
+          'NEVER generate English-scenario + English-only choices in public challenge.',
           'Exercise type-specific required fields:',
           ...exerciseFieldRequirements('beginner'),
           '',
           'For every translation exercise, acceptedAnswers must include AT LEAST 3 valid English variants. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
           '',
-          'CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output must include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
+          'CRITICAL ROMAJI RULE: In learner-visible fields, every Japanese string must include romaji in parentheses (example: こんにちは (konnichiwa)). In fields named "japanese", keep script-only text and put romanization in the paired "romaji" field.',
           '',
           'Exercise quality:',
           '- Vary exercise types within level constraints.',
           '- Cover at least 5 distinct phrases per session; do not reuse the same phrase in more than 2 exercises.',
           '- Do NOT generate two exercises that test the same phrase in the same way. If ありがとうございます (arigatou gozaimasu) appears in one multiple_choice exercise, do not create another multiple_choice that tests the same concept for that phrase.',
           '- For multiple_choice exercises: the "japanese" and "romaji" fields are metadata only and will NOT be shown to learners. They should store the key phrase for internal tracking.',
-          '- For multiple_choice exercises: the "question" field is the ONLY text shown above choices and MUST provide clear context and be self-contained. Use one of these patterns: (a) "What does [phrase] mean?"; (b) a real-life scenario asking what to say; (c) "Which phrase means [English meaning]?". If referencing Japanese text, include it directly in the question string. NEVER use a vague question like "Which phrase is most appropriate?" without a scenario.',
+          '- For public challenge multiple_choice exercises, ONLY use one of these two patterns: (a) scenario question in English + Japanese choices with romaji; (b) Japanese phrase in the question asking for meaning + English-only choices.',
+          '- For public challenge multiple_choice exercises, NEVER use English scenario question + English-only choices.',
           '- CRITICAL for multiple_choice: the question must NEVER require looking at "japanese"/"romaji" to make sense. The question + choices must form a complete quiz on their own.',
           'Use practical language the learner can immediately use in Japan.',
           'Keep content coherent around the requested scenario.',
@@ -1038,7 +1142,7 @@ export async function generatePublicChallengePlan(input: {
               culturalNote: 'A relevant cultural note...',
               keyPhrases: [
                 {
-                  japanese: 'すみません (sumimasen)',
+                  japanese: 'すみません',
                   romaji: 'sumimasen',
                   english: 'Excuse me',
                   usage: 'Use to politely get attention',
@@ -1049,7 +1153,7 @@ export async function generatePublicChallengePlan(input: {
               {
                 type: 'multiple_choice',
                 title: 'Choose the greeting',
-                japanese: 'こんにちは (konnichiwa)',
+                japanese: 'こんにちは',
                 romaji: 'konnichiwa',
                 englishContext: 'A common daytime greeting',
                 tags: ['greetings'],
@@ -1057,6 +1161,24 @@ export async function generatePublicChallengePlan(input: {
                 question: 'What does こんにちは (konnichiwa) mean?',
                 choices: ['Good morning', 'Good evening', 'Hello / Good afternoon', 'Goodbye'],
                 correctAnswer: 'Hello / Good afternoon',
+              },
+              {
+                type: 'multiple_choice',
+                title: 'Get attention politely',
+                japanese: 'すみません',
+                romaji: 'sumimasen',
+                englishContext: 'Polite way to get someone’s attention',
+                tags: ['directions', 'politeness'],
+                difficulty: 1,
+                question:
+                  'You want to politely stop someone on the street before asking for directions. What would you say?',
+                choices: [
+                  'すみません (sumimasen)',
+                  'ありがとう (arigatou)',
+                  'さようなら (sayounara)',
+                  'おはよう (ohayou)',
+                ],
+                correctAnswer: 'すみません (sumimasen)',
               },
             ],
             focus: input.scenario,
@@ -1081,12 +1203,14 @@ export async function generatePublicChallengePlan(input: {
     focus: string;
   };
 
-  const lesson = normalizeLesson(parsed.lesson);
+  const lesson = normalizePublicChallengeLesson(normalizeLesson(parsed.lesson));
   const validExercises: Exercise[] = [];
   const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
   for (let i = 0; i < rawExercises.length; i += 1) {
     try {
-      validExercises.push(normalizeExercise(rawExercises[i], i, 'beginner'));
+      validExercises.push(
+        normalizePublicChallengeExercise(normalizeExercise(rawExercises[i], i, 'beginner')),
+      );
     } catch (err) {
       console.warn(`[ai] Skipping public challenge exercise ${i}: ${(err as Error).message}`);
     }

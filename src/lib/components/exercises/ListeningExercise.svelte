@@ -163,4 +163,9 @@
     color: var(--text-usuzumi);
     opacity: 0.85;
   }
+
+  .btn {
+    width: 100%;
+    margin-top: var(--space-4);
+  }
 </style>

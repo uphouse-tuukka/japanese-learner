@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { createHmac } from 'crypto';
-import { config } from '$lib/config';
+import { config } from '$lib/server/config';
 import { getAuthSecret } from '$lib/server/auth';
 import { generatePublicChallengePlan } from '$lib/server/ai';
 import {
@@ -264,6 +264,9 @@ function getSessionState(
 }
 
 async function getRemainingSessionsToday(cookieId: string): Promise<number> {
+  if (config.portfolio.quotaDisabled) {
+    return MAX_COMPLETIONS_PER_COOKIE_24H;
+  }
   const completedCount = await countCompletedSessionsByCookie(cookieId, since24h());
   return Math.max(0, MAX_COMPLETIONS_PER_COOKIE_24H - completedCount);
 }
@@ -471,7 +474,8 @@ export async function startSession(
     countRecentAttemptsByCookie(resolvedCookieId, since),
   ]);
 
-  if (ipAttempts >= MAX_STARTS_PER_IP_24H) {
+  if (!config.portfolio.quotaDisabled && ipAttempts >= MAX_STARTS_PER_IP_24H) {
+    console.warn('[portfolio]', 'IP quota exceeded', { ipHash, ipAttempts, recentCookieStarts });
     return {
       ok: false,
       reason: 'quota_exceeded',
@@ -479,7 +483,13 @@ export async function startSession(
     };
   }
 
-  if (completedCount >= MAX_COMPLETIONS_PER_COOKIE_24H) {
+  if (!config.portfolio.quotaDisabled && completedCount >= MAX_COMPLETIONS_PER_COOKIE_24H) {
+    console.warn('[portfolio]', 'Cookie quota exceeded', {
+      resolvedCookieId,
+      completedCount,
+      recentCookieStarts,
+      configQuotaDisabled: config.portfolio.quotaDisabled,
+    });
     return {
       ok: false,
       reason: 'quota_exceeded',
@@ -495,35 +505,82 @@ export async function startSession(
   try {
     let lesson: Lesson | null = null;
     let exercises: Exercise[] = [];
+    let lastGenerationError: Error | null = null;
+    const maxGenerationAttempts = 2;
+    const generationTargetExerciseCount = TARGET_EXERCISE_COUNT + (supportsBrowserVoice ? 2 : 4);
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const plan = await withAbort(
-        generatePublicChallengePlan({
-          scenario: scenarioToTopic(scenario),
-          scenarioLabel: scenarioLabel(scenario),
-          targetExerciseCount: TARGET_EXERCISE_COUNT + 2,
-        }),
-        controller.signal,
-      );
+    for (let attempt = 1; attempt <= maxGenerationAttempts; attempt += 1) {
+      try {
+        const plan = await withAbort(
+          generatePublicChallengePlan({
+            scenario: scenarioToTopic(scenario),
+            scenarioLabel: scenarioLabel(scenario),
+            targetExerciseCount: generationTargetExerciseCount,
+          }),
+          controller.signal,
+        );
 
-      const repaired = repairExercises(plan.exercises, supportsBrowserVoice);
-      if (repaired.length >= TARGET_EXERCISE_COUNT) {
-        lesson = plan.lesson;
-        exercises = repaired.slice(0, TARGET_EXERCISE_COUNT);
-        break;
+        const repaired = repairExercises(plan.exercises, supportsBrowserVoice);
+        if (repaired.length >= TARGET_EXERCISE_COUNT) {
+          lesson = plan.lesson;
+          exercises = repaired.slice(0, TARGET_EXERCISE_COUNT);
+          break;
+        }
+
+        const listeningCount = plan.exercises.filter(
+          (exercise) => exercise.type === 'listening',
+        ).length;
+        console.warn('[portfolio]', 'Exercise repair left too few exercises, retrying', {
+          attempt,
+          maxGenerationAttempts,
+          scenario,
+          supportsBrowserVoice,
+          generatedCount: plan.exercises.length,
+          repairedCount: repaired.length,
+          removedListeningCount: listeningCount,
+          requestedTargetExerciseCount: generationTargetExerciseCount,
+          recentCookieStarts,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw error;
+        }
+        const generationErrorMessage = error instanceof Error ? error.message : String(error);
+        lastGenerationError = error instanceof Error ? error : new Error(generationErrorMessage);
+        if (attempt < maxGenerationAttempts) {
+          console.warn('[portfolio]', 'Session generation attempt failed, retrying', {
+            attempt,
+            maxGenerationAttempts,
+            scenario,
+            supportsBrowserVoice,
+            requestedTargetExerciseCount: generationTargetExerciseCount,
+            error: generationErrorMessage,
+            recentCookieStarts,
+          });
+          continue;
+        }
+        console.warn('[portfolio]', 'Session generation attempt failed', {
+          attempt,
+          maxGenerationAttempts,
+          scenario,
+          supportsBrowserVoice,
+          requestedTargetExerciseCount: generationTargetExerciseCount,
+          error: generationErrorMessage,
+          recentCookieStarts,
+        });
       }
-
-      console.warn('[portfolio]', 'Exercise repair left too few exercises, retrying', {
-        attempt,
-        scenario,
-        supportsBrowserVoice,
-        generatedCount: plan.exercises.length,
-        repairedCount: repaired.length,
-        recentCookieStarts,
-      });
     }
 
     if (!lesson || exercises.length < TARGET_EXERCISE_COUNT) {
+      if (lastGenerationError) {
+        console.warn('[portfolio]', 'All session generation attempts failed', {
+          scenario,
+          supportsBrowserVoice,
+          requestedTargetExerciseCount: generationTargetExerciseCount,
+          error: lastGenerationError.message,
+          recentCookieStarts,
+        });
+      }
       return {
         ok: false,
         reason: 'generation_failed',
@@ -542,7 +599,9 @@ export async function startSession(
       supportsBrowserVoice,
     });
 
-    const remainingSessionsToday = Math.max(0, MAX_COMPLETIONS_PER_COOKIE_24H - completedCount);
+    const remainingSessionsToday = config.portfolio.quotaDisabled
+      ? MAX_COMPLETIONS_PER_COOKIE_24H
+      : Math.max(0, MAX_COMPLETIONS_PER_COOKIE_24H - completedCount);
 
     return {
       ok: true,

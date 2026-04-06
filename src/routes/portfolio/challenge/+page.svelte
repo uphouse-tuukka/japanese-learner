@@ -775,53 +775,6 @@
     font-weight: var(--weight-medium);
   }
 
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    border: 1px solid var(--accent-shu-soft);
-    border-radius: 999px;
-    background: var(--accent-shu-wash);
-    color: var(--accent-shu-deep);
-    padding: var(--space-3) var(--space-6);
-    font: inherit;
-    font-weight: var(--weight-medium);
-    cursor: pointer;
-    transition:
-      background-color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out);
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--accent-shu-wash) 75%, white);
-    border-color: var(--accent-shu);
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border-light);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-bokashi);
-    padding: var(--space-3) var(--space-6);
-    font: inherit;
-    font-weight: var(--weight-medium);
-    cursor: pointer;
-    transition: background-color var(--duration-fast) var(--ease-out);
-  }
-
-  .btn-secondary:hover {
-    background: var(--bg-kinu);
-  }
-
   .cultural-note {
     background: var(--bg-washi);
     border-radius: var(--radius-md);
@@ -995,11 +948,6 @@
   .celebration {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-  }
-
-  .celebration-emoji {
-    font-size: var(--text-2xl);
   }
 
   .celebration-label {
