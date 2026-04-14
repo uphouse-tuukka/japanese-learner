@@ -183,15 +183,24 @@ export interface SessionPlan {
   metadata: Record<string, unknown>;
 }
 
+export interface SessionMiniLesson {
+  kind: 'related_phrase' | 'likely_reply' | 'nuance_upgrade' | 'follow_up';
+  japanese: string;
+  romaji: string;
+  english: string;
+  note: string;
+}
+
 export interface SessionSummary {
   sessionId: string;
   userId: string;
   summary: string;
   strengths: string[];
   weaknesses: string[];
-  nextSteps: string[];
+  nextSteps?: string[]; // legacy
   accuracy: number;
   generatedAt: string;
+  miniLesson?: SessionMiniLesson | null;
   levelUpRecommendation?: LevelUpRecommendation | null;
 }
 
@@ -202,14 +211,17 @@ export interface LevelUpRecommendation {
 
 export interface SessionMeta {
   summaryText: string;
-  category?: string; // NEW: topic category key (e.g., "food_dining")
+  category?: string;
   topic: string;
   accuracy: number;
   strengths: string[];
   weaknesses: string[];
-  nextSteps: string[];
+  nextSteps?: string[]; // legacy
+  handoffNotes?: string[];
   exerciseTypes: string[];
   keyPhrases: string[];
+  culturalNote?: string;
+  miniLesson?: SessionMiniLesson | null;
   hadLevelUpRecommendation?: boolean;
 }
 

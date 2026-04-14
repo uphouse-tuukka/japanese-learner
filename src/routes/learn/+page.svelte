@@ -4,8 +4,8 @@
   import SessionRenderer from '$lib/components/SessionRenderer.svelte';
   import SessionSummary from '$lib/components/SessionSummary.svelte';
   import DebugPanel from '$lib/components/DebugPanel.svelte';
+  import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
-  import InlineAudio from '$lib/components/InlineAudio.svelte';
   import {
     session,
     exercises,
@@ -412,6 +412,7 @@
           results: $answers.filter((a): a is NonNullable<typeof a> => a != null),
           lessonTopic: lesson?.topic ?? '',
           category: lesson?.category ?? '',
+          culturalNote: lesson?.culturalNote ?? '',
           keyPhrases: lesson?.keyPhrases?.map((phrase) => phrase.romaji).filter(Boolean) ?? [],
           maxCombo: $maxCombo,
           localDate: getHelsinkiLocalDate(),
@@ -503,15 +504,7 @@
         <h3>Key phrases</h3>
         <div class="key-phrases">
           {#each lesson.keyPhrases as phrase}
-            <article class="key-phrase">
-              <p class="jp">
-                {phrase.japanese}
-                <InlineAudio japanese={phrase.japanese} size="md" />
-              </p>
-              <p class="romaji">{phrase.romaji}</p>
-              <p class="en">{phrase.english}</p>
-              <p class="usage"><RichJapaneseText text={phrase.usage} /></p>
-            </article>
+            <LessonKeyPhraseCard {phrase} />
           {/each}
         </div>
       </div>
@@ -593,33 +586,6 @@
   .key-phrases {
     display: grid;
     gap: var(--space-3);
-  }
-
-  .key-phrase {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    padding: var(--space-3);
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .jp {
-    font-size: var(--text-xl);
-    margin: 0;
-  }
-
-  .romaji,
-  .en,
-  .usage {
-    margin: 0;
-  }
-
-  .romaji {
-    color: var(--text-usuzumi);
-  }
-
-  .usage {
-    font-size: var(--text-sm);
   }
 
   /* ── Loading animation: Ensō (禅円) ── */

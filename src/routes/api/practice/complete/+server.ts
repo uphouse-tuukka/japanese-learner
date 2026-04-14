@@ -100,7 +100,6 @@ function buildSummary(userId: string, sessionId: string, results: ResultPayload[
       accuracy >= 70
         ? ['Aim for faster recall next time']
         : ['Review incorrect items and retry soon'],
-    nextSteps: ['Repeat one weak exercise type', 'Do another quick practice set today'],
     accuracy,
     generatedAt: new Date().toISOString(),
   };

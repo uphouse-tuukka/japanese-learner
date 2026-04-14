@@ -2,8 +2,8 @@
   import { fade } from 'svelte/transition';
   import SessionRenderer from '$lib/components/SessionRenderer.svelte';
   import ProgressBar from '$lib/components/ProgressBar.svelte';
+  import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
-  import InlineAudio from '$lib/components/InlineAudio.svelte';
   import PortfolioBehindTheScenes from '$lib/components/PortfolioBehindTheScenes.svelte';
   import { isSupported, getJapaneseVoice } from '$lib/utils/tts';
   import type { Exercise, ExerciseAnswerPayload, Lesson } from '$lib/types';
@@ -523,15 +523,7 @@
           <h3 class="section-title">Key phrases</h3>
           <div class="key-phrases">
             {#each lesson.keyPhrases as phrase (phrase.japanese)}
-              <article class="key-phrase">
-                <p class="jp">
-                  {phrase.japanese}
-                  <InlineAudio japanese={phrase.japanese} size="md" />
-                </p>
-                <p class="romaji">{phrase.romaji}</p>
-                <p class="english">{phrase.english}</p>
-                <p class="usage"><RichJapaneseText text={phrase.usage} /></p>
-              </article>
+              <LessonKeyPhraseCard {phrase} />
             {/each}
           </div>
         </section>
@@ -798,32 +790,6 @@
   .key-phrases {
     display: grid;
     gap: var(--space-3);
-  }
-
-  .key-phrase {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    padding: var(--space-3);
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .jp {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-xl);
-    font-weight: var(--weight-medium);
-  }
-
-  .romaji,
-  .usage {
-    color: var(--text-usuzumi);
-    font-size: var(--text-sm);
-  }
-
-  .english {
-    color: var(--text-bokashi);
   }
 
   .active-card {

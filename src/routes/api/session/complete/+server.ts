@@ -27,6 +27,7 @@ type CompleteRequest = {
   lessonTopic?: string;
   category?: string;
   keyPhrases?: string[];
+  culturalNote?: string;
   localDate?: string;
 };
 
@@ -132,6 +133,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const requestedLessonTopic = String(body.lessonTopic ?? '').trim();
     const lessonTopic = requestedLessonTopic || inferLessonTopic(exercises);
     const category = String(body.category ?? '').trim() || undefined;
+    const culturalNote = String(body.culturalNote ?? '').trim() || undefined;
     const requestKeyPhrases = toStringList(body.keyPhrases);
     const keyPhrases =
       requestKeyPhrases.length > 0
@@ -140,11 +142,13 @@ export const POST: RequestHandler = async ({ request }) => {
     const exerciseTypes = Array.from(new Set(exercises.map((exercise) => exercise.type)));
 
     let summary: SessionSummary;
+    let handoffNotes: string[] = [];
     let summaryTokenInput = 0;
     let summaryTokenOutput = 0;
     const budgetCheck = await checkBudget(userId);
     if (!budgetCheck.allowed || !user || exercises.length === 0) {
       summary = buildFallbackSummary(userId, sessionId, results);
+      handoffNotes = summary.nextSteps ?? [];
     } else {
       try {
         const progressJournal = await getProgressJournal(userId);
@@ -172,6 +176,7 @@ export const POST: RequestHandler = async ({ request }) => {
         };
         const aiResult = await generateSessionSummary(summaryInput);
         summary = aiResult.summary;
+        handoffNotes = aiResult.handoffNotes;
         summaryTokenInput = aiResult.tokenUsage.tokensIn;
         summaryTokenOutput = aiResult.tokenUsage.tokensOut;
         // Fire-and-forget — do not block the main response on journal generation.
@@ -222,6 +227,7 @@ export const POST: RequestHandler = async ({ request }) => {
           userId,
         });
         summary = buildFallbackSummary(userId, sessionId, results);
+        handoffNotes = summary.nextSteps ?? [];
       }
     }
 
@@ -234,8 +240,11 @@ export const POST: RequestHandler = async ({ request }) => {
         strengths: summary.strengths,
         weaknesses: summary.weaknesses,
         nextSteps: summary.nextSteps,
+        handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
         exerciseTypes,
         keyPhrases,
+        culturalNote,
+        miniLesson: summary.miniLesson ?? null,
         hadLevelUpRecommendation: !!summary.levelUpRecommendation,
       } satisfies SessionMeta),
       tokenInput: summaryTokenInput,

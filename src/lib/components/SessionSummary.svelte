@@ -9,6 +9,7 @@
     type SessionXpBreakdown,
     // type Milestone,
   } from '$lib/types';
+  import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
 
   let {
@@ -22,6 +23,7 @@
   }>();
   const celebrate = $derived(score >= 80);
   const recommendation = $derived(summary.levelUpRecommendation);
+  const miniLesson = $derived(summary.miniLesson ?? null);
   const nextLevelLabel = $derived(
     recommendation ? LEVEL_LABELS[recommendation.recommendedLevel as UserLevel] : '',
   );
@@ -180,7 +182,7 @@
     </section>
   {/if}
 
-  <div class="grid">
+  <div class="summary-insights-grid">
     <section class="stagger-2 stagger-item">
       <h3>What you're mastering</h3>
       <ul>
@@ -197,15 +199,14 @@
         {/each}
       </ul>
     </section>
-    <section class="stagger-4 stagger-item">
-      <h3>Coming up next</h3>
-      <ul>
-        {#each summary.nextSteps as item}
-          <li>{item}</li>
-        {/each}
-      </ul>
-    </section>
   </div>
+
+  {#if miniLesson}
+    <section class="stagger-4 stagger-item mini-lesson-block">
+      <h3>One more useful phrase</h3>
+      <LessonKeyPhraseCard phrase={miniLesson} />
+    </section>
+  {/if}
 
   {#if displayedMilestones.length}
     {#each displayedMilestones as milestone}
@@ -365,14 +366,14 @@
     margin-bottom: 0;
   }
 
-  .grid {
+  .summary-insights-grid {
     display: grid;
     gap: var(--space-6);
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: var(--space-2);
   }
 
-  .grid > * {
+  .summary-insights-grid > * {
     min-width: 0;
   }
 
@@ -393,6 +394,17 @@
     margin-bottom: var(--space-3);
     color: var(--text-sumi);
     font-size: var(--text-md);
+  }
+
+  .mini-lesson-block {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  @media (max-width: 42rem) {
+    .summary-insights-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .actions {

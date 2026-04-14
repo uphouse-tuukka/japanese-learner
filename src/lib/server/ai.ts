@@ -7,6 +7,7 @@ import type {
   ExerciseType,
   KeyPhrase,
   Lesson,
+  SessionMiniLesson,
   SessionPlan,
   SessionSummary,
   TokenUsage,
@@ -370,6 +371,62 @@ function toStringArray(value: unknown, fieldName: string, fallback: string[] = [
     return [];
   }
   return fallback.map((item) => normalizeItem(item)).filter(Boolean);
+}
+
+function compactSingleLine(value: string, maxLength = 160): string {
+  const singleLine = value.replace(/\s+/g, ' ').trim();
+  if (singleLine.length <= maxLength) {
+    return singleLine;
+  }
+  return `${singleLine.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function normalizeMiniLessonKind(value: unknown): SessionMiniLesson['kind'] {
+  if (typeof value !== 'string' || !value.trim()) {
+    return 'related_phrase';
+  }
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if (normalized === 'related_phrase') return 'related_phrase';
+  if (normalized === 'likely_reply' || normalized === 'likely_response') return 'likely_reply';
+  if (normalized === 'nuance_upgrade') return 'nuance_upgrade';
+  if (normalized === 'follow_up' || normalized === 'followup') return 'follow_up';
+  return 'related_phrase';
+}
+
+function normalizeMiniLesson(raw: unknown): SessionMiniLesson | null {
+  const candidate = Array.isArray(raw)
+    ? (raw.find((item) => item && typeof item === 'object') ?? raw[0])
+    : raw;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const row = candidate as Record<string, unknown>;
+  const japaneseRaw = flexString(row, 'japanese', 'phrase', 'text', 'ja', 'jp');
+  const romajiRaw = flexString(row, 'romaji', 'romanji', 'romanization');
+  const englishRaw = flexString(row, 'english', 'meaning', 'translation', 'en');
+  const noteRaw = flexString(row, 'note', 'usage', 'context', 'why', 'description');
+
+  if (!japaneseRaw || !englishRaw || !noteRaw) {
+    return null;
+  }
+
+  const normalized = normalizeJapaneseAndRomajiFields(japaneseRaw, romajiRaw);
+  if (!normalized.japanese || !normalized.romaji) {
+    return null;
+  }
+
+  return {
+    kind: normalizeMiniLessonKind(row.kind ?? row.type),
+    japanese: normalized.japanese,
+    romaji: normalized.romaji,
+    english: englishRaw,
+    note: noteRaw,
+  };
 }
 
 function isExerciseType(value: unknown): value is ExerciseType {
@@ -816,7 +873,10 @@ export async function generateSessionPlan(input: {
     accuracy: number;
     strengths: string[];
     weaknesses: string[];
-    nextSteps: string[];
+    nextSteps?: string[];
+    handoffNotes?: string[];
+    culturalNote?: string;
+    miniLesson?: SessionMiniLesson | null;
     keyPhrases: string[];
   }>;
   recentAccuracy?: number;
@@ -873,19 +933,40 @@ export async function generateSessionPlan(input: {
         .join(' ')
     : '';
 
-  const priorNotes = (input.sessionHistory ?? [])
+  const priorNotes = sessionHistory
     .slice(0, 3)
     .map((s) => {
       const parts: string[] = [];
       if (s.weaknesses?.length) parts.push(`weak: ${s.weaknesses.join(', ')}`);
-      if (s.nextSteps?.length) parts.push(`next: ${s.nextSteps.join(', ')}`);
+      const handoffNotes = (s.handoffNotes?.length ? s.handoffNotes : (s.nextSteps ?? [])).filter(
+        (item) => typeof item === 'string' && item.trim(),
+      );
+      if (handoffNotes.length) parts.push(`handoff: ${handoffNotes.join(', ')}`);
       return parts.length ? `[${s.topic}] ${parts.join('; ')}` : null;
     })
     .filter(Boolean);
 
   const priorNotesBlock =
     priorNotes.length > 0
-      ? `PRIOR SESSION NOTES (from summary AI — address these):\n${priorNotes.join('\n')}`
+      ? `PRIOR SESSION HANDOFF (internal; soft guidance only):\n${priorNotes.join('\n')}`
+      : '';
+
+  const recentCulturalNotes = sessionHistory
+    .filter((s) => typeof s.culturalNote === 'string' && s.culturalNote.trim())
+    .slice(0, 4)
+    .map((s) => {
+      const categoryLabel = (s.category ?? 'uncategorized').trim() || 'uncategorized';
+      const topicLabel = s.topic.trim() || 'unknown topic';
+      const note = compactSingleLine(s.culturalNote ?? '');
+      return `- [${categoryLabel} / ${topicLabel}] "${note}"`;
+    });
+
+  const recentCulturalNotesBlock =
+    recentCulturalNotes.length > 0
+      ? [
+          'RECENT CULTURAL NOTES (avoid repeating these unless essential):',
+          ...recentCulturalNotes,
+        ].join('\n')
       : '';
 
   const response = await client.responses.create({
@@ -903,11 +984,15 @@ export async function generateSessionPlan(input: {
           '',
           priorNotesBlock,
           '',
+          recentCulturalNotesBlock,
+          '',
           '1) Teaching flow:',
           '- Pick a specific topic WITHIN the chosen category. Teach it first, then quiz only what was taught.',
-          '- Address prior session weaknesses and next-steps when relevant to the chosen topic.',
+          '- Use prior handoff notes when they fit the chosen category/topic, but do not override category rotation or force artificial continuity.',
+          '- Category rotation rules above are authoritative.',
           '- If recentAccuracy > 80, increase challenge slightly; if < 50, reinforce fundamentals.',
           '- Personalize by connecting to previously studied phrases.',
+          '- Avoid repeating recent cultural notes or the same micro-theme (especially repeated sumimasen politeness trivia) unless essential to the new lesson.',
           '',
           '2) Required output structure:',
           '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
@@ -1276,6 +1361,7 @@ export async function generateSessionSummary(input: {
   }>;
 }): Promise<{
   summary: SessionSummary;
+  handoffNotes: string[];
   tokenUsage: Pick<TokenUsage, 'model' | 'tokensIn' | 'tokensOut' | 'tokensTotal'>;
 }> {
   const client = getOpenAiClient();
@@ -1351,19 +1437,20 @@ export async function generateSessionSummary(input: {
       {
         role: 'system',
         content: [
-          'You are a Japanese tutor providing a concise handoff note for the next session.',
-          'Write ALL summary text in English. The summary, patterns_strong, patterns_weak, and next_focus fields must be in English. Japanese example words/phrases can be referenced inline, but surrounding analysis text must be English.',
-          'Return JSON only with keys: summary, patterns_strong, patterns_weak, next_focus, levelUpRecommendation.',
+          'You are a Japanese tutor providing a concise end-of-session learner summary plus internal handoff notes.',
+          'Write ALL learner-visible summary text in English. The summary, patterns_strong, patterns_weak, mini_lesson.english, and mini_lesson.note fields must be in English.',
+          'Return JSON only with keys: summary, patterns_strong, patterns_weak, mini_lesson, handoff_notes, levelUpRecommendation.',
           '',
           'RULES:',
           '1) Only reference exercises that appear in the provided session data. Never fabricate.',
           '2) patterns_strong: Identify PATTERNS and skills the learner demonstrates consistently — compare with prior sessions/journal when evidence exists. Do NOT list individual correct answers. Focus on what skills are ready to build upon.',
           '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
-          '4) next_focus: Written as friendly collaborative statements the LEARNER sees (e.g., "Next time we\'ll focus on…", "Let\'s add these to your vocabulary…"). These also feed back to the session generator, so be specific about topics/grammar. Do NOT suggest external activities like flashcards or real-life practice.',
-          '5) All Japanese must include romaji in parentheses. Example: こんにちは (konnichiwa).',
+          '4) mini_lesson: exactly one object with keys kind, japanese, romaji, english, note. kind must be one of: related_phrase, likely_reply, nuance_upgrade, follow_up. Keep it closely related to this completed lesson, concrete, and immediately usable. Do NOT copy a taught key phrase verbatim. Do NOT phrase it as a future promise ("next time we will...").',
+          '5) handoff_notes: 0-3 short internal notes for the next session generator. Keep them specific and pattern-oriented. These are internal only and MUST NOT be written as learner-facing "next time" statements.',
+          '6) All Japanese in learner-visible output must include matching romaji. Example: japanese="こんにちは", romaji="konnichiwa".',
           input.suppressPromotion
-            ? '6) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.'
-            : '6) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
+            ? '7) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.'
+            : '7) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
           '',
           "TRANSLATION ACCURACY: The 'isCorrect' field uses string matching which may be imperfect. Answers conveying the same meaning ARE correct. Do not penalize natural phrasings, added politeness, contractions, or word order differences. If an 'incorrect' answer was actually correct, acknowledge it as a strength.",
           'Keep feedback encouraging, concise, and travel-focused.',
@@ -1445,6 +1532,44 @@ export async function generateSessionSummary(input: {
     }
   }
 
+  const miniLessonRaw = pickFirst([
+    'mini_lesson',
+    'miniLesson',
+    'miniLessonItem',
+    'one_more_useful_phrase',
+  ]);
+  const miniLesson = normalizeMiniLesson(miniLessonRaw);
+  if (miniLessonRaw != null && !miniLesson) {
+    console.warn('[ai] mini lesson output was present but could not be normalized', {
+      sessionId: input.sessionId,
+    });
+  }
+
+  const handoffNotesFromModel = toStringArray(
+    pickFirst([
+      'handoff_notes',
+      'handoffNotes',
+      'internal_handoff',
+      'internal_notes',
+      'next_handoff',
+    ]),
+    'handoffNotes',
+  );
+  const legacyNextSteps = toStringArray(
+    pickFirst([
+      'next_focus',
+      'nextSteps',
+      'nextStep',
+      'next_steps',
+      'next_step',
+      'recommendations',
+      'actionItems',
+      'action_items',
+    ]),
+    'nextSteps',
+  );
+  const handoffNotes = handoffNotesFromModel.length > 0 ? handoffNotesFromModel : legacyNextSteps;
+
   const summary: SessionSummary = {
     sessionId: input.sessionId,
     userId: input.userId,
@@ -1474,22 +1599,10 @@ export async function generateSessionSummary(input: {
       'weaknesses',
       ['Review any missed phrases once more.'],
     ),
-    nextSteps: toStringArray(
-      pickFirst([
-        'next_focus',
-        'nextSteps',
-        'nextStep',
-        'next_steps',
-        'next_step',
-        'recommendations',
-        'actionItems',
-        'action_items',
-      ]),
-      'nextSteps',
-      ['Complete one more short session tomorrow.'],
-    ),
+    nextSteps: legacyNextSteps.length > 0 ? legacyNextSteps : undefined,
     accuracy,
     generatedAt: nowIso(),
+    miniLesson,
     levelUpRecommendation,
   };
 
@@ -1498,10 +1611,13 @@ export async function generateSessionSummary(input: {
     sessionId: input.sessionId,
     tokensInput: usage.input,
     tokensOutput: usage.output,
+    hasMiniLesson: !!miniLesson,
+    handoffNotesCount: handoffNotes.length,
   });
 
   return {
     summary,
+    handoffNotes,
     tokenUsage: {
       model: usage.model,
       tokensIn: usage.input,
