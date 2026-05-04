@@ -6,6 +6,7 @@
   import DebugPanel from '$lib/components/DebugPanel.svelte';
   import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
+  import { orderExercisesForSession } from '$lib/utils/exercise-order';
   import {
     session,
     exercises,
@@ -328,7 +329,7 @@
       }
 
       lesson = payload.lesson;
-      startSession(payload.session, shuffleArray(payload.exercises));
+      startSession(payload.session, orderExercisesForSession(payload.exercises));
       saveState('lesson');
       uiState = 'lesson';
     } catch (error) {

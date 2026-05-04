@@ -41,6 +41,9 @@ type SessionHistoryItem = {
   keyPhrases: string[];
 };
 
+const DEFAULT_GENERATION_TIMEOUT_MS = 30_000;
+const MAX_GENERATION_ATTEMPTS = 2;
+
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -136,6 +139,27 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
     nextSteps: [],
     keyPhrases: summary.trim() ? [summary.trim().slice(0, 120)] : [],
   };
+}
+
+function resolveGenerationTimeoutMs(): number {
+  const raw = Number(process.env.SESSION_GENERATION_TIMEOUT_MS ?? DEFAULT_GENERATION_TIMEOUT_MS);
+  if (!Number.isFinite(raw)) {
+    return DEFAULT_GENERATION_TIMEOUT_MS;
+  }
+  return Math.max(1, Math.floor(raw));
+}
+
+function waitForAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+  });
+}
+
+async function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    throw new Error('timeout');
+  }
+  return Promise.race([promise, waitForAbort(signal)]);
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -319,23 +343,59 @@ export const POST: RequestHandler = async ({ request }) => {
       .slice(0, 5)
       .map((item) => item.answerText.trim());
 
-    const plan = await generateSessionPlan({
-      userId: user.id,
-      userName: user.name,
-      userLevel: user.level,
-      exerciseCount,
-      sessionHistory,
-      recentAccuracy,
-      coveredTopics,
-      totalSessionCount: priorSessions.length,
-      categoryRotation,
-      performanceInsights: {
-        overallAccuracy,
-        weakExerciseIds,
-        strongExerciseIds,
-        recentWrongAnswers,
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort('timeout'), resolveGenerationTimeoutMs());
+    let plan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
+
+    try {
+      let lastError: Error | null = null;
+      for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+        try {
+          plan = await withAbort(
+            generateSessionPlan({
+              userId: user.id,
+              userName: user.name,
+              userLevel: user.level,
+              exerciseCount,
+              sessionHistory,
+              recentAccuracy,
+              coveredTopics,
+              totalSessionCount: priorSessions.length,
+              categoryRotation,
+              performanceInsights: {
+                overallAccuracy,
+                weakExerciseIds,
+                strongExerciseIds,
+                recentWrongAnswers,
+              },
+            }),
+            controller.signal,
+          );
+          break;
+        } catch (error) {
+          if (controller.signal.aborted) {
+            throw error;
+          }
+
+          lastError = error instanceof Error ? error : new Error(String(error));
+          if (attempt < MAX_GENERATION_ATTEMPTS) {
+            console.warn('[api/session/generate] generation attempt failed, retrying', {
+              attempt,
+              maxAttempts: MAX_GENERATION_ATTEMPTS,
+              userId,
+              error: lastError.message,
+            });
+            continue;
+          }
+        }
+      }
+
+      if (!plan) {
+        throw lastError ?? new Error('Failed to generate AI teaching session.');
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const session = await createSessionRecord({
       userId,
@@ -364,6 +424,12 @@ export const POST: RequestHandler = async ({ request }) => {
     };
     return json(response);
   } catch (error) {
+    if (error instanceof Error && error.message === 'timeout') {
+      return json(
+        { ok: false, error: 'Session generation timed out. Please try again.' },
+        { status: 503 },
+      );
+    }
     console.error('[api/session/generate] failed', { error });
     return json({ ok: false, error: 'Failed to generate AI teaching session.' }, { status: 500 });
   }

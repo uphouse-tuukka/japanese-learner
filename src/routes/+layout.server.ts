@@ -6,6 +6,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
   return {
     dev,
     useOpenAiTts: env.USE_OPENAI_TTS?.toLowerCase() === 'true',
+    ttsServerAvailable: Boolean(env.OPENAI_API_KEY?.trim()),
     authenticated: locals.authenticated,
     isPortfolio: url.pathname.startsWith('/portfolio/'),
   };

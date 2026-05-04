@@ -5,6 +5,7 @@
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
+  import { canCompleteMission } from '$lib/utils/mission-state';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -343,8 +344,8 @@
   }
 
   async function completeMission(): Promise<void> {
-    if (awaitingCompletion) return;
-    awaitingCompletion = true;
+    if (!canCompleteMission({ awaitingCompletion, uiState, userMissionId })) return;
+    uiState = 'responding';
 
     try {
       const res = await fetch(`/api/missions/${data.mission.id}/complete`, {
@@ -366,7 +367,7 @@
       uiState = 'complete';
       clearMissionStorage();
     } catch (error) {
-      awaitingCompletion = false;
+      uiState = 'active';
       errorMessage = error instanceof Error ? error.message : 'Failed to complete mission.';
       uiState = 'error';
     }
@@ -468,7 +469,12 @@
           <p class="finish-message">
             Great work — review your final feedback, then finish your mission.
           </p>
-          <button type="button" class="btn-primary finish-button" onclick={completeMission}>
+          <button
+            type="button"
+            class="btn-primary finish-button"
+            onclick={completeMission}
+            disabled={!canCompleteMission({ awaitingCompletion, uiState, userMissionId })}
+          >
             Complete Mission
           </button>
         </div>

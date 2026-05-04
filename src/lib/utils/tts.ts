@@ -15,9 +15,11 @@ let voiceLookupPromise: Promise<SpeechSynthesisVoice | null> | null = null;
 const serverAudioCache = new Map<string, ArrayBuffer>();
 const pendingServerAudio = new Map<string, Promise<ArrayBuffer>>();
 let useOpenAiTts = false;
+let serverTtsAvailable = false;
 
-export function configureOpenAiTts(enabled: boolean): void {
+export function configureOpenAiTts(enabled: boolean, serverAvailable = enabled): void {
   useOpenAiTts = enabled;
+  serverTtsAvailable = serverAvailable;
 }
 
 function scoreJapaneseVoice(voice: SpeechSynthesisVoice): number {
@@ -231,30 +233,28 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
   const browserFallbackVoiceName = options.fallbackVoice;
   const useBrowserFirst =
     options.preferBrowser === true ||
+    (!useOpenAiTts && options.preferBrowser !== false) ||
     (options.preferBrowser === undefined && trimmedText.length <= 15);
+  const canUseServerTts = serverTtsAvailable;
 
   stop();
 
-  if (!useOpenAiTts) {
-    try {
-      await speakViaBrowser(trimmedText, rate, pitch, volume, browserFallbackVoiceName);
-    } catch (browserError) {
-      console.warn('[tts] browser speech failed while OpenAI TTS is disabled', {
-        voice: browserFallbackVoiceName,
-        rate,
-        pitch,
-        volume,
-        error: browserError,
-      });
-    }
-    return;
-  }
-
-  if (useBrowserFirst) {
+  if (useBrowserFirst || !canUseServerTts) {
     try {
       await speakViaBrowser(trimmedText, rate, pitch, volume, browserFallbackVoiceName);
       return;
     } catch (browserError) {
+      if (!canUseServerTts) {
+        console.warn('[tts] browser speech failed and server synthesis is unavailable', {
+          voice: browserFallbackVoiceName,
+          rate,
+          pitch,
+          volume,
+          error: browserError,
+        });
+        return;
+      }
+
       console.warn('[tts] browser speech failed, falling back to server synthesis', {
         voice: browserFallbackVoiceName,
         rate,

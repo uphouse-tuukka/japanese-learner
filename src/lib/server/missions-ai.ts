@@ -122,6 +122,59 @@ function normalizeInputText(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function shuffleArray<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function preparePracticeChoices(
+  rawChoices: unknown[],
+  conversationHistory: MissionTurn[],
+): MissionChoice[] | undefined {
+  const previousResponses = new Set(
+    conversationHistory
+      .map((turn) => turn.userResponse?.japanese ?? '')
+      .map((value) => normalizeInputText(value))
+      .filter(Boolean),
+  );
+  const seenKeys = new Set<string>();
+  const normalized = rawChoices
+    .map((choice) => normalizeChoice(choice))
+    .filter((choice): choice is MissionChoice => choice !== null)
+    .filter((choice) => {
+      const key = [
+        normalizeInputText(choice.japanese),
+        normalizeInputText(choice.romaji),
+        normalizeInputText(choice.english),
+      ].join('|');
+      if (!key || seenKeys.has(key)) {
+        return false;
+      }
+      seenKeys.add(key);
+      return true;
+    });
+
+  const nonRepeated = normalized.filter(
+    (choice) => !previousResponses.has(normalizeInputText(choice.japanese)),
+  );
+  const selected = (nonRepeated.length >= 3 ? nonRepeated : normalized).slice(0, 3);
+  if (selected.length !== 3) {
+    return undefined;
+  }
+
+  const firstCorrectIndex = selected.findIndex((choice) => choice.isCorrect);
+  const correctIndex = firstCorrectIndex >= 0 ? firstCorrectIndex : 0;
+  selected.forEach((choice, index) => {
+    choice.isCorrect = index === correctIndex;
+  });
+
+  return shuffleArray(selected);
+}
+
 function buildGenerateSystemPrompt(input: {
   mission: Mission;
   mode: MissionMode;
@@ -132,7 +185,14 @@ function buildGenerateSystemPrompt(input: {
 }): string {
   const modeInstruction =
     input.mode === 'practice'
-      ? "Also generate 3 multiple choice response options for the user. One should be the best/correct response, two should be plausible but less ideal alternatives. For each option, provide: japanese, romaji, english meaning, and whether it's the correct one."
+      ? [
+          'Also generate 3 multiple choice response options for the user.',
+          'Exactly one option must be the best/correct response.',
+          'The two distractors must be plausible for this exact moment in the conversation, but still less appropriate or incorrect.',
+          'Do not reuse any earlier learner response as a choice.',
+          'Do not always place the correct answer first.',
+          'For each option, provide: japanese, romaji, english meaning, and whether it is the correct one.',
+        ].join(' ')
       : 'Also generate a contextual hint in English that helps the user understand what you said, without translating directly. The hint should guide them on what kind of response is expected.';
 
   return [
@@ -262,17 +322,7 @@ export async function generateMissionTurn(input: {
     let choices: MissionChoice[] | undefined;
     if (input.mode === 'practice') {
       const rawChoices = Array.isArray(parsed.choices) ? parsed.choices : [];
-      const normalized = rawChoices
-        .map((choice) => normalizeChoice(choice))
-        .filter((choice): choice is MissionChoice => choice !== null)
-        .slice(0, 3);
-
-      if (normalized.length === 3) {
-        if (!normalized.some((choice) => choice.isCorrect)) {
-          normalized[0].isCorrect = true;
-        }
-        choices = normalized;
-      }
+      choices = preparePracticeChoices(rawChoices, input.conversationHistory);
     }
 
     const hint =

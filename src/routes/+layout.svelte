@@ -6,7 +6,7 @@
   let { children, data } = $props();
 
   $effect(() => {
-    configureOpenAiTts(data.useOpenAiTts);
+    configureOpenAiTts(data.useOpenAiTts, data.ttsServerAvailable);
   });
 
   const pathname = $derived($page.url.pathname);
