@@ -49,6 +49,12 @@ Important values:
 - `DAILY_TOKEN_LIMIT`
 - `MAX_USERS`
 
+## Project docs
+
+- `AGENTS.md`: root boot guide for AI agents.
+- `documents/CONTRIBUTING.md`: contribution, validation, documentation, and review workflow.
+- `documents/INDEX.md`: status index for active, implemented, superseded, planning, analysis, and decision docs. Check it before following older plans.
+
 ## App routes
 
 - `/`: Home dashboard, profile selection, and profile creation

@@ -10,6 +10,59 @@ This document is mandatory reading for all AI agents and sessions working on thi
 - **Hosting**: Vercel
 - **Design**: Warm Japanese washi paper aesthetic (see `src/app.css` design tokens)
 
+## Agent Boot Sequence
+
+`AGENTS.md` is the root bootstrap document for AI agents. Read it before editing, then use this guide for project-specific workflow, docs, and review expectations.
+
+1. Run `git status --short --branch` and note existing user or agent changes.
+2. Read `README.md`, this guide, the current task or plan, and relevant decisions or analyses before choosing files to edit.
+3. Inspect relevant source files and tests before editing; do not infer behavior from stale plans alone.
+4. Identify the validation commands required for the task before editing.
+5. Keep work inside the requested scope and call out any feature ideas in the handoff instead of implementing them.
+
+## Agentic Work and Subagent Lanes
+
+Use subagents in narrow lanes and avoid overlapping edits, especially in large Svelte pages, DB internals, AI internals, and route handlers. Coordinate explicitly before two agents touch the same lane.
+
+| Lane | Ownership                 | Typical files                                                                                                |
+| ---- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A    | Docs and agent workflow   | `AGENTS.md`, `documents/CONTRIBUTING.md`, `documents/templates/*`, `documents/INDEX.md`, `README.md`         |
+| B    | Tooling and CI            | `package.json`, `package-lock.json`, `.github/workflows/ci.yml`, `.npmrc`, `.nvmrc`, `.env.example`, ignores |
+| C    | Shared validators/helpers | `src/lib/validators/**`, `src/lib/utils/**`, `src/lib/server/request*.ts`, related tests                     |
+| D    | DB internals              | `src/lib/server/db.ts`, `src/lib/server/db-*.ts`, `src/lib/server/repositories/**`, DB tests                 |
+| E    | AI internals              | `src/lib/server/ai.ts`, `src/lib/server/ai-*.ts`, `src/lib/server/ai/**`, AI tests                           |
+| F    | API/profile boundaries    | `src/routes/api/**/+server.ts`, `src/lib/server/api*.ts`, route tests                                        |
+| G    | UI modularization         | large `.svelte` pages/components and extracted page-state modules                                            |
+
+Use these templates for future structured docs:
+
+- Plans: `documents/templates/plan-template.md`
+- Decisions: `documents/templates/decision-template.md`
+- Reviews: `documents/templates/review-template.md`
+
+Required subagent handoff format:
+
+```text
+Task:
+Files changed:
+Behavior changed: yes/no. If yes, explain.
+Tests run:
+Validation result:
+Risks / follow-ups:
+```
+
+## Review Gates
+
+Run reviews in this order for each task or lane:
+
+1. **Spec compliance review** — confirm the implementation matches the plan, avoids feature creep, and uses the correct paths and scope.
+2. **Code quality review** — confirm the change is simpler or clearer, has adequate tests/docs, uses clear names and boundaries, and keeps secrets/user content protected in logs.
+3. **Phase verification** — run the listed validation commands and record exact results in the final handoff.
+
+## Maintenance / Refactor Non-Goals
+
+For maintenance and refactor tasks, do not add user-facing features. Preserve existing learning flows unless a task explicitly asks for behavior changes. Put feature ideas, product redesigns, and nice-to-have improvements in the handoff as follow-ups instead of changing code.
+
 ## Code Quality
 
 - **Linting**: ESLint (flat config in `eslint.config.js`)
@@ -59,6 +112,11 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 - Include date of creation
 - For decisions: state the decision, alternatives considered, and rationale
 - For plans: include implementation steps, files affected, and open questions
+- Use reusable templates when creating structured docs:
+  - Plans: `documents/templates/plan-template.md`
+  - Decisions: `documents/templates/decision-template.md`
+  - Reviews: `documents/templates/review-template.md`
+- Check `documents/INDEX.md` before following older plans so stale, implemented, and active docs are not confused
 
 ### What NOT to document here
 
@@ -93,7 +151,7 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 
 - All prompts MUST require romaji in parentheses for Japanese text
 - Use structured JSON output where possible
-- Log raw AI responses for debugging
+- Log only sanitized AI diagnostics: metadata, counts, statuses, and short non-sensitive previews when needed. Do not log secrets, auth data, full prompts, raw user learning content, or complete raw AI payloads.
 - Always include fallback behavior if AI call fails
 
 ### TTS

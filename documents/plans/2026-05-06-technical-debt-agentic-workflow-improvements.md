@@ -2,10 +2,14 @@
 
 > **For Hermes:** Use the `subagent-driven-development` skill to implement this plan task-by-task. Use a fresh implementation subagent per task or lane, then run spec-compliance and code-quality review before moving on.
 
-**Date:** 2026-05-06  
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`.  
-**Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.  
-**Architecture:** Treat this as a sequence of small internal hardening passes: documentation/workflow first, then tooling enforcement, then shared validation/helper boundaries, then gradual decomposition of the largest server/UI modules. Preserve current behavior and public app flows.  
+**Date:** 2026-05-06
+
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`.
+
+**Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
+
+**Architecture:** Treat this as a sequence of small internal hardening passes: documentation/workflow first, then tooling enforcement, then shared validation/helper boundaries, then gradual decomposition of the largest server/UI modules. Preserve current behavior and public app flows.
+
 **Tech Stack:** SvelteKit 2, Svelte 5 runes, TypeScript, Vitest, ESLint, Prettier, Turso/libsql, OpenAI, Vercel.
 
 ---
@@ -117,9 +121,12 @@ Largest maintainability risks found in the audit:
 
 ### Completed first implementation batch
 
-**Completed on:** 2026-05-06  
-**Commit:** `2e7b507` (`chore: harden agent workflow and validation`)  
-**Validation:** `npm run validate:ci` passed after the batch: formatting, Svelte check, ESLint, Vitest (`82` tests), and production build all passed. Existing Vercel optional dependency warnings were unchanged.  
+**Completed on:** 2026-05-06
+
+**Commit:** `2e7b507` (`chore: harden agent workflow and validation`)
+
+**Validation:** `npm run validate:ci` passed after the batch: formatting, Svelte check, ESLint, Vitest (`82` tests), and production build all passed. Existing Vercel optional dependency warnings were unchanged.
+
 **Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
 
 Completed tasks:
@@ -133,15 +140,31 @@ Completed tasks:
 - [x] Task 4.2 — Centralized `SessionMeta` parsing in `src/lib/validators/session-meta.ts` and updated `db.ts` plus `api/session/generate` to use it.
 - [x] Task 4.3 — Centralized `calculateMaxCombo` in `src/lib/utils/results.ts` and updated session/practice completion routes to use it.
 
+### Completed second docs/workflow batch
+
+**Completed on:** 2026-05-06
+
+**Commit:** `docs: document agent workflow templates and index`
+
+**Validation:** `npm run format:check` passed after the batch.
+
+**Review status:** independent spec-compliance review passed after one index-ordering fix, and independent code-quality/security review approved after replacing unsafe raw-AI-response logging guidance with sanitized logging guidance.
+
+Completed tasks:
+
+- [x] Task 1.2 — Added agent boot sequence, subagent lanes, review gates, and maintenance/refactor non-goals to `documents/CONTRIBUTING.md`.
+- [x] Task 1.3 — Added reusable plan/decision/review templates under `documents/templates/` and linked them from `documents/CONTRIBUTING.md`.
+- [x] Task 3.2 — Added `documents/INDEX.md` with status labels for current docs and linked it from `README.md`.
+
 ### Next recommended starting point
 
-Do not redo the completed first batch unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Finish workflow/docs hygiene: Task 1.2, Task 1.3, Task 3.2.
-2. Finish reproducibility/env hygiene: Task 2.3, Task 3.3.
-3. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
+1. Finish reproducibility/env hygiene: Task 2.3, Task 3.3.
+2. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
+3. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
 
-Still incomplete from the whole plan: documentation templates/index, Node/npm pinning, env synchronization, timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
+Still incomplete from the whole plan: Node/npm pinning, env synchronization, timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
 
 ---
 
