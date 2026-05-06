@@ -3,7 +3,7 @@
 > **For Hermes:** Use the `subagent-driven-development` skill to implement this plan task-by-task. Use a fresh implementation subagent per task or lane, then run spec-compliance and code-quality review before moving on.
 
 **Date:** 2026-05-06  
-**Status:** Ready for implementation planning / staged execution  
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`.  
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.  
 **Architecture:** Treat this as a sequence of small internal hardening passes: documentation/workflow first, then tooling enforcement, then shared validation/helper boundaries, then gradual decomposition of the largest server/UI modules. Preserve current behavior and public app flows.  
 **Tech Stack:** SvelteKit 2, Svelte 5 runes, TypeScript, Vitest, ESLint, Prettier, Turso/libsql, OpenAI, Vercel.
@@ -110,6 +110,38 @@ Largest maintainability risks found in the audit:
 - `src/routes/progress/+page.svelte`: 757 lines
 - `src/lib/server/gamification.ts`: 749 lines
 - `src/routes/learn/+page.svelte`: 733 lines
+
+---
+
+## 3.1 Implementation progress
+
+### Completed first implementation batch
+
+**Completed on:** 2026-05-06  
+**Commit:** `2e7b507` (`chore: harden agent workflow and validation`)  
+**Validation:** `npm run validate:ci` passed after the batch: formatting, Svelte check, ESLint, Vitest (`82` tests), and production build all passed. Existing Vercel optional dependency warnings were unchanged.  
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed tasks:
+
+- [x] Task 0.1 — Confirmed baseline before editing.
+- [x] Task 3.4 — Ignored `.idea/` and aligned `.prettierignore` with generated/editor artifacts.
+- [x] Task 1.1 — Added root `AGENTS.md` with boot, validation, coding, and subagent guidance.
+- [x] Task 2.1 — Added `npm run validate:ci` and aligned README/CONTRIBUTING/AGENTS guidance.
+- [x] Task 2.2 — Added `.github/workflows/ci.yml` to run `npm ci` and `npm run validate:ci`.
+- [x] Task 3.1 — Fixed README drift for current routes, API groups, cookie name, and DB summary.
+- [x] Task 4.2 — Centralized `SessionMeta` parsing in `src/lib/validators/session-meta.ts` and updated `db.ts` plus `api/session/generate` to use it.
+- [x] Task 4.3 — Centralized `calculateMaxCombo` in `src/lib/utils/results.ts` and updated session/practice completion routes to use it.
+
+### Next recommended starting point
+
+Do not redo the completed first batch unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+
+1. Finish workflow/docs hygiene: Task 1.2, Task 1.3, Task 3.2.
+2. Finish reproducibility/env hygiene: Task 2.3, Task 3.3.
+3. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
+
+Still incomplete from the whole plan: documentation templates/index, Node/npm pinning, env synchronization, timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
 
 ---
 
@@ -1451,15 +1483,17 @@ The improvement program is considered successful when:
 
 ## 20. Suggested first implementation batch
 
-If executing immediately, start with this small, high-leverage batch:
+If executing immediately, start with this small, high-leverage batch. This batch is now complete in commit `2e7b507`:
 
-1. Task 0.1 — confirm baseline.
-2. Task 3.4 — ignore `.idea/` and align prettier ignore.
-3. Task 1.1 — add `AGENTS.md`.
-4. Task 2.1 — add `validate:ci` and align docs.
-5. Task 2.2 — add CI workflow.
-6. Task 3.1 — fix README drift.
-7. Task 4.2 — centralize `SessionMeta` parsing.
-8. Task 4.3 — centralize combo helper.
+1. [x] Task 0.1 — confirm baseline.
+2. [x] Task 3.4 — ignore `.idea/` and align prettier ignore.
+3. [x] Task 1.1 — add `AGENTS.md`.
+4. [x] Task 2.1 — add `validate:ci` and align docs.
+5. [x] Task 2.2 — add CI workflow.
+6. [x] Task 3.1 — fix README drift.
+7. [x] Task 4.2 — centralize `SessionMeta` parsing.
+8. [x] Task 4.3 — centralize combo helper.
 
 This batch gives future agents better bootstrapping, a real quality gate, cleaner status, and the first safe code-level debt reductions without entering the largest refactors yet.
+
+Next agents should continue from the unfinished lanes listed in section 3.1 rather than repeating this batch.
