@@ -5,8 +5,9 @@ Minimal full-stack Japanese learning app with:
 - user profiles
 - learn sessions
 - practice sessions
-- session history
-- DB-backed seed exercises
+- progress tracking
+- travel missions
+- portfolio challenge
 - TTS with browser + `/api/tts` server fallback
 
 ## Tech stack
@@ -26,11 +27,10 @@ Minimal full-stack Japanese learning app with:
    ```bash
    cp .env.example .env
    ```
-3. Fill required env vars (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `OPENAI_API_KEY` if you use TTS).
-4. Run checks:
+3. Fill required env vars (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `OPENAI_API_KEY` for AI-backed learning features and server TTS).
+4. Run the full validation gate:
    ```bash
-   npm run check
-   npm run build
+   npm run validate:ci
    ```
 5. Start dev server:
    ```bash
@@ -51,23 +51,29 @@ Important values:
 
 ## App routes
 
-- `/` Home: profile selection + profile creation, first-visit seed loading
-- `/learn`: generates and completes AI mode sessions via API
-- `/practice`: generates and completes practice sessions via API
-- `/history`: session history from DB
+- `/`: Home dashboard, profile selection, and profile creation
+- `/learn`: AI lesson/session generation and completion
+- `/practice`: adaptive practice session generation and completion
+- `/missions`: travel mission overview and unlock progress
+- `/missions/[id]`: interactive mission conversation flow
+- `/progress`: DB-backed progress dashboard, history, XP, streaks, and skill breakdowns
+- `/portfolio/challenge`: public portfolio demo challenge session
 
 ## API routes
 
-- `POST /api/session/generate`
-- `POST /api/session/complete`
-- `POST /api/practice/generate`
-- `POST /api/practice/complete`
-- `GET /api/tts` (server fallback TTS)
+- `/api/auth/*`: login/logout
+- `/api/user/*`: user preference and level updates
+- `/api/session/*`: learn session generation/completion
+- `/api/practice/*`: practice session generation/completion
+- `/api/missions/*`: mission listing, start, response, and completion endpoints
+- `/api/portfolio/session/*`: portfolio challenge session start/current/progress/complete endpoints
+- `/api/check-answer`: answer evaluation helper
+- `/api/tts`: server fallback TTS
 
 ## Architecture summary
 
-- `src/lib/server/db.ts`: DB initialization and query helpers
-- `src/lib/server/seed.ts`: loads `src/lib/data/seed-exercises.json` into DB
+- `src/lib/server/db.ts`: DB initialization, schema setup, migrations, query helpers, and mission seed loading
+- `src/lib/server/missions-seed.ts`: current mission definition seed data
 - `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to 6 exercise components
 - `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
 - `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
@@ -85,17 +91,15 @@ Use Home page:
 
 1. Create user with display name and starting level.
 2. User is stored in `users` table.
-3. Selected user id is stored in cookie `selected_user_id`.
+3. Selected user id is stored in cookie `selected_user`.
 
 ## Database notes
 
-Tables created on startup:
+Current table groups created on startup:
 
-- `users`
-- `sessions`
-- `exercises`
-- `session_exercises`
-- `user_exercise_results`
-- `token_usage`
+- Core learning: `users`, `sessions`, `exercises`, `session_exercises`, `user_exercise_results`, `token_usage`
+- XP, streaks, and milestones: `user_xp`, `user_streaks`, `user_milestones`
+- Missions: `missions`, `user_missions`, `user_badges`, `user_mission_limits`
+- Portfolio challenge attempts: `portfolio_challenge_attempts`
 
-Seed exercises are loaded once when first visiting Home (if no seed rows exist).
+Mission definitions are seeded from `src/lib/server/missions-seed.ts` during DB initialization.

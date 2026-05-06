@@ -20,7 +20,8 @@ This document is mandatory reading for all AI agents and sessions working on thi
   - Verify formatting: `npm run format:check`
 - **Type checking**: `npm run check` (Svelte check + TypeScript)
 - **Tests**: `npm test` (Vitest)
-- **Full validation**: `npm run validate` (runs check → lint → test)
+- **Full CI validation**: `npm run validate:ci` (runs format:check → check → lint → test → build)
+- **Local validation shortcut**: `npm run validate` (runs check → lint → test)
 - **Pre-commit hook**: Husky + lint-staged runs ESLint + Prettier on staged files on every commit. If lint fails, commit is blocked.
 
 ### Key lint/format rules
@@ -34,13 +35,11 @@ This document is mandatory reading for all AI agents and sessions working on thi
 
 All agents (coder, designer, planner) must do the following after making changes:
 
-1. Run `npm run lint`
-2. Run `npm run check`
-3. Run `npm test`
-4. Fix all errors before considering work done
-5. Do not rely only on the pre-commit hook; fix lint/format issues proactively
+1. Run `npm run validate:ci`
+2. Fix all errors before considering work done
+3. Do not rely only on the pre-commit hook; fix lint/format issues proactively
 
-Shortcut: run `npm run validate` to run check + lint + test in one command.
+Local shortcut: run `npm run validate` to run check + lint + test when a full CI gate is not required.
 
 ## Documentation Rules
 
@@ -74,7 +73,7 @@ Shortcut: run `npm run validate` to run check + lint + test in one command.
 - Small-to-medium functions; avoid deep nesting
 - Descriptive names; comments only for non-obvious invariants
 - Use framework conventions (SvelteKit routing, Svelte 5 runes)
-- Always run `npm run validate` after changes (`npm run check`, `npm run lint`, `npm test`)
+- Always run `npm run validate:ci` after changes unless the task explicitly scopes validation differently
 
 ### Svelte Components
 

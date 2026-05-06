@@ -1,6 +1,7 @@
 import { createClient, type Client, type InStatement } from '@libsql/client';
 import { randomUUID } from 'node:crypto';
 import { config } from '$lib/config';
+import { parseSessionMeta } from '$lib/validators/session-meta';
 import type {
   Exercise,
   Session,
@@ -11,7 +12,6 @@ import type {
   TokenUsage,
   User,
   UserLevel,
-  SessionMiniLesson,
 } from '$lib/types';
 
 let dbClient: Client | null = null;
@@ -61,91 +61,6 @@ function asIso(value: unknown): string {
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
   return nowIso();
-}
-
-function toStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.map((item) => String(item).trim()).filter((item) => item.length > 0);
-}
-
-function parseMiniLesson(value: unknown): SessionMiniLesson | null | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (value === null) {
-    return null;
-  }
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-  const raw = value as Partial<SessionMiniLesson>;
-  if (
-    (raw.kind !== 'related_phrase' &&
-      raw.kind !== 'likely_reply' &&
-      raw.kind !== 'nuance_upgrade' &&
-      raw.kind !== 'follow_up') ||
-    typeof raw.japanese !== 'string' ||
-    typeof raw.romaji !== 'string' ||
-    typeof raw.english !== 'string' ||
-    typeof raw.note !== 'string'
-  ) {
-    return undefined;
-  }
-  return {
-    kind: raw.kind,
-    japanese: raw.japanese,
-    romaji: raw.romaji,
-    english: raw.english,
-    note: raw.note,
-  };
-}
-
-function parseSessionMetaSummary(rawSummary: string): SessionMeta | null {
-  try {
-    const parsed = JSON.parse(rawSummary) as Partial<SessionMeta> | null;
-    if (!parsed || typeof parsed !== 'object') {
-      return null;
-    }
-
-    if (
-      typeof parsed.summaryText !== 'string' ||
-      typeof parsed.topic !== 'string' ||
-      typeof parsed.accuracy !== 'number' ||
-      !Array.isArray(parsed.strengths) ||
-      !Array.isArray(parsed.weaknesses) ||
-      !Array.isArray(parsed.exerciseTypes) ||
-      !Array.isArray(parsed.keyPhrases)
-    ) {
-      return null;
-    }
-
-    const nextSteps = toStringArray(parsed.nextSteps);
-    const handoffNotes = toStringArray(parsed.handoffNotes);
-    const miniLesson = parseMiniLesson(parsed.miniLesson);
-
-    return {
-      summaryText: parsed.summaryText,
-      category: typeof parsed.category === 'string' ? parsed.category : undefined,
-      topic: parsed.topic,
-      accuracy: parsed.accuracy,
-      strengths: toStringArray(parsed.strengths),
-      weaknesses: toStringArray(parsed.weaknesses),
-      nextSteps: nextSteps.length > 0 ? nextSteps : undefined,
-      handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
-      exerciseTypes: toStringArray(parsed.exerciseTypes),
-      keyPhrases: toStringArray(parsed.keyPhrases),
-      culturalNote: typeof parsed.culturalNote === 'string' ? parsed.culturalNote : undefined,
-      miniLesson,
-      hadLevelUpRecommendation:
-        typeof parsed.hadLevelUpRecommendation === 'boolean'
-          ? parsed.hadLevelUpRecommendation
-          : undefined,
-    };
-  } catch {
-    return null;
-  }
 }
 
 function parseExercise(contentJson: unknown): Exercise {
@@ -593,7 +508,7 @@ LIMIT ?
     if (typeof raw !== 'string' || !raw.trim()) {
       continue;
     }
-    const parsed = parseSessionMetaSummary(raw);
+    const parsed = parseSessionMeta(raw);
     if (!parsed) {
       continue;
     }

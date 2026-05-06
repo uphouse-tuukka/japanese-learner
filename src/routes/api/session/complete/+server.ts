@@ -13,6 +13,7 @@ import {
 import { generateSessionSummary, generateUpdatedJournal } from '$lib/server/ai';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { processSessionCompletion } from '$lib/server/gamification';
+import { calculateMaxCombo } from '$lib/utils/results';
 
 type ResultPayload = {
   exerciseId: string;
@@ -30,22 +31,6 @@ type CompleteRequest = {
   culturalNote?: string;
   localDate?: string;
 };
-
-function calculateMaxCombo(results: ResultPayload[]): number {
-  let currentCombo = 0;
-  let maxCombo = 0;
-  for (const result of results) {
-    if (result.isCorrect) {
-      currentCombo += 1;
-      if (currentCombo > maxCombo) {
-        maxCombo = currentCombo;
-      }
-      continue;
-    }
-    currentCombo = 0;
-  }
-  return maxCombo;
-}
 
 function buildFallbackSummary(
   userId: string,

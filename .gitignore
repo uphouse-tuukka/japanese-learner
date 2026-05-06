@@ -23,6 +23,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+.idea/
 
 prompting-file.txt
 .superpowers/*
