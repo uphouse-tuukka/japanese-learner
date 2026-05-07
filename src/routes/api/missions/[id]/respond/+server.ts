@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { config } from '$lib/server/config';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import { getMissionById, getUserMission, updateUserMission } from '$lib/server/missions-db';
 import {
   evaluateUserResponse,
@@ -17,55 +19,73 @@ type RespondMissionRequest = {
   selectedChoiceIndex?: number;
 };
 
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ params, request, cookies }) => {
   try {
-    const body = (await request.json()) as RespondMissionRequest;
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
+    }
+
+    const body = bodyResult.value as RespondMissionRequest;
     const missionId = String(params.id ?? '').trim();
-    const userId = String(body.userId ?? '').trim();
-    const userMissionId = String(body.userMissionId ?? '').trim();
-    const responseText = String(body.response ?? '');
-    const turnNumber = Number(body.turnNumber);
-    const selectedChoiceIndex = body.selectedChoiceIndex;
+    const userIdResult = requireStringField(body, 'userId');
+    const userMissionIdResult = requireStringField(body, 'userMissionId');
+    const turnNumber = Number(body?.turnNumber);
 
     if (!missionId) {
-      return json({ error: 'Missing mission id.' }, { status: 400 });
+      return jsonError('Missing mission id.', 400);
     }
 
-    if (!userId || !userMissionId || !Number.isInteger(turnNumber) || turnNumber < 1) {
-      return json({ error: 'Missing required fields.' }, { status: 400 });
+    if (
+      !userIdResult.ok ||
+      !userMissionIdResult.ok ||
+      !Number.isInteger(turnNumber) ||
+      turnNumber < 1
+    ) {
+      return jsonError('Missing required fields.', 400);
     }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
+    const userMissionId = userMissionIdResult.value;
+    const responseText = String(body.response ?? '');
+    const selectedChoiceIndex = body.selectedChoiceIndex;
 
     const userMission = await getUserMission(userMissionId);
     if (!userMission) {
-      return json({ error: 'User mission not found.' }, { status: 404 });
+      return jsonError('User mission not found.', 404);
     }
 
     if (userMission.userId !== userId) {
-      return json({ error: 'Forbidden.' }, { status: 403 });
+      return jsonError('Forbidden.', 403);
     }
 
     if (userMission.status !== 'in_progress') {
-      return json({ error: 'Mission is not in progress.' }, { status: 400 });
+      return jsonError('Mission is not in progress.', 400);
     }
 
     const mission = await getMissionById(missionId);
     if (!mission) {
-      return json({ error: 'Mission not found.' }, { status: 404 });
+      return jsonError('Mission not found.', 404);
     }
 
     if (mission.id !== userMission.missionId) {
-      return json({ error: 'Mission mismatch for user mission.' }, { status: 400 });
+      return jsonError('Mission mismatch for user mission.', 400);
     }
 
     const conversationLog: MissionTurn[] = [...userMission.conversationLog];
     const turnIndex = conversationLog.findIndex((turn) => turn.turnNumber === turnNumber);
     if (turnIndex < 0) {
-      return json({ error: 'Turn not found in conversation log.' }, { status: 400 });
+      return jsonError('Turn not found in conversation log.', 400);
     }
 
     const currentTurn = conversationLog[turnIndex];
     if (currentTurn.userResponse) {
-      return json({ error: 'Turn has already been answered.' }, { status: 400 });
+      return jsonError('Turn has already been answered.', 400);
     }
 
     const mode = userMission.mode;
@@ -75,20 +95,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
     if (typeof selectedChoiceIndex === 'number' || mode === 'practice') {
       const choices = currentTurn.choices ?? [];
       if (!Array.isArray(choices) || choices.length === 0) {
-        return json({ error: 'No choices available for this turn.' }, { status: 400 });
+        return jsonError('No choices available for this turn.', 400);
       }
 
       if (typeof selectedChoiceIndex !== 'number' || !Number.isInteger(selectedChoiceIndex)) {
-        return json(
-          { error: 'selectedChoiceIndex is required in practice mode.' },
-          { status: 400 },
-        );
+        return jsonError('selectedChoiceIndex is required in practice mode.', 400);
       }
 
       const selectedIndex: number = selectedChoiceIndex;
 
       if (selectedIndex < 0 || selectedIndex >= choices.length) {
-        return json({ error: 'selectedChoiceIndex out of range.' }, { status: 400 });
+        return jsonError('selectedChoiceIndex out of range.', 400);
       }
 
       const selectedChoice = choices[selectedIndex];
@@ -101,7 +118,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     } else {
       const trimmedResponse = responseText.trim();
       if (!trimmedResponse) {
-        return json({ error: 'Response text is required in immersion mode.' }, { status: 400 });
+        return jsonError('Response text is required in immersion mode.', 400);
       }
 
       const evaluation = await evaluateUserResponse({
@@ -143,7 +160,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         mode,
         turnNumber: turnNumber + 1,
         totalTurns: config.missions.maxTurnsPerMission,
-        conversationHistory: conversationLog,
+        conversationHistory: [...conversationLog],
         userLevel: undefined,
       });
 
@@ -172,6 +189,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
       error,
       missionId: params.id,
     });
-    return json({ error: 'Failed to process mission response.' }, { status: 500 });
+    return jsonError('Failed to process mission response.', 500);
   }
 };
