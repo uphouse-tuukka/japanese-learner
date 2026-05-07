@@ -1,5 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import type { SessionSummary } from '$lib/types';
 import {
   completeSessionRecord,
@@ -116,19 +118,32 @@ function buildSummary(userId: string, sessionId: string, results: ResultPayload[
   };
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as CompleteRequest;
-    const userId = String(body.userId ?? '').trim();
-    const sessionId = String(body.sessionId ?? '').trim();
-    const results = parseResults(body.results);
-
-    if (!userId || !sessionId) {
-      return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 });
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
     }
 
+    const body = bodyResult.value as CompleteRequest;
+    const userIdResult = requireStringField(body, 'userId');
+    const sessionIdResult = requireStringField(body, 'sessionId');
+
+    if (!userIdResult.ok || !sessionIdResult.ok) {
+      return jsonError('Missing userId or sessionId.', 400);
+    }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
+    const sessionId = sessionIdResult.value;
+    const results = parseResults(body.results);
+
     if (!results) {
-      return json({ ok: false, error: 'Missing or invalid results.' }, { status: 400 });
+      return jsonError('Missing or invalid results.', 400);
     }
 
     await insertExerciseResults({
