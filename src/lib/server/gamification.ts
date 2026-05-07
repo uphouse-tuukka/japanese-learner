@@ -418,6 +418,16 @@ export function calculateMissionXp(input: {
   };
 }
 
+export function calculateNewMilestones(
+  newTotalXp: number,
+  unlockedMilestoneKeys: Iterable<string> = [],
+): Milestone[] {
+  const unlockedKeys = new Set(unlockedMilestoneKeys);
+  return MILESTONES.filter(
+    (milestone) => milestone.xpThreshold <= newTotalXp && !unlockedKeys.has(milestone.key),
+  );
+}
+
 export async function updateStreakAndGoal(
   userId: string,
   todayDateStr: string,
@@ -474,10 +484,9 @@ export async function checkAndUnlockMilestones(
   newTotalXp: number,
 ): Promise<Milestone[]> {
   const unlocked = await getUnlockedMilestones(userId);
-  const unlockedKeys = new Set(unlocked.map((milestone) => milestone.milestoneKey));
-
-  const toUnlock = MILESTONES.filter(
-    (milestone) => milestone.xpThreshold <= newTotalXp && !unlockedKeys.has(milestone.key),
+  const toUnlock = calculateNewMilestones(
+    newTotalXp,
+    unlocked.map((milestone) => milestone.milestoneKey),
   );
 
   if (toUnlock.length > 0) {

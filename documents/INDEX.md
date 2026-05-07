@@ -106,7 +106,7 @@ Use this index before following older plans or decisions. Status labels are cons
 - Status: planning
 - Description: Broad internal technical-debt plan. Partially implemented; check task checkboxes and current code before executing any lane.
 - Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals, API/profile boundaries, UI modularization
-- Last verified: 2026-05-06
+- Last verified: 2026-05-07
 
 ### `documents/plans/2026-03-27-travel-missions-design.md`
 

@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -228,15 +228,30 @@ Completed tasks:
 
 - [x] Task 4.5 — Added minimal shared API helpers in `src/lib/server/api.ts` with focused tests in `src/lib/server/api.test.ts`. No existing routes were migrated in this batch.
 
+### Completed targeted gamification/auth test batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `test: cover gamification and auth boundaries`
+
+**Validation:** `npm test -- src/lib/server/gamification.test.ts src/lib/server/auth.test.ts` passed with `18` targeted tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`113` tests / `16` files), and production build. `git diff --check` passed. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed tasks:
+
+- [x] Task 5.1 — Added pure gamification tests for session XP, mission XP, combo/perfect bonuses, date-string streak behavior, and milestone threshold detection. Exposed a minimal pure `calculateNewMilestones` helper and reused it in existing unlock logic without behavior changes.
+- [x] Task 5.3 — Added auth/session token tests for valid tokens, tampered signatures, expired/future timestamps, signature length mismatches, and `AUTH_SECRET` override behavior.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
-2. Continue API/profile boundary hardening after tests are in place: Task 8.1, then one low-risk route migration in Task 8.2 using the shared API helpers.
+1. Finish targeted request-boundary tests: Task 5.2 for session/practice completion APIs.
+2. Continue API/profile boundary hardening after completion route tests are in place: Task 8.1, then one low-risk route migration in Task 8.2 using the shared API helpers.
 3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 
-Still incomplete from the whole plan: targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers now exist, but route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: completion API request-validation tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers now exist, but route adoption remains intentionally incomplete.
 
 ---
 
