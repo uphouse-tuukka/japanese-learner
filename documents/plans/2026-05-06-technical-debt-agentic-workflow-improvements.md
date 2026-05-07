@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -214,15 +214,29 @@ Completed tasks:
 
 - [x] Task 2.4 — Updated vulnerable dependency versions with non-force npm remediation. Added a `cookie` override at `0.7.2` because current `@sveltejs/kit` `2.59.1` still declares `cookie` `^0.6.0`; remove the override once upstream ships a safe compatible range.
 
+### Completed shared API helper batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: add shared API helpers`
+
+**Validation:** `npm test -- src/lib/server/api.test.ts` passed with `10` tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`95` tests / `14` files), and production build. Existing Vercel optional dependency warnings were unchanged. `git diff --check` passed.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved after one Prettier formatting fix.
+
+Completed tasks:
+
+- [x] Task 4.5 — Added minimal shared API helpers in `src/lib/server/api.ts` with focused tests in `src/lib/server/api.test.ts`. No existing routes were migrated in this batch.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue low-risk helper extraction: Task 4.5.
-2. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+1. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+2. Continue API/profile boundary hardening after tests are in place: Task 8.1, then one low-risk route migration in Task 8.2 using the shared API helpers.
 3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 
-Still incomplete from the whole plan: API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
+Still incomplete from the whole plan: targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers now exist, but route adoption remains intentionally incomplete.
 
 ---
 
