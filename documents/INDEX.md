@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-07
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -144,6 +144,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Description: Decision record for hybrid inline audio: structured exercise data plus Japanese text auto-detection.
 - Source files affected: `src/lib/utils/japanese.ts`, `src/lib/components/InlineAudio.svelte`, `src/lib/components/RichJapaneseText.svelte`, TTS utilities, exercise components
 - Last verified: 2026-05-06
+
+### `documents/decisions/003-selected-user-api-boundary.md`
+
+- Status: decision
+- Description: Decision record for enforcing present `selected_user` cookies against body `userId` on migrated profile-scoped write APIs while allowing absent cookies for compatibility.
+- Source files affected: `src/lib/server/selected-user.ts`, migrated profile-scoped write routes under `src/routes/api/**`
+- Last verified: 2026-05-07
 
 ## Analyses
 

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateSessionPlan, TOPIC_CATEGORIES } from '$lib/server/ai';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import {
   attachExercisesToSession,
   createSessionRecord,
@@ -11,6 +12,7 @@ import {
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { withAbort } from '$lib/server/async';
 import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 import type { Exercise, Lesson, Session, SessionMiniLesson } from '$lib/types';
@@ -58,15 +60,26 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
   };
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as GenerateRequest;
-    const userId = String(body.userId ?? '').trim();
-    const exerciseCount = Math.min(Math.max(Number(body.exerciseCount ?? 6), 4), 12);
-
-    if (!userId) {
-      return json({ ok: false, error: 'Missing userId.' }, { status: 400 });
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
     }
+
+    const body = bodyResult.value as GenerateRequest;
+    const userIdResult = requireStringField(body, 'userId');
+    if (!userIdResult.ok) {
+      return jsonError(userIdResult.error, 400);
+    }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
+    const exerciseCount = Math.min(Math.max(Number(body.exerciseCount ?? 6), 4), 12);
 
     await deleteStaleGhostSessions(userId);
 
@@ -85,7 +98,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const user = await getUser(userId);
     if (!user) {
-      return json({ ok: false, error: 'User not found.' }, { status: 404 });
+      return jsonError('User not found.', 404);
     }
 
     const priorSessions = await getSessionsForUser(userId, 10);
@@ -324,12 +337,9 @@ export const POST: RequestHandler = async ({ request }) => {
     return json(response);
   } catch (error) {
     if (error instanceof Error && error.message === 'timeout') {
-      return json(
-        { ok: false, error: 'Session generation timed out. Please try again.' },
-        { status: 503 },
-      );
+      return jsonError('Session generation timed out. Please try again.', 503);
     }
     console.error('[api/session/generate] failed', { error });
-    return json({ ok: false, error: 'Failed to generate AI teaching session.' }, { status: 500 });
+    return jsonError('Failed to generate AI teaching session.', 500);
   }
 };
