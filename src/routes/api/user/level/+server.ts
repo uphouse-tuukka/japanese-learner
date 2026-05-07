@@ -1,34 +1,43 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import { getUserById, updateUserLevel } from '$lib/server/db';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import { LEVEL_ORDER, type UserLevel } from '$lib/types';
-
-type LevelUpdateRequest = {
-  userId?: string;
-  level?: string;
-};
 
 function isValidLevel(value: string): value is UserLevel {
   return LEVEL_ORDER.includes(value as UserLevel);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as LevelUpdateRequest;
-    const userId = String(body.userId ?? '').trim();
-    const level = String(body.level ?? '').trim();
-
-    if (!userId || !level) {
-      return json({ ok: false, error: 'Missing userId or level.' }, { status: 400 });
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
     }
 
+    const body = bodyResult.value;
+    const userIdResult = requireStringField(body, 'userId');
+    const levelResult = requireStringField(body, 'level');
+
+    if (!userIdResult.ok || !levelResult.ok) {
+      return jsonError('Missing userId or level.', 400);
+    }
+
+    const level = levelResult.value;
     if (!isValidLevel(level)) {
-      return json({ ok: false, error: 'Invalid level.' }, { status: 400 });
+      return jsonError('Invalid level.', 400);
     }
 
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
     const user = await getUserById(userId);
     if (!user) {
-      return json({ ok: false, error: 'User not found.' }, { status: 404 });
+      return jsonError('User not found.', 404);
     }
 
     await updateUserLevel(userId, level);
@@ -36,6 +45,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ ok: true, level });
   } catch (error) {
     console.error('[api/user/level] failed', { error });
-    return json({ ok: false, error: 'Failed to update user level.' }, { status: 500 });
+    return jsonError('Failed to update user level.', 500);
   }
 };
