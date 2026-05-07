@@ -1,25 +1,43 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import { getUserById, updateJapaneseWritingSetting } from '$lib/server/db';
+import { matchSelectedUser } from '$lib/server/selected-user';
 
-type WritingToggleRequest = {
-  userId?: string;
-  enabled?: boolean;
-};
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
 
-export const POST: RequestHandler = async ({ request }) => {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as WritingToggleRequest;
-    const userId = String(body.userId ?? '').trim();
-    const enabled = body.enabled;
-
-    if (!userId || typeof enabled !== 'boolean') {
-      return json({ ok: false, error: 'Missing userId or enabled.' }, { status: 400 });
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
     }
+
+    const body = bodyResult.value;
+    const userIdResult = requireStringField(body, 'userId');
+    const enabled = isPlainObject(body) ? body.enabled : undefined;
+
+    if (!userIdResult.ok || typeof enabled !== 'boolean') {
+      return jsonError('Missing userId or enabled.', 400);
+    }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
 
     const user = await getUserById(userId);
     if (!user) {
-      return json({ ok: false, error: 'User not found.' }, { status: 404 });
+      return jsonError('User not found.', 404);
     }
 
     await updateJapaneseWritingSetting(userId, enabled);
