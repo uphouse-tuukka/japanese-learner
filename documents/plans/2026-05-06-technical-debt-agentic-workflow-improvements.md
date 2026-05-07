@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -170,6 +170,20 @@ Completed tasks:
 
 - [x] Task 2.3 — Added Node/npm runtime expectations: `package.json` `engines.node`, `packageManager`, `.nvmrc`, README setup guidance, package-lock metadata, and CI `node-version-file: .nvmrc`.
 - [x] Task 3.3 — Synchronized env documentation and parsing for `AUTH_SECRET`, `MISSIONS_UNLOCK_ALL`, `SESSION_GENERATION_TIMEOUT_MS`, OpenAI TTS availability, and deprecated/unused `MONTHLY_TOKEN_BUDGET`.
+
+### Completed Node 24 runtime follow-up
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: upgrade pinned runtime to node 24`
+
+**Validation:** Node `v24.15.0` with npm `11.12.1`; `npm install --package-lock-only`, `npm ci`, and `npm run validate:ci` passed after the update. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** Node 24 compatibility was checked against Vercel Node runtime documentation and package engine ranges before changing the pin.
+
+Completed follow-up:
+
+- [x] Updated Task 2.3 runtime pin from Node 22 to Node 24 after confirming no project-specific reason to stay on Node 22.
 
 ### Next recommended starting point
 

@@ -23,8 +23,8 @@ Minimal full-stack Japanese learning app with:
    ```bash
    nvm install
    nvm use
-   node --version # v22.21.1
-   npm --version  # 10.9.4
+   node --version # v24.15.0
+   npm --version  # 11.12.1
    ```
 2. Install dependencies:
    ```bash
