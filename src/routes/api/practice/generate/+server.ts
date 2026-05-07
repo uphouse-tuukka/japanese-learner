@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { dev } from '$app/environment';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import {
   attachExercisesToSession,
   createSessionRecord,
@@ -8,6 +9,7 @@ import {
 } from '$lib/server/db';
 import { getDebugExercises } from '$lib/server/debug-exercises';
 import { buildPracticeSession } from '$lib/server/practice';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import type { ExerciseType } from '$lib/types';
 
 type GenerateRequest = {
@@ -29,10 +31,25 @@ function isExerciseType(value: string): value is ExerciseType {
   return EXERCISE_TYPES.includes(value as ExerciseType);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as GenerateRequest;
-    const userId = String(body.userId ?? '').trim();
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
+    }
+
+    const body = bodyResult.value as GenerateRequest;
+    const userIdResult = requireStringField(body, 'userId');
+    if (!userIdResult.ok) {
+      return jsonError('Missing userId.', 400);
+    }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
     const exerciseCount = typeof body.exerciseCount === 'number' ? body.exerciseCount : undefined;
     const debugExerciseTypeValue =
       typeof body.debugExerciseType === 'string' ? body.debugExerciseType.trim() : undefined;
@@ -41,12 +58,8 @@ export const POST: RequestHandler = async ({ request }) => {
         ? debugExerciseTypeValue
         : undefined;
 
-    if (!userId) {
-      return json({ ok: false, error: 'Missing userId.' }, { status: 400 });
-    }
-
     if (dev && debugExerciseTypeValue && !debugExerciseType) {
-      return json({ ok: false, error: 'Invalid debugExerciseType.' }, { status: 400 });
+      return jsonError('Invalid debugExerciseType.', 400);
     }
 
     await deleteStaleGhostSessions(userId);
