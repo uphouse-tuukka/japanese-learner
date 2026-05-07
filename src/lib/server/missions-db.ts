@@ -248,6 +248,7 @@ export async function createUserMission(input: {
   userId: string;
   missionId: string;
   mode: MissionMode;
+  conversationLog?: MissionTurn[];
 }): Promise<string> {
   const db = await getDb();
   const id = `usermission-${randomUUID()}`;
@@ -268,9 +269,16 @@ INSERT INTO user_missions (
   completed_at,
   created_at
 )
-VALUES (?, ?, ?, ?, 'in_progress', 0, 0, 0, 0, 0, '[]', NULL, ?)
+VALUES (?, ?, ?, ?, 'in_progress', 0, 0, 0, 0, 0, ?, NULL, ?)
 `,
-    args: [id, input.userId, input.missionId, input.mode, nowIso()],
+    args: [
+      id,
+      input.userId,
+      input.missionId,
+      input.mode,
+      JSON.stringify(input.conversationLog ?? []),
+      nowIso(),
+    ],
   });
   return id;
 }

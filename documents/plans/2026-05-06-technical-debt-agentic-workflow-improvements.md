@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`; mission start API boundary batch completed in commit `chore: harden mission start API boundary`; mission response API boundary batch completed in commit `chore: harden mission response API boundary`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`; mission start API boundary batch completed in commit `chore: harden mission start API boundary`; mission response API boundary batch completed in commit `chore: harden mission response API boundary`; mission-start atomicity batch completed in commit `chore: harden mission start atomicity`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -384,16 +384,30 @@ Completed task:
 
 - [x] Task 8.3 mission-response slice — Migrated `src/routes/api/missions/[id]/respond/+server.ts` to shared JSON/error helpers and selected-user matching. Added route tests for matching selected user, absent selected-user cookie compatibility, mismatch `403` with no DB/AI/token/update side effects, invalid JSON `400` with no side effects, missing/blank `userId`, missing/blank `userMissionId`, invalid `turnNumber`, blank selected-user cookie validation, practice-mode success response shape preservation, and immersion last-turn behavior without next-turn generation. The successful `MissionRespondResponse` shape remains unchanged.
 
+### Completed mission-start atomicity batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: harden mission start atomicity`
+
+**Validation:** TDD RED was observed before production changes (`4` failing tests / `10` passing tests in `src/routes/api/missions/[id]/start.server.test.ts`), then GREEN after implementation (`14`/`14` targeted tests passing). Related mission-route subset `npm test -- 'src/routes/api/missions/[id]/start.server.test.ts' 'src/routes/api/missions/[id]/respond.server.test.ts' 'src/routes/api/missions/[id]/complete.server.test.ts'` passed with `34` tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`211` tests / `25` files), and production build. `git diff --check` passed. Added-line security scan covered `90` added lines and found no findings. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved. `npm run validate:ci` initially caught a Prettier issue in `src/routes/api/missions/[id]/start.server.test.ts`; formatting was fixed before the successful full gate.
+
+Completed task:
+
+- [x] Task 8.4 — Hardened the mission-start failure path by generating the initial mission turn and recording token usage before creating the `user_mission` row. `createUserMission` now accepts an optional initial `conversationLog`, and mission start creates the row with `[generated.turn]` instead of creating an empty row and then calling `updateUserMission`. The successful `MissionStartResponse` shape remains unchanged, and generation/token-recording failures now return `500` without creating or updating a `user_mission` row.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Address the mission-start atomicity follow-up in Task 8.4. All Task 8.3 high-risk write API candidates listed in Phase 8 now have individual boundary-hardening slices, including `missions/[id]/respond`; keep any atomicity/failure-path change isolated from route boundary cleanup.
-2. Continue staged decomposition after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+1. Continue staged decomposition after helper/test/API boundaries are in place: DB internals (Phase 6), starting with Task 6.1.
+2. Continue AI internals (Phase 7) after the DB boundary work has a clean handoff, or as a separate non-overlapping lane.
 3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 4. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
 
-Still incomplete from the whole plan: DB decomposition, AI decomposition, mission-start atomicity follow-up, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, and every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB decomposition, AI decomposition, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, and Task 8.4 mission-start atomicity is complete; broader route adoption remains intentionally incomplete.
 
 ---
 

@@ -6,7 +6,6 @@ import {
   createUserMission,
   getCategorySessionCount,
   getMissionById,
-  updateUserMission,
 } from '$lib/server/missions-db';
 import { generateMissionTurn, recordMissionTokenUsage } from '$lib/server/missions-ai';
 import { config } from '$lib/server/config';
@@ -80,8 +79,6 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       return jsonError('Mission is locked.', 403);
     }
 
-    const userMissionId = await createUserMission({ userId, missionId: mission.id, mode });
-
     const generated = await generateMissionTurn({
       mission,
       mode,
@@ -92,7 +89,13 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     });
 
     await recordMissionTokenUsage(userId, generated.tokenUsage);
-    await updateUserMission(userMissionId, { conversationLog: [generated.turn] });
+
+    const userMissionId = await createUserMission({
+      userId,
+      missionId: mission.id,
+      mode,
+      conversationLog: [generated.turn],
+    });
 
     const response: MissionStartResponse = {
       userMissionId,

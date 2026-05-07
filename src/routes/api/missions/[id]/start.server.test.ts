@@ -207,11 +207,6 @@ describe('POST /api/missions/[id]/start', () => {
     expect(mockGetMissionById).toHaveBeenCalledWith('mission-1');
     expect(mockCheckBudget).toHaveBeenCalledWith('user-1');
     expect(mockGetCategorySessionCount).toHaveBeenCalledWith('user-1', 'food');
-    expect(mockCreateUserMission).toHaveBeenCalledWith({
-      userId: 'user-1',
-      missionId: 'mission-1',
-      mode: 'practice',
-    });
     expect(mockGenerateMissionTurn).toHaveBeenCalledWith({
       mission: mission(),
       mode: 'practice',
@@ -221,9 +216,13 @@ describe('POST /api/missions/[id]/start', () => {
       userLevel: undefined,
     });
     expect(mockRecordMissionTokenUsage).toHaveBeenCalledWith('user-1', tokenUsage);
-    expect(mockUpdateUserMission).toHaveBeenCalledWith('user-mission-1', {
+    expect(mockCreateUserMission).toHaveBeenCalledWith({
+      userId: 'user-1',
+      missionId: 'mission-1',
+      mode: 'practice',
       conversationLog: [turn],
     });
+    expect(mockUpdateUserMission).not.toHaveBeenCalled();
   });
 
   it('starts a mission when no selected_user cookie is present', async () => {
@@ -241,11 +240,58 @@ describe('POST /api/missions/[id]/start', () => {
       userId: 'user-1',
       missionId: 'mission-1',
       mode: 'immersion',
-    });
-    expect(mockRecordMissionTokenUsage).toHaveBeenCalledWith('user-1', tokenUsage);
-    expect(mockUpdateUserMission).toHaveBeenCalledWith('user-mission-1', {
       conversationLog: [turn],
     });
+    expect(mockRecordMissionTokenUsage).toHaveBeenCalledWith('user-1', tokenUsage);
+    expect(mockUpdateUserMission).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 without creating, recording tokens, or updating when initial turn generation fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGenerateMissionTurn.mockRejectedValueOnce(new Error('AI unavailable'));
+
+    const response = await startMission({ userId: 'user-1', mode: 'practice' }, 'user-1');
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to start mission.',
+    });
+    expect(mockGenerateMissionTurn).toHaveBeenCalledWith({
+      mission: mission(),
+      mode: 'practice',
+      turnNumber: 1,
+      totalTurns: config.missions.maxTurnsPerMission,
+      conversationHistory: [],
+      userLevel: undefined,
+    });
+    expect(mockCreateUserMission).not.toHaveBeenCalled();
+    expect(mockRecordMissionTokenUsage).not.toHaveBeenCalled();
+    expect(mockUpdateUserMission).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 without creating or updating when token recording fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockRecordMissionTokenUsage.mockRejectedValueOnce(new Error('token write failed'));
+
+    const response = await startMission({ userId: 'user-1', mode: 'practice' }, 'user-1');
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to start mission.',
+    });
+    expect(mockGenerateMissionTurn).toHaveBeenCalledWith({
+      mission: mission(),
+      mode: 'practice',
+      turnNumber: 1,
+      totalTurns: config.missions.maxTurnsPerMission,
+      conversationHistory: [],
+      userLevel: undefined,
+    });
+    expect(mockRecordMissionTokenUsage).toHaveBeenCalledWith('user-1', tokenUsage);
+    expect(mockCreateUserMission).not.toHaveBeenCalled();
+    expect(mockUpdateUserMission).not.toHaveBeenCalled();
   });
 
   it('returns 403 before mission DB, budget, AI, token, or update calls when selected_user does not match body userId', async () => {
