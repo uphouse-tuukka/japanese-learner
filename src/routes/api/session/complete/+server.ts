@@ -24,13 +24,39 @@ type ResultPayload = {
 type CompleteRequest = {
   userId?: string;
   sessionId?: string;
-  results?: ResultPayload[];
+  results?: unknown;
   lessonTopic?: string;
   category?: string;
   keyPhrases?: string[];
   culturalNote?: string;
   localDate?: string;
 };
+
+function isResultPayload(value: unknown): value is ResultPayload {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.exerciseId === 'string' &&
+    result.exerciseId.trim().length > 0 &&
+    typeof result.answerText === 'string' &&
+    typeof result.isCorrect === 'boolean'
+  );
+}
+
+function parseResults(value: unknown): ResultPayload[] | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+
+  if (!value.every(isResultPayload)) {
+    return null;
+  }
+
+  return value;
+}
 
 function buildFallbackSummary(
   userId: string,
@@ -95,10 +121,14 @@ export const POST: RequestHandler = async ({ request }) => {
     const body = (await request.json()) as CompleteRequest;
     const userId = String(body.userId ?? '').trim();
     const sessionId = String(body.sessionId ?? '').trim();
-    const results = Array.isArray(body.results) ? body.results : [];
+    const results = parseResults(body.results);
 
     if (!userId || !sessionId) {
       return json({ ok: false, error: 'Missing userId or sessionId.' }, { status: 400 });
+    }
+
+    if (!results) {
+      return json({ ok: false, error: 'Missing or invalid results.' }, { status: 400 });
     }
 
     await insertExerciseResults({

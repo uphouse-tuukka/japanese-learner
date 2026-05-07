@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -243,15 +243,29 @@ Completed tasks:
 - [x] Task 5.1 — Added pure gamification tests for session XP, mission XP, combo/perfect bonuses, date-string streak behavior, and milestone threshold detection. Exposed a minimal pure `calculateNewMilestones` helper and reused it in existing unlock logic without behavior changes.
 - [x] Task 5.3 — Added auth/session token tests for valid tokens, tampered signatures, expired/future timestamps, signature length mismatches, and `AUTH_SECRET` override behavior.
 
+### Completed completion API boundary test batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `test: cover completion API boundaries`
+
+**Validation:** `npm test -- src/routes/api/session/complete.server.test.ts src/routes/api/practice/complete.server.test.ts` passed with `14` targeted tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`127` tests / `18` files), and production build. `git diff --check` passed. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved after one Prettier formatting fix.
+
+Completed tasks:
+
+- [x] Task 5.2 — Added route request-boundary tests for session/practice completion APIs covering missing `userId`, missing `sessionId`, malformed/non-array results, empty results, fallback/local summary paths without real OpenAI/Turso, and non-fatal XP failures. Added minimal route-local result validation so invalid or empty result payloads return `400` without writing DB records; valid frontend payloads and successful response shapes are preserved.
+
 ### Next recommended starting point
 
 Do not redo the completed first/docs/reproducibility/dependency/helper/test batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Finish targeted request-boundary tests: Task 5.2 for session/practice completion APIs.
-2. Continue API/profile boundary hardening after completion route tests are in place: Task 8.1, then one low-risk route migration in Task 8.2 using the shared API helpers.
-3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+1. Continue API/profile boundary hardening now that completion route tests are in place: Task 8.1, then one low-risk route migration in Task 8.2 using the shared API helpers.
+2. Continue staged decomposition after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 
-Still incomplete from the whole plan: completion API request-validation tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers now exist, but route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers now exist and completion routes now have local result validation, but route adoption of shared helpers remains intentionally incomplete.
 
 ---
 
