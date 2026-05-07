@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -342,15 +342,29 @@ Completed task:
 
 - [x] Task 8.3 practice-completion slice — Migrated `src/routes/api/practice/complete/+server.ts` to shared JSON/error helpers and selected-user matching. Added route tests for matching selected user, absent selected-user cookie compatibility, mismatch `403` with no DB/AI/token/XP/background writes, invalid JSON `400` with no side effects, blank `userId`, blank selected-user cookie validation, existing invalid result payload handling, local-summary behavior, and XP failure non-fatal behavior.
 
+### Completed mission completion API boundary batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: harden mission completion API boundary`
+
+**Validation:** `npm test -- src/routes/api/missions/[id]/complete.server.test.ts src/routes/api/practice/complete.server.test.ts src/routes/api/session/complete.server.test.ts` passed with `35` targeted tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`187` tests / `23` files), and production build. `git diff --check` passed. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed task:
+
+- [x] Task 8.3 mission-completion slice — Migrated `src/routes/api/missions/[id]/complete/+server.ts` to shared JSON/error helpers and selected-user matching. Added route tests for matching selected user, absent selected-user cookie compatibility, mismatch `403` with no DB/gamification writes, invalid JSON `400` with no DB/gamification writes, missing or blank `userId`/`userMissionId`, blank selected-user cookie validation, and the existing user-mission/body-user mismatch path. The successful `MissionCompleteResponse` shape remains unchanged.
+
 ### Next recommended starting point
 
 Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue API/profile boundary hardening with Task 8.3: migrate the next high-risk write API one route per task/commit with route tests first. Do not redo the selected-user helper, `writing-toggle`, `level`, `practice/generate`, `session/generate`, `session/complete`, or `practice/complete` migrations. Good next candidates are the mission write routes.
+1. Continue API/profile boundary hardening with Task 8.3: migrate the next high-risk write API one route per task/commit with route tests first. Do not redo the selected-user helper, `writing-toggle`, `level`, `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, or `missions/[id]/complete` migrations. Good next candidates are `src/routes/api/missions/[id]/start/+server.ts` and `src/routes/api/missions/[id]/respond/+server.ts`.
 2. Continue staged decomposition after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 
-Still incomplete from the whole plan: DB decomposition, AI decomposition, remaining high-risk API/profile route migrations, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, and `practice/generate`, `session/generate`, `session/complete`, plus `practice/complete` now use the helper pattern; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB decomposition, AI decomposition, remaining high-risk API/profile route migrations, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, and `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, plus `missions/[id]/complete` now use the helper pattern; broader route adoption remains intentionally incomplete.
 
 ---
 

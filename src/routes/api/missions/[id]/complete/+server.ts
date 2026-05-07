@@ -1,5 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import type { MissionCompleteResponse } from '$lib/types';
 import {
   awardBadge,
@@ -16,28 +18,41 @@ type CompleteMissionRequest = {
   naturalPhrasings?: number;
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const body = (await request.json()) as CompleteMissionRequest;
-    const userId = String(body.userId ?? '').trim();
-    const userMissionId = String(body.userMissionId ?? '').trim();
-    const naturalPhrasings = Math.max(0, Math.floor(Number(body.naturalPhrasings ?? 0)));
-
-    if (!userId || !userMissionId) {
-      return json({ ok: false, error: 'Missing userId or userMissionId.' }, { status: 400 });
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
     }
+
+    const body = bodyResult.value as CompleteMissionRequest;
+    const userIdResult = requireStringField(body, 'userId');
+    const userMissionIdResult = requireStringField(body, 'userMissionId');
+
+    if (!userIdResult.ok || !userMissionIdResult.ok) {
+      return jsonError('Missing userId or userMissionId.', 400);
+    }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
+    const userMissionId = userMissionIdResult.value;
+    const naturalPhrasings = Math.max(0, Math.floor(Number(body.naturalPhrasings ?? 0)));
 
     const userMission = await getUserMission(userMissionId);
     if (!userMission) {
-      return json({ ok: false, error: 'Mission progress not found.' }, { status: 404 });
+      return jsonError('Mission progress not found.', 404);
     }
 
     if (userMission.userId !== userId) {
-      return json({ ok: false, error: 'Forbidden.' }, { status: 403 });
+      return jsonError('Forbidden.', 403);
     }
 
     if (userMission.status !== 'in_progress') {
-      return json({ ok: false, error: 'Mission is not in progress.' }, { status: 400 });
+      return jsonError('Mission is not in progress.', 400);
     }
 
     const exchanges = userMission.exchanges;
@@ -64,7 +79,7 @@ export const POST: RequestHandler = async ({ request }) => {
       if (!badgeAlreadyEarned) {
         const mission = await getMissionById(userMission.missionId);
         if (!mission) {
-          return json({ ok: false, error: 'Mission not found.' }, { status: 404 });
+          return jsonError('Mission not found.', 404);
         }
 
         earnedBadge = await awardBadge({
@@ -98,6 +113,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json(response);
   } catch (error) {
     console.error('[api/missions/[id]/complete] failed', { error });
-    return json({ ok: false, error: 'Failed to complete mission.' }, { status: 500 });
+    return jsonError('Failed to complete mission.', 500);
   }
 };
