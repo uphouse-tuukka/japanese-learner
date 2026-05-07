@@ -1,5 +1,4 @@
-import { env } from '$env/dynamic/private';
-import { config } from '$lib/config';
+import { config, resolveAuthSecretOverride } from '$lib/server/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -25,7 +24,7 @@ function createSignature(username: string, timestamp: string, secret: string): s
 }
 
 export function getAuthSecret(): string {
-  const configuredSecret = env.AUTH_SECRET?.trim();
+  const configuredSecret = resolveAuthSecretOverride();
   if (configuredSecret) {
     return configuredSecret;
   }

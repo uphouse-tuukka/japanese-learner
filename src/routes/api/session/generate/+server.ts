@@ -9,6 +9,7 @@ import {
   getSessionsForUser,
 } from '$lib/server/db';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
+import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 import type { Exercise, Lesson, Session, SessionMiniLesson } from '$lib/types';
@@ -42,7 +43,6 @@ type SessionHistoryItem = {
   keyPhrases: string[];
 };
 
-const DEFAULT_GENERATION_TIMEOUT_MS = 30_000;
 const MAX_GENERATION_ATTEMPTS = 2;
 
 function legacySummaryToHistory(summary: string): SessionHistoryItem {
@@ -55,14 +55,6 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
     nextSteps: [],
     keyPhrases: summary.trim() ? [summary.trim().slice(0, 120)] : [],
   };
-}
-
-function resolveGenerationTimeoutMs(): number {
-  const raw = Number(process.env.SESSION_GENERATION_TIMEOUT_MS ?? DEFAULT_GENERATION_TIMEOUT_MS);
-  if (!Number.isFinite(raw)) {
-    return DEFAULT_GENERATION_TIMEOUT_MS;
-  }
-  return Math.max(1, Math.floor(raw));
 }
 
 function waitForAbort(signal: AbortSignal): Promise<never> {
@@ -260,7 +252,10 @@ export const POST: RequestHandler = async ({ request }) => {
       .map((item) => item.answerText.trim());
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort('timeout'), resolveGenerationTimeoutMs());
+    const timeoutId = setTimeout(
+      () => controller.abort('timeout'),
+      resolveSessionGenerationTimeoutMs(),
+    );
     let plan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
 
     try {

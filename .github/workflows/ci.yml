@@ -20,8 +20,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Task 2.3 will pin this via .nvmrc/package.json engines; use the current local major meanwhile.
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies

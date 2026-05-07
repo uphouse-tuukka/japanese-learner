@@ -1,12 +1,12 @@
 import type { LayoutServerLoad } from './$types';
 import { dev } from '$app/environment';
-import { env } from '$env/dynamic/private';
+import { hasOpenAiApiKey, resolveOpenAiTtsEnabled } from '$lib/config';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
   return {
     dev,
-    useOpenAiTts: env.USE_OPENAI_TTS?.toLowerCase() === 'true',
-    ttsServerAvailable: Boolean(env.OPENAI_API_KEY?.trim()),
+    useOpenAiTts: resolveOpenAiTtsEnabled(),
+    ttsServerAvailable: hasOpenAiApiKey(),
     authenticated: locals.authenticated,
     isPortfolio: url.pathname.startsWith('/portfolio/'),
   };

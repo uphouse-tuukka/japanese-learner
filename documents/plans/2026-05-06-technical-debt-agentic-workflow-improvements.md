@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -156,15 +156,30 @@ Completed tasks:
 - [x] Task 1.3 — Added reusable plan/decision/review templates under `documents/templates/` and linked them from `documents/CONTRIBUTING.md`.
 - [x] Task 3.2 — Added `documents/INDEX.md` with status labels for current docs and linked it from `README.md`.
 
+### Completed third reproducibility/env batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: pin runtime and sync env config`
+
+**Validation:** `npm install --package-lock-only` and `npm run validate:ci` passed after the batch. Validation included formatting, Svelte check, ESLint, Vitest (`82` tests), and production build. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved. One minor reviewer suggestion to harden `AUTH_SECRET` documentation was addressed before commit.
+
+Completed tasks:
+
+- [x] Task 2.3 — Added Node/npm runtime expectations: `package.json` `engines.node`, `packageManager`, `.nvmrc`, README setup guidance, package-lock metadata, and CI `node-version-file: .nvmrc`.
+- [x] Task 3.3 — Synchronized env documentation and parsing for `AUTH_SECRET`, `MISSIONS_UNLOCK_ALL`, `SESSION_GENERATION_TIMEOUT_MS`, OpenAI TTS availability, and deprecated/unused `MONTHLY_TOKEN_BUDGET`.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Finish reproducibility/env hygiene: Task 2.3, Task 3.3.
-2. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
-3. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+1. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
+2. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 
-Still incomplete from the whole plan: Node/npm pinning, env synchronization, timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
+Still incomplete from the whole plan: timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
 
 ---
 

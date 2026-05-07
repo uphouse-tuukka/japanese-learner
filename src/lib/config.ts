@@ -31,6 +31,14 @@ function toBoolean(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
+export function resolveOpenAiTtsEnabled(): boolean {
+  return toBoolean(env.USE_OPENAI_TTS, false);
+}
+
+export function hasOpenAiApiKey(): boolean {
+  return Boolean(env.OPENAI_API_KEY?.trim());
+}
+
 export const config: AppConfig = {
   siteAccess: {
     basicAuthUser: env.BASIC_AUTH_USER ?? '',

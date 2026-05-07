@@ -19,20 +19,27 @@ Minimal full-stack Japanese learning app with:
 
 ## Setup
 
-1. Install dependencies:
+1. Use the pinned Node runtime and npm package manager:
+   ```bash
+   nvm install
+   nvm use
+   node --version # v22.21.1
+   npm --version  # 10.9.4
+   ```
+2. Install dependencies:
    ```bash
    npm install
    ```
-2. Copy env file:
+3. Copy env file:
    ```bash
    cp .env.example .env
    ```
-3. Fill required env vars (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `OPENAI_API_KEY` for AI-backed learning features and server TTS).
-4. Run the full validation gate:
+4. Fill required env vars (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `OPENAI_API_KEY` for AI-backed learning features and server TTS).
+5. Run the full validation gate:
    ```bash
    npm run validate:ci
    ```
-5. Start dev server:
+6. Start dev server:
    ```bash
    npm run dev
    ```
@@ -43,11 +50,20 @@ See `.env.example` for full list and comments.
 
 Important values:
 
-- `TURSO_DATABASE_URL`
-- `TURSO_AUTH_TOKEN`
-- `OPENAI_API_KEY`
-- `DAILY_TOKEN_LIMIT`
-- `MAX_USERS`
+- `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`: optional app access gate.
+- `AUTH_SECRET`: optional cookie/session signing override; defaults to a derived secret from `BASIC_AUTH_PASSWORD`. Recommended for production/public deployments, especially if `BASIC_AUTH_PASSWORD` is unset or weak.
+- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`: required database connection.
+- `OPENAI_API_KEY`: required for AI-backed session generation, answer checking, missions, and server TTS.
+- `USE_OPENAI_TTS`: set `true` to enable OpenAI-backed TTS from server-provided layout data.
+- `DAILY_TOKEN_LIMIT`: per-user daily token cap; monthly token cap is derived as `DAILY_TOKEN_LIMIT * 31`.
+- `MONTHLY_COST_LIMIT`: monthly USD cost value surfaced with budget data.
+- `BYPASS_KEY`: optional token-limit bypass key for admin/internal testing.
+- `MAX_USERS`: maximum number of user profiles.
+- `PRACTICE_MODE_ENABLED`: enables/disables practice mode features.
+- `MISSIONS_UNLOCK_ALL`: optional dev override to unlock all missions.
+- `DISABLE_PORTFOLIO_QUOTA`: dev-only portfolio/public challenge quota bypass.
+- `SESSION_GENERATION_TIMEOUT_MS`: AI session generation timeout in milliseconds (default `30000`).
+- `MONTHLY_TOKEN_BUDGET`: deprecated/unused; do not set it.
 
 ## Project docs
 
@@ -89,7 +105,7 @@ Important values:
 Token usage budget is enforced by server token-limiter utilities.
 
 - Learn page reads budget status from server load.
-- Daily limits and monthly budget are configured in env vars.
+- Daily limits are configured with `DAILY_TOKEN_LIMIT`; the monthly token budget is derived as `DAILY_TOKEN_LIMIT * 31`.
 
 ## Adding users
 
