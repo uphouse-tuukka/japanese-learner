@@ -26,7 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@sveltejs/adapter-vercel": "^6.3.3",
-    "@sveltejs/kit": "^2.50.2",
+    "@sveltejs/kit": "^2.59.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
@@ -40,7 +40,7 @@
     "svelte-check": "^4.4.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1",
-    "vite": "^7.3.1",
+    "vite": "^7.3.3",
     "vitest": "^4.1.0"
   },
   "dependencies": {
@@ -55,5 +55,8 @@
     "*.{json,md,css,html}": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "cookie": "0.7.2"
   }
 }

@@ -200,16 +200,29 @@ Completed tasks:
 
 - [x] Task 4.4 — Centralized abort/timeout wrapping in `src/lib/server/async.ts` and replaced duplicated helpers in session generation plus portfolio challenge.
 
+### Completed dependency vulnerability remediation batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: remediate dependency vulnerabilities`
+
+**Validation:** Node `v24.15.0` with npm `11.12.1`; `npm audit` reported zero vulnerabilities, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`85` tests / `13` files), and production build. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed tasks:
+
+- [x] Task 2.4 — Updated vulnerable dependency versions with non-force npm remediation. Added a `cookie` override at `0.7.2` because current `@sveltejs/kit` `2.59.1` still declares `cookie` `^0.6.0`; remove the override once upstream ships a safe compatible range.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Audit and fix dependency vulnerabilities: Task 2.4.
-2. Continue low-risk helper extraction: Task 4.5.
-3. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
-4. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+1. Continue low-risk helper extraction: Task 4.5.
+2. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 
-Still incomplete from the whole plan: dependency vulnerability remediation, API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
+Still incomplete from the whole plan: API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
 
 ---
 
@@ -593,9 +606,9 @@ If `package-lock.json` changes only due to package metadata/script changes, incl
 - Possibly modify: `.npmrc` if install/audit policy needs explicit documentation
 - Possibly modify: README or maintenance docs if residual advisories are accepted
 
-**Current audit context:**
+**Audit context when Task 2.4 was added:**
 
-`npm audit --json` currently reports 7 vulnerabilities: 1 low, 3 moderate, and 3 high. Direct vulnerable dependencies are `@sveltejs/kit` and `vite`. Transitive vulnerable dependencies are `cookie`, `brace-expansion`, `picomatch`, `postcss`, and `yaml`. All reported advisories have `fixAvailable: true`.
+`npm audit --json` reported 7 vulnerabilities: 1 low, 3 moderate, and 3 high. Direct vulnerable dependencies were `@sveltejs/kit` and `vite`. Transitive vulnerable dependencies were `cookie`, `brace-expansion`, `picomatch`, `postcss`, and `yaml`. All reported advisories had `fixAvailable: true`.
 
 **Implementation guidance:**
 
