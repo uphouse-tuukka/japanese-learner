@@ -3,6 +3,7 @@ import { createHmac } from 'crypto';
 import { config } from '$lib/server/config';
 import { getAuthSecret } from '$lib/server/auth';
 import { generatePublicChallengePlan } from '$lib/server/ai';
+import { withAbort } from '$lib/server/async';
 import {
   cleanupExpiredPortfolioAttempts,
   countRecentAttemptsByIp,
@@ -134,19 +135,6 @@ function scenarioLabel(scenario: ScenarioId): string {
 
 function isScenarioId(value: string): value is ScenarioId {
   return SCENARIOS.some((scenario) => scenario.id === value);
-}
-
-function waitForAbort(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
-  });
-}
-
-async function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    throw new Error('timeout');
-  }
-  return Promise.race([promise, waitForAbort(signal)]);
 }
 
 function safeParseJson<T>(value: string | null, fallback: T): T {

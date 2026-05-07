@@ -9,6 +9,7 @@ import {
   getSessionsForUser,
 } from '$lib/server/db';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
+import { withAbort } from '$lib/server/async';
 import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
@@ -55,19 +56,6 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
     nextSteps: [],
     keyPhrases: summary.trim() ? [summary.trim().slice(0, 120)] : [],
   };
-}
-
-function waitForAbort(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
-  });
-}
-
-async function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    throw new Error('timeout');
-  }
-  return Promise.race([promise, waitForAbort(signal)]);
 }
 
 export const POST: RequestHandler = async ({ request }) => {

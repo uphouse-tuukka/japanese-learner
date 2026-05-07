@@ -20,6 +20,7 @@ This plan covers internal improvements only:
 
 - agent/workflow documentation
 - CI and validation gates
+- dependency vulnerability remediation
 - stale docs cleanup
 - env/toolchain hygiene
 - ignore/prettier hygiene
@@ -185,15 +186,30 @@ Completed follow-up:
 
 - [x] Updated Task 2.3 runtime pin from Node 22 to Node 24 after confirming no project-specific reason to stay on Node 22.
 
+### Completed current helper extraction batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: centralize timeout helper and track audits`
+
+**Validation:** `npm test -- src/lib/server/async.test.ts src/routes/api/session/generate.server.test.ts src/lib/server/ai.public-challenge.test.ts` passed, `npm run validate` passed with Vitest `85` tests / `13` files, and `npm run validate:ci` passed including format/build. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed tasks:
+
+- [x] Task 4.4 — Centralized abort/timeout wrapping in `src/lib/server/async.ts` and replaced duplicated helpers in session generation plus portfolio challenge.
+
 ### Next recommended starting point
 
 Do not redo the completed first/docs/reproducibility batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue low-risk helper extraction: Task 4.4, then Task 4.5.
-2. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
-3. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+1. Audit and fix dependency vulnerabilities: Task 2.4.
+2. Continue low-risk helper extraction: Task 4.5.
+3. Start targeted pure/request-boundary tests: Task 5.1, Task 5.2, Task 5.3.
+4. Continue staged decomposition only after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
 
-Still incomplete from the whole plan: timeout/API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
+Still incomplete from the whole plan: dependency vulnerability remediation, API/background helpers, targeted route/gamification/auth tests, DB decomposition, AI decomposition, API/profile hardening, background task boundary, Svelte modularization, and final documentation closure.
 
 ---
 
@@ -565,6 +581,38 @@ npm run validate:ci
 ```
 
 If `package-lock.json` changes only due to package metadata/script changes, include it in the commit.
+
+### Task 2.4: Audit and fix dependency vulnerabilities
+
+**Objective:** Remediate dependency advisories without introducing product changes or unnecessary breaking upgrades.
+
+**Files:**
+
+- Modify: `package.json`
+- Modify: `package-lock.json`
+- Possibly modify: `.npmrc` if install/audit policy needs explicit documentation
+- Possibly modify: README or maintenance docs if residual advisories are accepted
+
+**Current audit context:**
+
+`npm audit --json` currently reports 7 vulnerabilities: 1 low, 3 moderate, and 3 high. Direct vulnerable dependencies are `@sveltejs/kit` and `vite`. Transitive vulnerable dependencies are `cookie`, `brace-expansion`, `picomatch`, `postcss`, and `yaml`. All reported advisories have `fixAvailable: true`.
+
+**Implementation guidance:**
+
+1. Run `npm audit --json` and inspect the current advisories plus available fixed versions.
+2. Prefer non-breaking package upgrades first, especially patch/minor updates to direct dependencies.
+3. Avoid `npm audit fix --force` unless a human or reviewer explicitly accepts the reviewed breaking-change scope.
+4. Update `package.json` and `package-lock.json` using npm so the lockfile stays reproducible.
+5. If any advisories remain, document the accepted residual advisory IDs/severity, why they are accepted, and the follow-up owner/date.
+
+**Verification:**
+
+```bash
+npm audit
+npm run validate:ci
+```
+
+Expected: `npm audit` reports zero vulnerabilities. If that is not possible without an explicitly accepted breaking upgrade, document the residual advisories and their rationale before merge.
 
 ---
 
@@ -1507,17 +1555,18 @@ The improvement program is considered successful when:
 2. `documents/CONTRIBUTING.md` reflects current agentic workflow, validation gates, and no-feature-drift rules.
 3. `npm run validate:ci` exists and is documented.
 4. GitHub Actions runs `npm run validate:ci`.
-5. README no longer contains known stale route/cookie/schema references.
-6. `.env.example` documents all source-used env vars or explicitly marks deprecated ones.
-7. `.idea/` no longer pollutes normal git status unless intentionally tracked.
-8. Duplicated `SessionMeta` parsing is centralized and tested.
-9. Duplicated combo and abort helpers are centralized and tested.
-10. DB schema/migration/mapping logic is at least partially extracted from `db.ts` while public imports remain stable.
-11. AI client/model/prompt/normalization logic is at least partially extracted from `ai.ts` while public imports remain stable.
-12. Key route and pure-logic tests cover the riskiest write paths and calculations.
-13. Background journal update behavior is explicit and consistently logged.
-14. Large Svelte pages have begun moving storage/state logic out of markup-heavy files.
-15. Final `npm run validate:ci` passes.
+5. Dependency vulnerabilities are remediated or any residual advisories are explicitly documented with rationale and follow-up ownership.
+6. README no longer contains known stale route/cookie/schema references.
+7. `.env.example` documents all source-used env vars or explicitly marks deprecated ones.
+8. `.idea/` no longer pollutes normal git status unless intentionally tracked.
+9. Duplicated `SessionMeta` parsing is centralized and tested.
+10. Duplicated combo and abort helpers are centralized and tested.
+11. DB schema/migration/mapping logic is at least partially extracted from `db.ts` while public imports remain stable.
+12. AI client/model/prompt/normalization logic is at least partially extracted from `ai.ts` while public imports remain stable.
+13. Key route and pure-logic tests cover the riskiest write paths and calculations.
+14. Background journal update behavior is explicit and consistently logged.
+15. Large Svelte pages have begun moving storage/state logic out of markup-heavy files.
+16. Final `npm run validate:ci` passes.
 
 ---
 
