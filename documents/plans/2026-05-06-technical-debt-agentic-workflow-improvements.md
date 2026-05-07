@@ -398,16 +398,30 @@ Completed task:
 
 - [x] Task 8.4 — Hardened the mission-start failure path by generating the initial mission turn and recording token usage before creating the `user_mission` row. `createUserMission` now accepts an optional initial `conversationLog`, and mission start creates the row with `[generated.turn]` instead of creating an empty row and then calling `updateUserMission`. The successful `MissionStartResponse` shape remains unchanged, and generation/token-recording failures now return `500` without creating or updating a `user_mission` row.
 
+### Completed DB module decomposition batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: extract db module internals`
+
+**Validation:** TDD RED was confirmed in a detached worktree before production modules existed: the new DB helper tests failed because `db-mappers`, `db-migrations`, and `db-schema` were missing. GREEN targeted validation `npm test -- src/lib/server/db-mappers.test.ts src/lib/server/db-migrations.test.ts src/lib/server/db-schema.test.ts` passed with `17` tests, `npm run validate` passed with Vitest `228` tests / `28` files, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`228` tests / `28` files), and production build. `git diff --check` passed. Added-line security scan covered `793` added lines and found no findings. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved. During implementation, `npm run check && npm run lint` caught a leftover duplicate `PortfolioSessionRow`/mapper in `db.ts`, and `npm run format:check` caught a Prettier issue in `db-migrations.test.ts`; both were fixed before the successful full gate.
+
+Completed task:
+
+- [x] Task 6.1 — Mechanically extracted DB client lifecycle, schema statement construction, migration statement/key helpers, and row mappers from `src/lib/server/db.ts` into `db-client.ts`, `db-schema.ts`, `db-migrations.ts`, and `db-mappers.ts`. `db.ts` remains the public facade for existing imports, extracted modules stay under `src/lib/server/`, schema/migration SQL semantics were preserved, and helper tests now cover extracted pure behavior.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1 batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue staged decomposition after helper/test/API boundaries are in place: DB internals (Phase 6), starting with Task 6.1.
-2. Continue AI internals (Phase 7) after the DB boundary work has a clean handoff, or as a separate non-overlapping lane.
+1. Continue DB internals (Phase 6), starting with Task 6.2 column-aware/idempotent migrations. Do not fold Task 6.3 mission FK/index decisions into the same batch unless explicitly scoped.
+2. Continue AI internals (Phase 7) after the DB 6.2/6.3 boundary work has a clean handoff, or as a separate non-overlapping lane.
 3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 4. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
 
-Still incomplete from the whole plan: DB decomposition, AI decomposition, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, and Task 8.4 mission-start atomicity is complete; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB migration idempotency/mission constraint follow-ups, AI decomposition, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, and Task 6.1 DB module extraction is complete; broader route adoption remains intentionally incomplete.
 
 ---
 
@@ -1256,6 +1270,8 @@ Do this after validator/helper tests are in place. This phase is intentionally s
 
 ### Task 6.1: Extract DB client and schema without changing public imports
 
+**Status:** Completed in the DB module decomposition batch (`chore: extract db module internals`).
+
 **Objective:** Reduce `db.ts` responsibility while keeping existing imports working.
 
 **Files:**
@@ -1266,6 +1282,7 @@ Do this after validator/helper tests are in place. This phase is intentionally s
 - Create: `src/lib/server/db-migrations.ts`
 - Create: `src/lib/server/db-mappers.ts`
 - Tests if helpers are pure:
+  - `src/lib/server/db-schema.test.ts`
   - `src/lib/server/db-migrations.test.ts`
   - `src/lib/server/db-mappers.test.ts`
 

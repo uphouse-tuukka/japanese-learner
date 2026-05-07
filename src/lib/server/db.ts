@@ -1,6 +1,5 @@
-import { createClient, type Client, type InStatement } from '@libsql/client';
+import type { Client, InStatement } from '@libsql/client';
 import { randomUUID } from 'node:crypto';
-import { config } from '$lib/config';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 import type {
   Exercise,
@@ -13,8 +12,24 @@ import type {
   User,
   UserLevel,
 } from '$lib/types';
+import { getClient } from './db-client';
+import { runDatabaseMigrations } from './db-migrations';
+import {
+  asIso,
+  asNumber,
+  asString,
+  mapPortfolioSessionRow,
+  mapSessionRow,
+  mapTokenUsageRow,
+  mapUserRow,
+  parseExercise,
+  toPercent,
+} from './db-mappers';
+import type { PortfolioSessionRow } from './db-mappers';
+import { getSchemaStatements } from './db-schema';
 
-let dbClient: Client | null = null;
+export type { PortfolioSessionRow } from './db-mappers';
+
 let databaseInitPromise: Promise<void> | null = null;
 const HELSINKI_TIME_ZONE = 'Europe/Helsinki';
 const HELSINKI_DATE_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
@@ -24,341 +39,16 @@ const HELSINKI_DATE_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
   day: '2-digit',
 });
 
-function requiredValue(name: string, value: string): string {
-  const normalized = value.trim();
-  if (!normalized) {
-    throw new Error(`[db] Missing configuration value: ${name}`);
-  }
-  return normalized;
-}
-
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'bigint') return Number(value);
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
-
-function toPercent(correctCount: number, totalCount: number): number {
-  if (totalCount <= 0) return 0;
-  return Math.round((correctCount / totalCount) * 100);
-}
-
-function asIso(value: unknown): string {
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-  return nowIso();
-}
-
-function parseExercise(contentJson: unknown): Exercise {
-  if (typeof contentJson !== 'string' || !contentJson.trim()) {
-    throw new Error('[db] Missing exercise content_json');
-  }
-  return JSON.parse(contentJson) as Exercise;
-}
-
-function mapUserRow(row: Record<string, unknown>): User {
-  return {
-    id: asString(row.id),
-    name: asString(row.name),
-    level: asString(row.level) as UserLevel,
-    japaneseWritingEnabled:
-      row.japanese_writing_enabled === 1 || row.japanese_writing_enabled === '1',
-    createdAt: asIso(row.created_at),
-    updatedAt: asIso(row.updated_at),
-    lastActiveAt: row.last_active_at ? asIso(row.last_active_at) : null,
-    progressJournal: row.progress_journal ? asString(row.progress_journal) : null,
-  };
-}
-
-function mapSessionRow(row: Record<string, unknown>): Session {
-  return {
-    id: asString(row.id),
-    userId: asString(row.user_id),
-    mode: asString(row.mode) as SessionMode,
-    status: asString(row.status) as SessionStatus,
-    model: row.model ? asString(row.model) : null,
-    tokenInput: asNumber(row.token_input),
-    tokenOutput: asNumber(row.token_output),
-    summary: row.summary ? asString(row.summary) : null,
-    createdAt: asIso(row.created_at),
-    completedAt: row.completed_at ? asIso(row.completed_at) : null,
-  };
-}
-
-function mapTokenUsageRow(row: Record<string, unknown>): TokenUsage {
-  return {
-    id: asString(row.id),
-    userId: asString(row.user_id),
-    sessionId: row.session_id ? asString(row.session_id) : null,
-    model: asString(row.model),
-    tokensIn: asNumber(row.tokens_in),
-    tokensOut: asNumber(row.tokens_out),
-    tokensTotal: asNumber(row.tokens_total),
-    createdAt: asIso(row.created_at),
-  };
-}
-
-function getClient(): Client {
-  if (!dbClient) {
-    dbClient = createClient({
-      url: requiredValue('config.turso.databaseUrl', config.turso.databaseUrl),
-      authToken: requiredValue('config.turso.authToken', config.turso.authToken),
-    });
-  }
-  return dbClient;
 }
 
 export async function initializeDatabase(): Promise<void> {
   if (!databaseInitPromise) {
     databaseInitPromise = (async () => {
       const db = getClient();
-      const schemaStatements: InStatement[] = [
-        `PRAGMA foreign_keys = ON;`,
-        `CREATE TABLE IF NOT EXISTS users (
-id TEXT PRIMARY KEY,
-name TEXT NOT NULL,
-level TEXT NOT NULL,
-progress_journal TEXT DEFAULT NULL,
-japanese_writing_enabled INTEGER NOT NULL DEFAULT 0,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);`,
-        `CREATE TABLE IF NOT EXISTS sessions (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-mode TEXT NOT NULL,
-status TEXT NOT NULL,
-model TEXT,
-token_input INTEGER NOT NULL DEFAULT 0,
-token_output INTEGER NOT NULL DEFAULT 0,
-summary TEXT,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-completed_at TEXT,
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS exercises (
-id TEXT PRIMARY KEY,
-type TEXT NOT NULL,
-title TEXT NOT NULL,
-content_json TEXT NOT NULL,
-is_seed INTEGER NOT NULL DEFAULT 0,
-created_by_user_id TEXT,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (created_by_user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS session_exercises (
-session_id TEXT NOT NULL,
-exercise_id TEXT NOT NULL,
-order_index INTEGER NOT NULL,
-PRIMARY KEY (session_id, order_index),
-FOREIGN KEY (session_id) REFERENCES sessions(id),
-FOREIGN KEY (exercise_id) REFERENCES exercises(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS user_exercise_results (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-session_id TEXT,
-exercise_id TEXT NOT NULL,
-mode TEXT NOT NULL,
-is_correct INTEGER NOT NULL,
-answer_text TEXT,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id),
-FOREIGN KEY (session_id) REFERENCES sessions(id),
-FOREIGN KEY (exercise_id) REFERENCES exercises(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS token_usage (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-session_id TEXT,
-model TEXT NOT NULL,
-tokens_in INTEGER NOT NULL,
-tokens_out INTEGER NOT NULL,
-tokens_total INTEGER NOT NULL,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS user_xp (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-session_id TEXT,
-amount INTEGER NOT NULL,
-reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS user_streaks (
-user_id TEXT PRIMARY KEY,
-current_streak INTEGER NOT NULL DEFAULT 0,
-longest_streak INTEGER NOT NULL DEFAULT 0,
-last_activity_date TEXT,
-daily_goal_met INTEGER NOT NULL DEFAULT 0,
-updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS user_milestones (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-milestone_key TEXT NOT NULL,
-xp_at_unlock INTEGER NOT NULL,
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-UNIQUE(user_id, milestone_key),
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-        `CREATE TABLE IF NOT EXISTS missions (
-id TEXT PRIMARY KEY,
-title TEXT NOT NULL,
-category TEXT NOT NULL,
-difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard')),
-sequence INTEGER NOT NULL,
-scenario_prompt TEXT NOT NULL,
-badge_emoji TEXT NOT NULL,
-badge_name TEXT NOT NULL,
-badge_statement TEXT NOT NULL,
-unlock_sessions_required INTEGER NOT NULL DEFAULT 0,
-start_unlocked INTEGER NOT NULL DEFAULT 0
-);`,
-        `CREATE TABLE IF NOT EXISTS user_missions (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-mission_id TEXT NOT NULL,
-mode TEXT NOT NULL CHECK(mode IN ('practice', 'immersion')),
-status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed')) DEFAULT 'in_progress',
-exchanges INTEGER NOT NULL DEFAULT 0,
-correct_responses INTEGER NOT NULL DEFAULT 0,
-score REAL NOT NULL DEFAULT 0,
-xp_earned INTEGER NOT NULL DEFAULT 0,
-badge_earned INTEGER NOT NULL DEFAULT 0,
-conversation_log TEXT NOT NULL DEFAULT '[]',
-completed_at TEXT,
-created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);`,
-        `CREATE TABLE IF NOT EXISTS user_badges (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-mission_id TEXT NOT NULL,
-badge_emoji TEXT NOT NULL,
-badge_name TEXT NOT NULL,
-badge_statement TEXT NOT NULL,
-earned_at TEXT NOT NULL DEFAULT (datetime('now')),
-UNIQUE(user_id, mission_id)
-);`,
-        `CREATE TABLE IF NOT EXISTS user_mission_limits (
-user_id TEXT NOT NULL,
-date TEXT NOT NULL,
-missions_used INTEGER NOT NULL DEFAULT 0,
-PRIMARY KEY (user_id, date)
-);`,
-        `CREATE TABLE IF NOT EXISTS portfolio_challenge_attempts (
-id TEXT PRIMARY KEY,
-cookie_id TEXT NOT NULL,
-ip_hash TEXT NOT NULL,
-status TEXT NOT NULL CHECK(status IN ('started', 'completed', 'blocked', 'expired')),
-started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-completed_at TEXT,
-expires_at TEXT NOT NULL
-);`,
-        `CREATE INDEX IF NOT EXISTS idx_sessions_user_created_at ON sessions(user_id, created_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_exercises_seed ON exercises(is_seed);`,
-        `CREATE INDEX IF NOT EXISTS idx_results_user_created_at ON user_exercise_results(user_id, created_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_results_exercise_created_at ON user_exercise_results(exercise_id, created_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_token_usage_user_created_at ON token_usage(user_id, created_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_token_usage_created_at ON token_usage(created_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_xp_user_id ON user_xp(user_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_xp_session_id ON user_xp(session_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_milestones_user_id ON user_milestones(user_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_missions_user ON user_missions(user_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_missions_mission ON user_missions(mission_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);`,
-        `CREATE INDEX IF NOT EXISTS idx_missions_category ON missions(category);`,
-        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_cookie ON portfolio_challenge_attempts(cookie_id, started_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_ip ON portfolio_challenge_attempts(ip_hash, started_at);`,
-        `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_expires ON portfolio_challenge_attempts(expires_at);`,
-      ];
-
-      await db.batch(schemaStatements);
-      await db.execute({
-        sql: `CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);`,
-      });
-
-      const userXpMigrationKey = 'user_xp_mission_reasons';
-      const userXpMigration = await db.execute({
-        sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
-        args: [userXpMigrationKey],
-      });
-
-      if (userXpMigration.rows.length === 0) {
-        const userXpTable = await db.execute({
-          sql: `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_xp' LIMIT 1;`,
-        });
-        const userXpCreateSql = userXpTable.rows[0]?.sql;
-        const hasMissionReasons =
-          typeof userXpCreateSql === 'string' &&
-          userXpCreateSql.includes('mission_complete') &&
-          userXpCreateSql.includes('mission_correct_response') &&
-          userXpCreateSql.includes('mission_natural_phrasing');
-
-        if (!hasMissionReasons) {
-          await db.batch([
-            `ALTER TABLE user_xp RENAME TO user_xp_old;`,
-            `CREATE TABLE user_xp (
-id TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-session_id TEXT,
-amount INTEGER NOT NULL,
-reason TEXT NOT NULL CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus','mission_complete','mission_correct_response','mission_natural_phrasing')),
-created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FOREIGN KEY (user_id) REFERENCES users(id)
-);`,
-            `INSERT INTO user_xp (id, user_id, session_id, amount, reason, created_at)
-SELECT id, user_id, session_id, amount, reason, created_at FROM user_xp_old;`,
-            `DROP TABLE user_xp_old;`,
-            `CREATE INDEX IF NOT EXISTS idx_user_xp_user_id ON user_xp(user_id);`,
-            `CREATE INDEX IF NOT EXISTS idx_user_xp_session_id ON user_xp(session_id);`,
-          ]);
-        }
-
-        await db.execute({
-          sql: `INSERT INTO _migrations (key) VALUES (?);`,
-          args: [userXpMigrationKey],
-        });
-      }
-
-      const migrationKey = 'portfolio_v2_session_columns';
-      const migrationResult = await db.execute({
-        sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
-        args: [migrationKey],
-      });
-
-      if (migrationResult.rows.length === 0) {
-        await db.batch([
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN scenario TEXT DEFAULT NULL;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN lesson TEXT DEFAULT NULL;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN exercises TEXT DEFAULT NULL;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN answers TEXT DEFAULT NULL;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN current_step INTEGER DEFAULT 0;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN summary TEXT DEFAULT NULL;`,
-          `ALTER TABLE portfolio_challenge_attempts ADD COLUMN supports_browser_voice INTEGER DEFAULT 0;`,
-        ]);
-        await db.execute({
-          sql: `INSERT INTO _migrations (key) VALUES (?);`,
-          args: [migrationKey],
-        });
-      }
+      await db.batch(getSchemaStatements());
+      await runDatabaseMigrations(db);
 
       const { seedMissions } = await import('./missions-seed');
       await seedMissions(db);
@@ -1180,42 +870,6 @@ export async function cleanupExpiredPortfolioAttempts(): Promise<void> {
     sql: `DELETE FROM portfolio_challenge_attempts WHERE expires_at < ? AND status = 'started'`,
     args: [nowIso()],
   });
-}
-
-export type PortfolioSessionRow = {
-  id: string;
-  cookieId: string;
-  ipHash: string;
-  status: string;
-  startedAt: string;
-  completedAt: string | null;
-  expiresAt: string;
-  scenario: string | null;
-  lesson: string | null;
-  exercises: string | null;
-  answers: string | null;
-  currentStep: number;
-  summary: string | null;
-  supportsBrowserVoice: boolean;
-};
-
-function mapPortfolioSessionRow(row: Record<string, unknown>): PortfolioSessionRow {
-  return {
-    id: asString(row.id),
-    cookieId: asString(row.cookie_id),
-    ipHash: asString(row.ip_hash),
-    status: asString(row.status),
-    startedAt: asIso(row.started_at),
-    completedAt: row.completed_at ? asIso(row.completed_at) : null,
-    expiresAt: asIso(row.expires_at),
-    scenario: row.scenario ? asString(row.scenario) : null,
-    lesson: row.lesson ? asString(row.lesson) : null,
-    exercises: row.exercises ? asString(row.exercises) : null,
-    answers: row.answers ? asString(row.answers) : null,
-    currentStep: asNumber(row.current_step, 0),
-    summary: row.summary ? asString(row.summary) : null,
-    supportsBrowserVoice: row.supports_browser_voice === 1 || row.supports_browser_voice === '1',
-  };
 }
 
 export async function getPortfolioSession(sessionId: string): Promise<PortfolioSessionRow | null> {
