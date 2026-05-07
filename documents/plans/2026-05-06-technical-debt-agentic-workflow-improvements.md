@@ -356,15 +356,30 @@ Completed task:
 
 - [x] Task 8.3 mission-completion slice — Migrated `src/routes/api/missions/[id]/complete/+server.ts` to shared JSON/error helpers and selected-user matching. Added route tests for matching selected user, absent selected-user cookie compatibility, mismatch `403` with no DB/gamification writes, invalid JSON `400` with no DB/gamification writes, missing or blank `userId`/`userMissionId`, blank selected-user cookie validation, and the existing user-mission/body-user mismatch path. The successful `MissionCompleteResponse` shape remains unchanged.
 
+### Completed mission start API boundary batch
+
+**Completed on:** 2026-05-07
+
+**Commit:** `chore: harden mission start API boundary`
+
+**Validation:** `npm test -- src/routes/api/missions/[id]/start.server.test.ts` passed with `12` targeted tests; `npm test -- src/routes/api/missions/[id]/start.server.test.ts src/routes/api/missions/[id]/complete.server.test.ts` passed with `22` related-route tests; and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`199` tests / `24` files), and production build. `git diff --check` passed. Added-line security scan covered `440` added lines and found no findings. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved after the user-existence boundary fix. The quality reviewer classified the pre-existing mission-start atomicity issue as follow-up, not blocking: the route still creates a `user_mission` before AI generation/token recording/update, so a later failure can leave an in-progress mission with an empty/stale `conversation_log`.
+
+Completed task:
+
+- [x] Task 8.3 mission-start slice — Migrated `src/routes/api/missions/[id]/start/+server.ts` to shared JSON/error helpers and selected-user matching. Added route tests for matching selected user, absent selected-user cookie compatibility, mismatch `403` with no mission DB/budget/AI/token/update side effects, invalid JSON `400` with no side effects, missing/blank `userId`, blank selected-user cookie validation, invalid `mode`, mission not found, user not found before budget/category/create/generate/token/update side effects, budget exhaustion, locked mission, and successful `MissionStartResponse` shape preservation.
+
 ### Next recommended starting point
 
 Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue API/profile boundary hardening with Task 8.3: migrate the next high-risk write API one route per task/commit with route tests first. Do not redo the selected-user helper, `writing-toggle`, `level`, `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, or `missions/[id]/complete` migrations. Good next candidates are `src/routes/api/missions/[id]/start/+server.ts` and `src/routes/api/missions/[id]/respond/+server.ts`.
-2. Continue staged decomposition after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
-3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
+1. Continue API/profile boundary hardening with Task 8.3: migrate the next high-risk write API one route per task/commit with route tests first. Do not redo the selected-user helper, `writing-toggle`, `level`, `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, or `missions/[id]/start` migrations. The next route candidate is `src/routes/api/missions/[id]/respond/+server.ts`.
+2. Address the mission-start atomicity follow-up in Task 8.4 if prioritized before more route migrations.
+3. Continue staged decomposition after helper/test boundaries are in place: DB internals (Phase 6), then AI internals (Phase 7).
+4. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 
-Still incomplete from the whole plan: DB decomposition, AI decomposition, remaining high-risk API/profile route migrations, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, and `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, plus `missions/[id]/complete` now use the helper pattern; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB decomposition, AI decomposition, remaining high-risk API/profile route migrations, mission-start atomicity follow-up, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, and `practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, plus `missions/[id]/start` now use the helper pattern; broader route adoption remains intentionally incomplete.
 
 ---
 
@@ -1502,6 +1517,28 @@ npm run validate
 
 ```bash
 npm test -- <relevant-test-file>
+npm run validate
+```
+
+### Task 8.4: Assess mission-start creation atomicity
+
+**Objective:** Decide and, if appropriate, harden the mission-start failure path where the route creates a `user_mission` row before AI generation, token recording, and conversation-log update complete.
+
+**Known risk:**
+
+`src/routes/api/missions/[id]/start/+server.ts` can return `500` after creating an in-progress `user_mission` with an empty/stale `conversation_log` if `generateMissionTurn`, `recordMissionTokenUsage`, or `updateUserMission` fails. This predates the Task 8.3 mission-start boundary migration and was intentionally left as follow-up to avoid mixing atomicity/business-flow changes into the profile-boundary slice.
+
+**Implementation guidance:**
+
+- First decide whether preserving the current create-before-generate ordering is required for recovery semantics.
+- Prefer a narrow, tested fix: generate before creating the row if safe, or add cleanup/transactional handling if the current ordering is required.
+- Cover the chosen failure path with route-level tests.
+- Do not change `MissionStartResponse` success shape.
+
+**Verification:**
+
+```bash
+npm test -- src/routes/api/missions/[id]/start.server.test.ts
 npm run validate
 ```
 

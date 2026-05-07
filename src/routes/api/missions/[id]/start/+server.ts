@@ -1,5 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
+import { matchSelectedUser } from '$lib/server/selected-user';
 import {
   createUserMission,
   getCategorySessionCount,
@@ -9,6 +11,7 @@ import {
 import { generateMissionTurn, recordMissionTokenUsage } from '$lib/server/missions-ai';
 import { config } from '$lib/server/config';
 import { checkBudget } from '$lib/server/token-limiter';
+import { getUser } from '$lib/server/users';
 import type { MissionMode, MissionStartResponse } from '$lib/types';
 
 type StartMissionRequest = {
@@ -16,38 +19,53 @@ type StartMissionRequest = {
   mode?: MissionMode;
 };
 
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ params, request, cookies }) => {
   try {
-    const body = (await request.json()) as StartMissionRequest;
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return jsonError(bodyResult.error, 400);
+    }
+
+    const body = bodyResult.value as StartMissionRequest;
     const missionId = String(params.id ?? '').trim();
-    const userId = String(body.userId ?? '').trim();
-    const mode = body.mode;
+    const userIdResult = requireStringField(body, 'userId');
 
     if (!missionId) {
-      return json({ error: 'Missing mission id.' }, { status: 400 });
+      return jsonError('Missing mission id.', 400);
     }
 
-    if (!userId) {
-      return json({ error: 'Missing userId.' }, { status: 400 });
+    if (!userIdResult.ok) {
+      return jsonError(userIdResult.error, 400);
     }
 
+    const mode = body.mode;
     if (mode !== 'practice' && mode !== 'immersion') {
-      return json({ error: 'Invalid mode. Must be practice or immersion.' }, { status: 400 });
+      return jsonError('Invalid mode. Must be practice or immersion.', 400);
     }
+
+    const selectedUser = matchSelectedUser(cookies, userIdResult.value);
+    if (!selectedUser.ok) {
+      return jsonError(selectedUser.error, selectedUser.status);
+    }
+
+    const userId = selectedUser.userId;
 
     const mission = await getMissionById(missionId);
     if (!mission) {
-      return json({ error: 'Mission not found.' }, { status: 404 });
+      return jsonError('Mission not found.', 404);
+    }
+
+    const user = await getUser(userId);
+    if (!user) {
+      return jsonError('User not found.', 404);
     }
 
     if (!config.missions.unlockAllOverride) {
       const budget = await checkBudget(userId);
       if (!budget.allowed) {
-        return json(
-          {
-            error: "You've reached today's AI practice budget. Please try again tomorrow.",
-          },
-          { status: 429 },
+        return jsonError(
+          "You've reached today's AI practice budget. Please try again tomorrow.",
+          429,
         );
       }
     }
@@ -59,7 +77,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       categorySessionCount >= mission.unlockSessionsRequired;
 
     if (!unlocked) {
-      return json({ error: 'Mission is locked.' }, { status: 403 });
+      return jsonError('Mission is locked.', 403);
     }
 
     const userMissionId = await createUserMission({ userId, missionId: mission.id, mode });
@@ -91,6 +109,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
       error,
       missionId: params.id,
     });
-    return json({ error: 'Failed to start mission.' }, { status: 500 });
+    return jsonError('Failed to start mission.', 500);
   }
 };
