@@ -22,7 +22,8 @@ vi.mock('$lib/config', () => ({
   },
 }));
 
-import { generatePublicChallengePlan } from '$lib/server/ai';
+import { generatePublicChallengePlan as generatePublicChallengePlanFromFacade } from '$lib/server/ai';
+import { generatePublicChallengePlan } from '$lib/server/ai-public-challenge';
 
 function mockPublicChallengeModelOutput(payload: {
   lesson: {
@@ -51,6 +52,10 @@ function mockPublicChallengeModelOutput(payload: {
 }
 
 describe('generatePublicChallengePlan', () => {
+  it('keeps the ai.ts public export wired to the public challenge facade', () => {
+    expect(generatePublicChallengePlanFromFacade).toBe(generatePublicChallengePlan);
+  });
+
   beforeEach(() => {
     mockResponsesCreate.mockReset();
     mockPublicChallengeModelOutput({
