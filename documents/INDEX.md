@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-05-07
+**Last updated:** 2026-05-08
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -106,7 +106,7 @@ Use this index before following older plans or decisions. Status labels are cons
 - Status: planning
 - Description: Broad internal technical-debt plan. Partially implemented; check task checkboxes and current code before executing any lane.
 - Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals, API/profile boundaries, UI modularization
-- Last verified: 2026-05-07
+- Last verified: 2026-05-08
 
 ### `documents/plans/2026-03-27-travel-missions-design.md`
 
@@ -151,6 +151,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Description: Decision record for enforcing present `selected_user` cookies against body `userId` on migrated profile-scoped write APIs while allowing absent cookies for compatibility.
 - Source files affected: `src/lib/server/selected-user.ts`, migrated profile-scoped write routes under `src/routes/api/**`
 - Last verified: 2026-05-07
+
+### `documents/decisions/004-mission-db-constraints.md`
+
+- Status: decision
+- Description: Decision record for leaving mission table FK/index conventions unchanged until a future orphan audit and SQLite/libsql table-rebuild migration plan justify DB-level enforcement.
+- Source files affected: `src/lib/server/db-schema.ts`, `src/lib/server/db-migrations.ts`, mission-related DB access in `src/lib/server/missions-db.ts`
+- Last verified: 2026-05-08
 
 ## Analyses
 
