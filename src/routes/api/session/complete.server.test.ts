@@ -13,6 +13,7 @@ const {
   mockRecordUsageEvent,
   mockUpdateProgressJournal,
   mockCheckBudget,
+  mockRunBackgroundTask,
 } = vi.hoisted(() => ({
   mockCompleteSessionRecord: vi.fn(),
   mockGenerateSessionSummary: vi.fn(),
@@ -26,6 +27,7 @@ const {
   mockRecordUsageEvent: vi.fn(),
   mockUpdateProgressJournal: vi.fn(),
   mockCheckBudget: vi.fn(),
+  mockRunBackgroundTask: vi.fn(),
 }));
 
 vi.mock('$lib/server/db', () => ({
@@ -50,6 +52,10 @@ vi.mock('$lib/server/token-limiter', () => ({
 
 vi.mock('$lib/server/gamification', () => ({
   processSessionCompletion: mockProcessSessionCompletion,
+}));
+
+vi.mock('$lib/server/background-task', () => ({
+  runBackgroundTask: mockRunBackgroundTask,
 }));
 
 import { POST } from './complete/+server';
@@ -116,6 +122,7 @@ function expectNoWrites() {
   expect(mockCheckBudget).not.toHaveBeenCalled();
   expect(mockRecordUsageEvent).not.toHaveBeenCalled();
   expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+  expect(mockRunBackgroundTask).not.toHaveBeenCalled();
 }
 
 describe('POST /api/session/complete', () => {
@@ -136,6 +143,7 @@ describe('POST /api/session/complete', () => {
     mockRecordUsageEvent.mockReset();
     mockUpdateProgressJournal.mockReset();
     mockCheckBudget.mockReset();
+    mockRunBackgroundTask.mockReset();
 
     mockCompleteSessionRecord.mockResolvedValue(undefined);
     mockGenerateSessionSummary.mockResolvedValue({
@@ -426,6 +434,58 @@ describe('POST /api/session/complete', () => {
       'session-1',
       expect.objectContaining({ tokenInput: 0, tokenOutput: 0, summary: expect.any(String) }),
     );
+  });
+
+  it('schedules AI journal updates through the shared background helper', async () => {
+    mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+      category: 'restaurant',
+      keyPhrases: ['konnichiwa'],
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, state: 'done' });
+
+    expect(mockRunBackgroundTask).toHaveBeenCalledOnce();
+    const [taskName, task, meta] = mockRunBackgroundTask.mock.calls[0] as [
+      string,
+      () => Promise<void>,
+      Record<string, unknown>,
+    ];
+    expect(taskName).toBe('session-complete-journal-update');
+    expect(meta).toEqual({
+      route: 'api/session/complete',
+      sessionId: 'session-1',
+      userId: 'user-1',
+    });
+    expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+
+    await task();
+
+    expect(mockGenerateUpdatedJournal).toHaveBeenCalledWith({
+      currentJournal: null,
+      sessionSummary: expect.objectContaining({ summary: 'AI generated summary' }),
+      sessionMeta: {
+        category: 'restaurant',
+        topic: 'Ordering Food',
+        exerciseTypes: ['translation'],
+        keyPhrases: ['konnichiwa'],
+      },
+      userLevel: 'beginner',
+    });
+    expect(mockUpdateProgressJournal).toHaveBeenCalledWith('user-1', 'updated progress journal');
+    expect(mockRecordUsageEvent).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 1,
+      tokensOut: 2,
+    });
   });
 
   it('keeps XP processing failures non-fatal after storing results and completing the record', async () => {

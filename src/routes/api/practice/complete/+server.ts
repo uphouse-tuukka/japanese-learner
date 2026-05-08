@@ -11,6 +11,7 @@ import {
   updateProgressJournal,
 } from '$lib/server/db';
 import { generateUpdatedJournal } from '$lib/server/ai';
+import { runBackgroundTask } from '$lib/server/background-task';
 import { recordUsageEvent } from '$lib/server/token-limiter';
 import { processSessionCompletion } from '$lib/server/gamification';
 import { calculateMaxCombo } from '$lib/utils/results';
@@ -52,50 +53,6 @@ function parseResults(value: unknown): ResultPayload[] | null {
   }
 
   return value;
-}
-
-function runJournalUpdateInBackground(
-  userId: string,
-  sessionId: string,
-  summary: SessionSummary,
-): void {
-  void (async () => {
-    try {
-      const [progressJournal, user] = await Promise.all([
-        getProgressJournal(userId),
-        getUserById(userId),
-      ]);
-      if (!user) {
-        return;
-      }
-
-      const journalResult = await generateUpdatedJournal({
-        currentJournal: progressJournal,
-        sessionSummary: summary,
-        sessionMeta: {
-          category: 'practice_review',
-          topic: 'practice_review',
-          exerciseTypes: [],
-          keyPhrases: [],
-        },
-        userLevel: user.level,
-      });
-      await updateProgressJournal(userId, journalResult.journal);
-      await recordUsageEvent({
-        userId,
-        sessionId,
-        model: journalResult.tokenUsage.model,
-        tokensIn: journalResult.tokenUsage.tokensIn,
-        tokensOut: journalResult.tokenUsage.tokensOut,
-      });
-    } catch (journalError) {
-      console.error('[api/practice/complete] journal update failed (non-fatal)', {
-        error: journalError,
-        sessionId,
-        userId,
-      });
-    }
-  })().catch((err) => console.error('[practice/complete] Background journal update failed:', err));
 }
 
 function buildSummary(userId: string, sessionId: string, results: ResultPayload[]): SessionSummary {
@@ -158,7 +115,39 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     });
 
     const summary = buildSummary(userId, sessionId, results);
-    runJournalUpdateInBackground(userId, sessionId, summary);
+    runBackgroundTask(
+      'practice-complete-journal-update',
+      async () => {
+        const [progressJournal, user] = await Promise.all([
+          getProgressJournal(userId),
+          getUserById(userId),
+        ]);
+        if (!user) {
+          return;
+        }
+
+        const journalResult = await generateUpdatedJournal({
+          currentJournal: progressJournal,
+          sessionSummary: summary,
+          sessionMeta: {
+            category: 'practice_review',
+            topic: 'practice_review',
+            exerciseTypes: [],
+            keyPhrases: [],
+          },
+          userLevel: user.level,
+        });
+        await updateProgressJournal(userId, journalResult.journal);
+        await recordUsageEvent({
+          userId,
+          sessionId,
+          model: journalResult.tokenUsage.model,
+          tokensIn: journalResult.tokenUsage.tokensIn,
+          tokensOut: journalResult.tokenUsage.tokensOut,
+        });
+      },
+      { route: 'api/practice/complete', sessionId, userId },
+    );
     await completeSessionRecord(sessionId, { summary: summary.summary });
 
     let xpBreakdown: Awaited<ReturnType<typeof processSessionCompletion>> | null = null;

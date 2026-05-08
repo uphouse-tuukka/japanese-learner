@@ -13,6 +13,7 @@ import {
   updateProgressJournal,
 } from '$lib/server/db';
 import { generateSessionSummary, generateUpdatedJournal } from '$lib/server/ai';
+import { runBackgroundTask } from '$lib/server/background-task';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { processSessionCompletion } from '$lib/server/gamification';
 import { calculateMaxCombo } from '$lib/utils/results';
@@ -210,39 +211,34 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         summaryTokenInput = aiResult.tokenUsage.tokensIn;
         summaryTokenOutput = aiResult.tokenUsage.tokensOut;
         // Fire-and-forget — do not block the main response on journal generation.
-        void generateUpdatedJournal({
-          currentJournal: progressJournal,
-          sessionSummary: summary,
-          sessionMeta: {
-            category,
-            topic: lessonTopic,
-            exerciseTypes,
-            keyPhrases,
-          },
-          userLevel: user.level,
-        })
-          .then(async (journalResult) => {
+        runBackgroundTask(
+          'session-complete-journal-update',
+          async () => {
+            const journalResult = await generateUpdatedJournal({
+              currentJournal: progressJournal,
+              sessionSummary: summary,
+              sessionMeta: {
+                category,
+                topic: lessonTopic,
+                exerciseTypes,
+                keyPhrases,
+              },
+              userLevel: user.level,
+            });
             if (!journalResult?.journal) {
               return;
             }
-            try {
-              await updateProgressJournal(userId, journalResult.journal);
-              await recordUsageEvent({
-                userId,
-                sessionId,
-                model: journalResult.tokenUsage.model,
-                tokensIn: journalResult.tokenUsage.tokensIn,
-                tokensOut: journalResult.tokenUsage.tokensOut,
-              });
-            } catch (err) {
-              console.error('[session/complete] Background journal update failed:', err);
-            }
-          })
-          .catch((journalError) => {
-            console.error('[api/session/complete] journal update failed (non-fatal)', {
-              error: journalError,
+            await updateProgressJournal(userId, journalResult.journal);
+            await recordUsageEvent({
+              userId,
+              sessionId,
+              model: journalResult.tokenUsage.model,
+              tokensIn: journalResult.tokenUsage.tokensIn,
+              tokensOut: journalResult.tokenUsage.tokensOut,
             });
-          });
+          },
+          { route: 'api/session/complete', sessionId, userId },
+        );
         await recordUsageEvent({
           userId,
           sessionId,

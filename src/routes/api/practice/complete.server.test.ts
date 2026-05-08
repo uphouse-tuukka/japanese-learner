@@ -9,6 +9,7 @@ const {
   mockProcessSessionCompletion,
   mockRecordUsageEvent,
   mockUpdateProgressJournal,
+  mockRunBackgroundTask,
 } = vi.hoisted(() => ({
   mockCompleteSessionRecord: vi.fn(),
   mockGenerateUpdatedJournal: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockProcessSessionCompletion: vi.fn(),
   mockRecordUsageEvent: vi.fn(),
   mockUpdateProgressJournal: vi.fn(),
+  mockRunBackgroundTask: vi.fn(),
 }));
 
 vi.mock('$lib/server/db', () => ({
@@ -38,6 +40,10 @@ vi.mock('$lib/server/token-limiter', () => ({
 
 vi.mock('$lib/server/gamification', () => ({
   processSessionCompletion: mockProcessSessionCompletion,
+}));
+
+vi.mock('$lib/server/background-task', () => ({
+  runBackgroundTask: mockRunBackgroundTask,
 }));
 
 import { POST } from './complete/+server';
@@ -100,6 +106,7 @@ function expectNoWrites() {
   expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
   expect(mockRecordUsageEvent).not.toHaveBeenCalled();
   expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+  expect(mockRunBackgroundTask).not.toHaveBeenCalled();
 }
 
 describe('POST /api/practice/complete', () => {
@@ -116,6 +123,7 @@ describe('POST /api/practice/complete', () => {
     mockProcessSessionCompletion.mockReset();
     mockRecordUsageEvent.mockReset();
     mockUpdateProgressJournal.mockReset();
+    mockRunBackgroundTask.mockReset();
 
     mockCompleteSessionRecord.mockResolvedValue(undefined);
     mockGenerateUpdatedJournal.mockResolvedValue({
@@ -324,6 +332,67 @@ describe('POST /api/practice/complete', () => {
       error: 'Missing or invalid results.',
     });
     expectNoWrites();
+  });
+
+  it('schedules progress-journal updates through the shared background helper', async () => {
+    mockGetUserById.mockResolvedValueOnce({
+      id: 'user-1',
+      name: 'Test User',
+      level: 'beginner',
+      japaneseWritingEnabled: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      lastActiveAt: null,
+      progressJournal: null,
+    });
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, state: 'done' });
+
+    expect(mockRunBackgroundTask).toHaveBeenCalledOnce();
+    const [taskName, task, meta] = mockRunBackgroundTask.mock.calls[0] as [
+      string,
+      () => Promise<void>,
+      Record<string, unknown>,
+    ];
+    expect(taskName).toBe('practice-complete-journal-update');
+    expect(meta).toEqual({
+      route: 'api/practice/complete',
+      sessionId: 'session-1',
+      userId: 'user-1',
+    });
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+
+    await task();
+
+    expect(mockGetProgressJournal).toHaveBeenCalledWith('user-1');
+    expect(mockGetUserById).toHaveBeenCalledWith('user-1');
+    expect(mockGenerateUpdatedJournal).toHaveBeenCalledWith({
+      currentJournal: null,
+      sessionSummary: expect.objectContaining({ summary: 'Practice complete: 1/2 correct (50%).' }),
+      sessionMeta: {
+        category: 'practice_review',
+        topic: 'practice_review',
+        exerciseTypes: [],
+        keyPhrases: [],
+      },
+      userLevel: 'beginner',
+    });
+    expect(mockUpdateProgressJournal).toHaveBeenCalledWith('user-1', 'updated progress journal');
+    expect(mockRecordUsageEvent).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 1,
+      tokensOut: 2,
+    });
   });
 
   it('keeps XP processing failures non-fatal after storing results and completing the record', async () => {
