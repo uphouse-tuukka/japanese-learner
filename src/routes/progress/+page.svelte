@@ -1,105 +1,15 @@
 <script lang="ts">
   import LevelBadge from '$lib/components/LevelBadge.svelte';
   import type { PageData } from './$types';
+  import {
+    buildCalendarData,
+    buildHistoryList,
+    buildMilestoneGallery,
+    buildSkillBreakdown,
+    getAccuracyColor,
+  } from './progress-view-model';
 
   let { data } = $props<{ data: PageData }>();
-
-  function getAccuracyColor(accuracy: number) {
-    if (accuracy >= 80) return 'var(--accent-matcha)';
-    if (accuracy >= 50) return 'var(--state-warning)';
-    return 'var(--accent-shu)';
-  }
-
-  const typeLabels: Record<string, string> = {
-    multiple_choice: 'Multiple Choice',
-    translation: 'Translation',
-    fill_blank: 'Fill in the Blank',
-    reorder: 'Word Order',
-    reading: 'Reading',
-    listening: 'Listening',
-  };
-
-  function buildCalendarData(activityDates: string[]) {
-    const toLocalDateKey = (value: Date): string => value.toLocaleDateString('sv-SE');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayKey = toLocalDateKey(today);
-    const currentDay = today.getDay();
-    const daysSinceMonday = currentDay === 0 ? 6 : currentDay - 1;
-    const weeksToShow = 12;
-    const daysTotal = weeksToShow * 7;
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - daysSinceMonday - (weeksToShow - 1) * 7);
-    const days = [];
-    const activeSet = new Set(activityDates);
-    for (let i = 0; i < daysTotal; i++) {
-      const d = new Date(startDate);
-      d.setDate(startDate.getDate() + i);
-      const dateStr = toLocalDateKey(d);
-      days.push({
-        dateStr,
-        isToday: dateStr === todayKey,
-        isFuture: d.getTime() > today.getTime(),
-        isActive: activeSet.has(dateStr),
-        label: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(d),
-      });
-    }
-    return days;
-  }
-
-  function buildMilestoneGallery(
-    milestones: Array<{
-      key: string;
-      name: string;
-      nameJa: string;
-      icon: string;
-      xpThreshold: number;
-    }>,
-    unlockedMilestones: Array<{ milestoneKey: string; createdAt: string }>,
-    totalXp: number,
-  ) {
-    const unlockedMap = new Map(unlockedMilestones.map((m) => [m.milestoneKey, m]));
-    return milestones.map((m) => {
-      const unlocked = unlockedMap.get(m.key);
-      return {
-        ...m,
-        isUnlocked: totalXp >= m.xpThreshold,
-        achievedAt: unlocked ? new Date(unlocked.createdAt).toLocaleDateString() : null,
-      };
-    });
-  }
-
-  function buildSkillBreakdown(
-    items: Array<{ type: string; totalCount: number; correctCount: number; accuracy: number }>,
-  ) {
-    return items
-      .map((item) => ({
-        ...item,
-        label: typeLabels[item.type] || item.type,
-        accuracyPct: item.accuracy,
-      }))
-      .sort((a, b) => b.totalCount - a.totalCount);
-  }
-
-  function buildHistoryList(
-    history: Array<{
-      session: { createdAt: string; mode: string };
-      accuracy: number;
-      exerciseCount: number;
-    }>,
-  ) {
-    return history.map((h) => ({
-      ...h,
-      dateLabel: new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(new Date(h.session.createdAt)),
-      modeLabel: h.session.mode,
-      accuracyPct: h.accuracy,
-    }));
-  }
 </script>
 
 <div class="progress-page page-transition">
