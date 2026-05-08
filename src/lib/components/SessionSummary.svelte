@@ -1,16 +1,15 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import { page } from '$app/stores';
-  import {
-    LEVEL_LABELS,
-    LEVEL_ORDER,
-    type SessionSummary as SessionSummaryType,
-    type UserLevel,
-    type SessionXpBreakdown,
-    // type Milestone,
-  } from '$lib/types';
+  import { type SessionSummary as SessionSummaryType, type SessionXpBreakdown } from '$lib/types';
   import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
+  import {
+    buildLevelTransition,
+    buildMilestoneDisplay,
+    buildXpRows,
+    shouldCelebrateScore,
+  } from './session-summary-view-model';
 
   let {
     summary,
@@ -21,30 +20,17 @@
     score?: number;
     xpBreakdown?: SessionXpBreakdown | null;
   }>();
-  const celebrate = $derived(score >= 80);
+  const celebrate = $derived(shouldCelebrateScore(score));
   const recommendation = $derived(summary.levelUpRecommendation);
   const miniLesson = $derived(summary.miniLesson ?? null);
-  const nextLevelLabel = $derived(
-    recommendation ? LEVEL_LABELS[recommendation.recommendedLevel as UserLevel] : '',
-  );
-
-  const currentLevelKey = $derived.by(() => {
-    if (!recommendation) return null;
-    const nextIdx = LEVEL_ORDER.indexOf(recommendation.recommendedLevel as UserLevel);
-    return nextIdx > 0 ? LEVEL_ORDER[nextIdx - 1] : null;
-  });
-  const currentLevelLabel = $derived(
-    currentLevelKey ? LEVEL_LABELS[currentLevelKey as UserLevel] : '',
-  );
-  const displayedMilestones = $derived.by(() => {
-    const milestones = xpBreakdown?.newMilestones ?? [];
-    if (milestones.length <= 2) return milestones;
-    return [milestones[milestones.length - 1]];
-  });
-  const hiddenMilestoneCount = $derived.by(() => {
-    const milestones = xpBreakdown?.newMilestones ?? [];
-    return milestones.length > 2 ? milestones.length - 1 : 0;
-  });
+  const xpRows = $derived(buildXpRows(xpBreakdown));
+  const milestoneDisplay = $derived(buildMilestoneDisplay(xpBreakdown?.newMilestones));
+  const displayedMilestones = $derived(milestoneDisplay.displayedMilestones);
+  const hiddenMilestoneCount = $derived(milestoneDisplay.hiddenMilestoneCount);
+  const levelTransition = $derived(buildLevelTransition(recommendation));
+  const currentLevelLabel = $derived(levelTransition.currentLevelLabel);
+  const nextLevelLabel = $derived(levelTransition.nextLevelLabel);
+  const isReadyForJapan = $derived(levelTransition.isReadyForJapan);
   const isOnPracticePage = $derived($page.url.pathname === '/practice');
 
   let displayScore = $state(0);
@@ -148,36 +134,12 @@
         <span class="xp-total">{displayXp}</span>
       </div>
       <div class="xp-breakdown">
-        {#if xpBreakdown.exerciseXp > 0}
-          <div class="xp-row">
-            <span>Correct answers</span>
-            <span>{xpBreakdown.exerciseXp}墨</span>
+        {#each xpRows as row}
+          <div class="xp-row" class:highlight={row.highlight}>
+            <span>{row.label}</span>
+            <span>{row.value}</span>
           </div>
-        {/if}
-        {#if xpBreakdown.sessionBonusXp > 0}
-          <div class="xp-row">
-            <span>Session complete</span>
-            <span>+{xpBreakdown.sessionBonusXp}墨</span>
-          </div>
-        {/if}
-        {#if xpBreakdown.perfectBonusXp > 0}
-          <div class="xp-row highlight">
-            <span>Perfect score</span>
-            <span>+{xpBreakdown.perfectBonusXp}墨</span>
-          </div>
-        {/if}
-        {#if xpBreakdown.streakBonusXp > 0}
-          <div class="xp-row highlight">
-            <span>Streak bonus</span>
-            <span>+{xpBreakdown.streakBonusXp}墨</span>
-          </div>
-        {/if}
-        {#if xpBreakdown.comboBonusXp > 0}
-          <div class="xp-row highlight">
-            <span>Combo bonus</span>
-            <span>+{xpBreakdown.comboBonusXp}墨</span>
-          </div>
-        {/if}
+        {/each}
       </div>
     </section>
   {/if}
@@ -248,7 +210,7 @@
             <span class="label">Next Level</span>
             <span class="value">
               {nextLevelLabel}
-              {#if recommendation.recommendedLevel === 'ready_for_japan'}
+              {#if isReadyForJapan}
                 🇯🇵
               {/if}
             </span>
