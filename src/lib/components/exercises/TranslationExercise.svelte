@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { OnAnswer, TranslationExercise as TranslationExerciseData } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
+  import {
+    buildAcceptedAnswers,
+    buildDirectionDisplay,
+    buildHintText,
+    buildPromptDisplay,
+  } from './translation-exercise-view-model';
   import { normalizeForComparison } from '$lib/utils/text';
 
   interface Props {
@@ -21,17 +27,10 @@
   let submittedCorrect = $state(false);
   let aiVerified = $state(false);
 
-  const hintText = $derived(
-    hintLevel === 0
-      ? ''
-      : hintLevel === 1
-        ? exercise.expectedAnswer.charAt(0) + '...'
-        : exercise.expectedAnswer.slice(0, 3) + '...',
-  );
-
-  const allAcceptedAnswers = $derived([
-    ...new Set([exercise.expectedAnswer, ...exercise.acceptedAnswers]),
-  ]);
+  const directionDisplay = $derived(buildDirectionDisplay(exercise.direction));
+  const promptDisplay = $derived(buildPromptDisplay(exercise));
+  const hintText = $derived(buildHintText(exercise.expectedAnswer, hintLevel));
+  const allAcceptedAnswers = $derived(buildAcceptedAnswers(exercise));
 
   function showHint(): void {
     if (answered) return;
@@ -128,28 +127,22 @@
 
 <section class="translation-exercise" aria-label="Translation exercise">
   <div class="direction-badge">
-    {#if exercise.direction === 'ja_to_en'}
-      <span>日本語</span>
-      <span class="arrow">→</span>
-      <span>English</span>
-    {:else}
-      <span>English</span>
-      <span class="arrow">→</span>
-      <span>日本語</span>
-    {/if}
+    <span>{directionDisplay.sourceLabel}</span>
+    <span class="arrow">→</span>
+    <span>{directionDisplay.targetLabel}</span>
   </div>
 
   <p class="exercise-title">{exercise.title}</p>
 
   <div class="prompt-area">
-    {#if exercise.direction === 'ja_to_en'}
+    {#if promptDisplay.kind === 'japanese'}
       <p class="prompt-japanese">
-        {exercise.japanese}
+        {promptDisplay.japanese}
         <InlineAudio japanese={exercise.japanese} size="md" />
       </p>
-      <p class="prompt-romaji">{exercise.romaji}</p>
+      <p class="prompt-romaji">{promptDisplay.romaji}</p>
     {:else}
-      <p class="prompt-english">{exercise.prompt}</p>
+      <p class="prompt-english">{promptDisplay.prompt}</p>
     {/if}
   </div>
 

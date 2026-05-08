@@ -104,8 +104,8 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/plans/2026-05-06-technical-debt-agentic-workflow-improvements.md`
 
 - Status: planning
-- Description: Broad internal technical-debt plan. Partially implemented through Task 10.3 SessionSummary view-model helper extraction; check the next recommended starting point before executing any lane.
-- Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals, API/profile boundaries, background tasks, and UI modularization including `src/routes/learn/session-storage.ts`, `src/routes/missions/[id]/mission-storage.ts`, `src/routes/progress/progress-view-model.ts`, and `src/lib/components/session-summary-view-model.ts`
+- Description: Broad internal technical-debt plan. Partially implemented through Task 10.3 TranslationExercise view-model helper extraction; check the next recommended starting point before executing any lane.
+- Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals, API/profile boundaries, background tasks, and UI modularization including `src/routes/learn/session-storage.ts`, `src/routes/missions/[id]/mission-storage.ts`, `src/routes/progress/progress-view-model.ts`, `src/lib/components/session-summary-view-model.ts`, and `src/lib/components/exercises/translation-exercise-view-model.ts`
 - Last verified: 2026-05-08
 
 ### `documents/plans/2026-03-27-travel-missions-design.md`
