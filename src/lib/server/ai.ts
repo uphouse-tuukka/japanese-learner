@@ -1,6 +1,8 @@
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
 import { randomUUID } from 'node:crypto';
 import { config } from '$lib/config';
+import { SESSION_MODEL } from '$lib/server/ai-models';
+import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import { LEVEL_ORDER } from '$lib/types';
 import type {
   Exercise,
@@ -117,7 +119,6 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-const SESSION_MODEL = 'gpt-5.4';
 const JAPANESE_SCRIPT_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]/u;
 const INLINE_ROMAJI_PATTERN = /^(?<japanese>.+?)\s*\((?<romaji>[A-Za-z0-9'.,\-\s]+)\)\s*$/u;
 const JAPANESE_CHOICE_WITH_ROMAJI_PATTERN =
@@ -273,21 +274,16 @@ export const TOPIC_CATEGORIES = [
 
 export type TopicCategoryKey = (typeof TOPIC_CATEGORIES)[number]['key'];
 
-let openaiClient: OpenAI | null = null;
-
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 function getOpenAiClient(): OpenAI {
-  const apiKey = config.openai.apiKey.trim();
-  if (!apiKey) {
-    throw new Error('[ai] Missing OpenAI API key in config.openai.apiKey');
-  }
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey });
-  }
-  return openaiClient;
+  return getCachedOpenAiClient({
+    scope: 'ai',
+    apiKey: config.openai.apiKey,
+    missingApiKeyMessage: '[ai] Missing OpenAI API key in config.openai.apiKey',
+  });
 }
 
 function assertString(value: unknown, fieldName: string): string {

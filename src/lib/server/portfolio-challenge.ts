@@ -1,9 +1,10 @@
-import OpenAI from 'openai';
 import { createHmac } from 'crypto';
 import { config } from '$lib/server/config';
 import { getAuthSecret } from '$lib/server/auth';
 import { generatePublicChallengePlan } from '$lib/server/ai';
 import { withAbort } from '$lib/server/async';
+import { PORTFOLIO_MODEL } from '$lib/server/ai-models';
+import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import {
   cleanupExpiredPortfolioAttempts,
   countRecentAttemptsByIp,
@@ -24,7 +25,6 @@ const SESSION_TTL_MS = 30 * 60 * 1_000;
 const MAX_STARTS_PER_IP_24H = 4;
 const MAX_COMPLETIONS_PER_COOKIE_24H = 2;
 const TARGET_EXERCISE_COUNT = 4;
-const PORTFOLIO_MODEL = 'gpt-5.4';
 
 export const SCENARIOS = [
   { id: 'food', label: 'Food & Dining', emoji: '🍜' },
@@ -100,13 +100,12 @@ export type CompleteResult =
       message: string;
     };
 
-let openaiClient: OpenAI | null = null;
-
-function getOpenAiClient(): OpenAI {
-  const apiKey = config.openai.apiKey.trim();
-  if (!apiKey) throw new Error('[portfolio] Missing OpenAI API key');
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey });
-  return openaiClient;
+function getOpenAiClient() {
+  return getCachedOpenAiClient({
+    scope: 'portfolio',
+    apiKey: config.openai.apiKey,
+    missingApiKeyMessage: '[portfolio] Missing OpenAI API key',
+  });
 }
 
 function hashIp(ip: string): string {
