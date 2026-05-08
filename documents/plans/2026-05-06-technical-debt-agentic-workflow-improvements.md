@@ -454,16 +454,30 @@ Completed task:
 
 - [x] Task 7.1 — Centralized session/portfolio model constants in `src/lib/server/ai-models.ts` and centralized OpenAI client construction in `src/lib/server/openai-client.ts`. `src/lib/server/ai.ts` and `src/lib/server/portfolio-challenge.ts` now use the shared constants/client helper while preserving exact model strings, per-scope client caching, missing-API-key messages, prompts, and public behavior. Other OpenAI-backed modules were intentionally left untouched for later scoped work.
 
+### Completed AI session prompt-builder extraction batch
+
+**Completed on:** 2026-05-08
+
+**Commit:** `chore: extract ai session prompts`
+
+**Validation:** Added `src/lib/server/ai-session-prompts.test.ts` prompt-contract coverage for stable topic keys, session target-count/history shaping, rotation/handoff/cultural-note prompt context, and the public challenge multiple-choice guardrails. Targeted validation `npm test -- src/lib/server/ai-session-prompts.test.ts src/lib/server/ai.session-summary.test.ts src/lib/server/ai.public-challenge.test.ts` passed with `31` tests / `3` files. `npm run check && npm run lint` passed after removing an unused destructured prompt-builder return value. `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`242` tests / `31` files), and production build. `git diff --check` passed. Added-line secret and dangerous-pattern scans found no findings. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed. Independent code-quality/security review initially found the unused `sessionHistory` destructure in `src/lib/server/ai.ts`; after removing it, re-review approved with no blockers.
+
+Completed task slice:
+
+- [x] Task 7.2 prompt-builder first step — Extracted session/public-challenge prompt construction from `src/lib/server/ai.ts` into `src/lib/server/ai-session-prompts.ts`. `ai.ts` now delegates to `buildSessionPlanPrompt` and `buildPublicChallengePrompt`, imports shared `LEVEL_RULES` for existing validation, and re-exports `TOPIC_CATEGORIES` / `TopicCategoryKey` for existing route compatibility. Prompt text, target-count behavior, session-history slicing, public challenge scenario payloads, and current logging behavior were preserved; logging standardization and normalizer extraction were intentionally left for later slices.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2/DB-6.3/AI-7.1 batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2/DB-6.3/AI-7.1/AI-7.2-prompt-builder batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue AI internals (Phase 7), starting with Task 7.2 prompt-builder/normalizer extraction. Keep this as a small mechanical extraction with prompt-contract tests; do not mix logging standardization into the same batch.
+1. Continue AI internals (Phase 7), starting with the remaining Task 7.2 normalizer/validation extraction from `src/lib/server/ai.ts` into a focused server-only module such as `src/lib/server/ai-session-normalizers.ts`. Keep it mechanical with normalizer contract tests; do not mix logging standardization into the same batch.
 2. Continue background task boundary work (Phase 9) as a separate non-overlapping lane.
 3. Continue lower-priority Svelte modularization (Phase 10) after server/internal boundaries have cleaner handoffs.
 4. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
 
-Still incomplete from the whole plan: AI prompt/normalizer decomposition, AI logging standardization, background task boundary, Svelte modularization, and final documentation closure. A future mission FK migration remains a documented follow-up in Decision 004, but Task 6.3's cautious decision slice is complete. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, Task 6.2 DB migration idempotency is complete, Task 6.3 mission DB constraint decision work is complete, and Task 7.1 AI model/client extraction is complete; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: AI normalizer/remaining prompt decomposition, AI logging standardization, background task boundary, Svelte modularization, and final documentation closure. A future mission FK migration remains a documented follow-up in Decision 004, but Task 6.3's cautious decision slice is complete. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, Task 6.2 DB migration idempotency is complete, Task 6.3 mission DB constraint decision work is complete, Task 7.1 AI model/client extraction is complete, and the Task 7.2 session/public-challenge prompt-builder slice is complete; broader route adoption remains intentionally incomplete.
 
 ---
 
