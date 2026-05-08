@@ -104,8 +104,8 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/plans/2026-05-06-technical-debt-agentic-workflow-improvements.md`
 
 - Status: planning
-- Description: Broad internal technical-debt plan. Partially implemented; check task checkboxes and current code before executing any lane.
-- Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals, API/profile boundaries, UI modularization
+- Description: Broad internal technical-debt plan. Partially implemented through the Task 7.2 summary/journal prompt extraction; check task checkboxes and current code before executing any lane.
+- Source files affected: docs/workflow, tooling/CI, shared validators/helpers, DB internals, AI internals including `src/lib/server/ai-summary-prompts.ts`, API/profile boundaries, UI modularization
 - Last verified: 2026-05-08
 
 ### `documents/plans/2026-03-27-travel-missions-design.md`

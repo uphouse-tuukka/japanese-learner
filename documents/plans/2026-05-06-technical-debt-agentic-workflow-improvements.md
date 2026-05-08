@@ -482,17 +482,31 @@ Completed task slice:
 
 - [x] Task 7.2 normalizer/validation step — Extracted session/public-challenge lesson, exercise, mini-lesson, string-array, and exercise-set normalization/validation helpers from `src/lib/server/ai.ts` into `src/lib/server/ai-session-normalizers.ts`. `ai.ts` now delegates to the focused server-only module while preserving public exports, prompt/model/client behavior, validation error contracts, and current logging behavior. Logging standardization and remaining summary/journal prompt decomposition were intentionally left for later slices.
 
+### Completed AI session summary/journal prompt extraction batch
+
+**Completed on:** 2026-05-08
+
+**Commit:** `chore: extract ai summary prompts`
+
+**Validation:** Added `src/lib/server/ai-summary-prompts.test.ts` contract coverage for summary result accuracy/details, progress-journal/recent-session context, suppress-level-promotion guidance, first-session journal fallback, ordered journal headings, the no-romaji journal instruction, and session payload shaping. Targeted validation `npm test -- src/lib/server/ai-summary-prompts.test.ts src/lib/server/ai.session-summary.test.ts src/lib/server/ai.public-challenge.test.ts` passed with `31` tests / `3` files. `npm run check`, `npm run lint`, and `git diff --check` passed. `npm run validate:ci` passed after the documentation updates, including format, Svelte check, ESLint, Vitest (`253` tests / `33` files), and production build. Added-line secret and dangerous-pattern scans found no findings. Existing Vercel optional dependency warnings were unchanged. A temporary-worktree RED check was blocked by tool/user policy and was not retried.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved with no blockers.
+
+Completed task slice:
+
+- [x] Task 7.2 summary/journal prompt step — Extracted session summary and progress journal prompt construction from `src/lib/server/ai.ts` into `src/lib/server/ai-summary-prompts.ts`. `ai.ts` now delegates to `buildSessionSummaryPrompt` and `buildUpdatedJournalPrompt` while preserving OpenAI model/client usage, temperatures, JSON response format, parsing/normalization, token usage, logging behavior, public exports/aliases, result-detail payloads, progress-journal fallback, recent-session compaction, key-phrase caps, and suppress-level-promotion guidance. Logging standardization and any remaining facade work were intentionally left for later slices.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2/DB-6.3/AI-7.1/AI-7.2-prompt-builder/AI-7.2-normalizer batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2/DB-6.3/AI-7.1/AI-7.2-prompt-builder/AI-7.2-normalizer/AI-7.2-summary-journal batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue AI internals (Phase 7), starting with the remaining Task 7.2 prompt/facade decomposition still inside `src/lib/server/ai.ts`, such as summary/journal prompt construction (`src/lib/server/ai-summary-prompts.ts`) or a focused public-challenge facade (`src/lib/server/ai-public-challenge.ts`). Keep it mechanical with contract tests; do not mix logging standardization into the same batch.
-2. Continue AI logging standardization (Task 7.3) only after the remaining prompt/facade extraction scope is intentionally parked or completed.
+1. Continue AI internals (Phase 7), if still desired, with a focused public-challenge facade extraction from `src/lib/server/ai.ts` into `src/lib/server/ai-public-challenge.ts`. Keep it mechanical with contract tests; do not mix logging standardization into the same batch.
+2. Continue AI logging standardization (Task 7.3) only after the remaining facade extraction scope is intentionally parked or completed.
 3. Continue background task boundary work (Phase 9) as a separate non-overlapping lane.
 4. Continue lower-priority Svelte modularization (Phase 10) after server/internal boundaries have cleaner handoffs.
 5. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
 
-Still incomplete from the whole plan: AI remaining prompt/facade decomposition, AI logging standardization, background task boundary, Svelte modularization, and final documentation closure. A future mission FK migration remains a documented follow-up in Decision 004, but Task 6.3's cautious decision slice is complete. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, Task 6.2 DB migration idempotency is complete, Task 6.3 mission DB constraint decision work is complete, Task 7.1 AI model/client extraction is complete, and the Task 7.2 session/public-challenge prompt-builder and normalizer/validation slices are complete; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: optional AI public-challenge facade decomposition, AI logging standardization, background task boundary, Svelte modularization, and final documentation closure. A future mission FK migration remains a documented follow-up in Decision 004, but Task 6.3's cautious decision slice is complete. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, Task 6.2 DB migration idempotency is complete, Task 6.3 mission DB constraint decision work is complete, Task 7.1 AI model/client extraction is complete, and the Task 7.2 session/public-challenge prompt-builder, normalizer/validation, and summary/journal prompt slices are complete; broader route adoption remains intentionally incomplete.
 
 ---
 
@@ -1485,7 +1499,7 @@ npm run validate
 
 ### Task 7.2: Extract AI prompt builders and normalizers
 
-**Status:** Partially completed: the session/public-challenge prompt-builder slice is complete in `chore: extract ai session prompts`, and the session/public-challenge normalizer/validation slice is complete in `chore: extract ai session normalizers`. Remaining optional decomposition should be scoped to summary/journal prompt construction or a public-challenge facade, not logging.
+**Status:** Partially completed: the session/public-challenge prompt-builder slice is complete in `chore: extract ai session prompts`, the session/public-challenge normalizer/validation slice is complete in `chore: extract ai session normalizers`, and the summary/journal prompt-builder slice is complete in `chore: extract ai summary prompts`. Remaining optional decomposition should be scoped to a public-challenge facade, not logging.
 
 **Objective:** Make `ai.ts` easier to reason about without changing prompt contracts.
 
