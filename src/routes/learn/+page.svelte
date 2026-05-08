@@ -37,16 +37,16 @@
   } from '$lib/stores/gamification.svelte';
   import type { Exercise, ExerciseAnswerPayload, ExerciseType, Lesson, Session } from '$lib/types';
   import type { PageData } from './$types';
-
-  type UiState =
-    | 'idle'
-    | 'loading'
-    | 'lesson'
-    | 'active'
-    | 'completing'
-    | 'done'
-    | 'budget_exhausted'
-    | 'error';
+  import {
+    clearLearnPageStorage,
+    createLearnStorageKeys,
+    formatSavedAt,
+    restoreLearnLesson,
+    restoreResumableLearnUiState,
+    saveLearnLesson,
+    saveLearnUiState,
+    type LearnUiState,
+  } from './session-storage';
 
   type GenerateResponse = {
     ok: boolean;
@@ -66,78 +66,36 @@
   };
 
   let { data } = $props<{ data: PageData }>();
-  let uiState = $state<UiState>('idle');
+  let uiState = $state<LearnUiState>('idle');
   let errorMessage = $state('');
   let lesson = $state<Lesson | null>(null);
 
-  const STORAGE_KEY = $derived(`learn:${data.selectedUserId}`);
-  const LESSON_STORAGE_KEY = $derived(`jp-lesson:learn:${data.selectedUserId}`);
-  const UI_STATE_STORAGE_KEY = $derived(`jp-uistate:learn:${data.selectedUserId}`);
+  const storageKeys = $derived(createLearnStorageKeys(data.selectedUserId));
   let showContinuePrompt = $state(false);
   let continueSavedAtLabel = $state('');
 
-  function saveLessonToStorage(lessonData: Lesson | null): void {
-    try {
-      if (lessonData) {
-        sessionStorage.setItem(LESSON_STORAGE_KEY, JSON.stringify(lessonData));
-      } else {
-        sessionStorage.removeItem(LESSON_STORAGE_KEY);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function restoreLessonFromStorage(): Lesson | null {
-    try {
-      const raw = sessionStorage.getItem(LESSON_STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw) as Lesson;
-    } catch {
-      return null;
-    }
-  }
-
-  function saveState(targetUiState: UiState): void {
-    saveSessionToStorage(STORAGE_KEY);
-    saveGamificationToStorage(STORAGE_KEY);
-    saveLessonToStorage(lesson);
-    try {
-      sessionStorage.setItem(UI_STATE_STORAGE_KEY, targetUiState);
-    } catch {
-      /* ignore */
-    }
+  function saveState(targetUiState: LearnUiState): void {
+    saveSessionToStorage(storageKeys.session);
+    saveGamificationToStorage(storageKeys.session);
+    saveLearnLesson(storageKeys.lesson, lesson);
+    saveLearnUiState(storageKeys.uiState, targetUiState);
   }
 
   function clearAllStorage(): void {
-    clearSessionStorage(STORAGE_KEY);
-    clearGamificationStorage(STORAGE_KEY);
-    saveLessonToStorage(null);
-    try {
-      sessionStorage.removeItem(UI_STATE_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    clearSessionStorage(storageKeys.session);
+    clearGamificationStorage(storageKeys.session);
+    clearLearnPageStorage(storageKeys);
   }
 
   function continueSession(): void {
-    const restored = restoreSessionFromStorage(STORAGE_KEY);
+    const restored = restoreSessionFromStorage(storageKeys.session);
     if (!restored) {
       showContinuePrompt = false;
       return;
     }
-    restoreGamificationFromStorage(STORAGE_KEY);
-    lesson = restoreLessonFromStorage();
-    try {
-      const savedState = sessionStorage.getItem(UI_STATE_STORAGE_KEY) as UiState | null;
-      if (savedState === 'lesson' || savedState === 'active') {
-        uiState = savedState;
-      } else {
-        uiState = 'active';
-      }
-    } catch {
-      uiState = 'active';
-    }
+    restoreGamificationFromStorage(storageKeys.session);
+    lesson = restoreLearnLesson(storageKeys.lesson);
+    uiState = restoreResumableLearnUiState(storageKeys.uiState);
     showContinuePrompt = false;
     continueSavedAtLabel = '';
   }
@@ -148,19 +106,6 @@
     continueSavedAtLabel = '';
     resetSession();
     resetGamification();
-  }
-
-  function formatSavedAt(savedAt: string | null): string {
-    if (!savedAt) return '';
-    const date = new Date(savedAt);
-    if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
   }
 
   /* — Loading animation state — */
@@ -267,9 +212,9 @@
   });
 
   $effect(() => {
-    if (hasSavedSession(STORAGE_KEY) && uiState === 'idle') {
+    if (hasSavedSession(storageKeys.session) && uiState === 'idle') {
       showContinuePrompt = true;
-      continueSavedAtLabel = formatSavedAt(getSavedSessionAt(STORAGE_KEY));
+      continueSavedAtLabel = formatSavedAt(getSavedSessionAt(storageKeys.session));
     }
   });
 
