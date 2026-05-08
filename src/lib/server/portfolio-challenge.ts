@@ -4,6 +4,7 @@ import { getAuthSecret } from '$lib/server/auth';
 import { generatePublicChallengePlan } from '$lib/server/ai';
 import { withAbort } from '$lib/server/async';
 import { PORTFOLIO_MODEL } from '$lib/server/ai-models';
+import { logError, logWarn } from '$lib/server/logger';
 import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import {
   cleanupExpiredPortfolioAttempts,
@@ -145,6 +146,10 @@ function safeParseJson<T>(value: string | null, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function loggableErrorType(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
 }
 
 function isBaseExercise(value: unknown): value is Exercise {
@@ -422,8 +427,8 @@ async function generatePublicSummary(
         : ['The app would replay this scenario and focus on the missed items.'],
     };
   } catch (error) {
-    console.warn('[portfolio]', 'Public summary generation failed, using fallback', {
-      error: (error as Error).message,
+    logWarn('portfolio', 'public summary generation failed, using fallback', {
+      errorType: loggableErrorType(error),
     });
     const fallback = buildDeterministicSummary(scenario, lesson, exercises, answers);
     return {
@@ -449,7 +454,9 @@ export async function startSession(
     };
   }
 
-  void cleanupExpiredPortfolioAttempts().catch(console.error);
+  void cleanupExpiredPortfolioAttempts().catch((error) => {
+    logError('portfolio', 'cleanup expired attempts failed', { error });
+  });
 
   const ipHash = hashIp(ip);
   const resolvedCookieId = cookieId ?? `anon-${ipHash.slice(0, 12)}`;
@@ -462,7 +469,7 @@ export async function startSession(
   ]);
 
   if (!config.portfolio.quotaDisabled && ipAttempts >= MAX_STARTS_PER_IP_24H) {
-    console.warn('[portfolio]', 'IP quota exceeded', { ipHash, ipAttempts, recentCookieStarts });
+    logWarn('portfolio', 'IP quota exceeded', { ipHash, ipAttempts, recentCookieStarts });
     return {
       ok: false,
       reason: 'quota_exceeded',
@@ -471,8 +478,7 @@ export async function startSession(
   }
 
   if (!config.portfolio.quotaDisabled && completedCount >= MAX_COMPLETIONS_PER_COOKIE_24H) {
-    console.warn('[portfolio]', 'Cookie quota exceeded', {
-      resolvedCookieId,
+    logWarn('portfolio', 'cookie quota exceeded', {
       completedCount,
       recentCookieStarts,
       configQuotaDisabled: config.portfolio.quotaDisabled,
@@ -517,7 +523,7 @@ export async function startSession(
         const listeningCount = plan.exercises.filter(
           (exercise) => exercise.type === 'listening',
         ).length;
-        console.warn('[portfolio]', 'Exercise repair left too few exercises, retrying', {
+        logWarn('portfolio', 'exercise repair left too few exercises, retrying', {
           attempt,
           maxGenerationAttempts,
           scenario,
@@ -535,24 +541,24 @@ export async function startSession(
         const generationErrorMessage = error instanceof Error ? error.message : String(error);
         lastGenerationError = error instanceof Error ? error : new Error(generationErrorMessage);
         if (attempt < maxGenerationAttempts) {
-          console.warn('[portfolio]', 'Session generation attempt failed, retrying', {
+          logWarn('portfolio', 'session generation attempt failed, retrying', {
             attempt,
             maxGenerationAttempts,
             scenario,
             supportsBrowserVoice,
             requestedTargetExerciseCount: generationTargetExerciseCount,
-            error: generationErrorMessage,
+            errorType: loggableErrorType(error),
             recentCookieStarts,
           });
           continue;
         }
-        console.warn('[portfolio]', 'Session generation attempt failed', {
+        logWarn('portfolio', 'session generation attempt failed', {
           attempt,
           maxGenerationAttempts,
           scenario,
           supportsBrowserVoice,
           requestedTargetExerciseCount: generationTargetExerciseCount,
-          error: generationErrorMessage,
+          errorType: loggableErrorType(error),
           recentCookieStarts,
         });
       }
@@ -560,11 +566,11 @@ export async function startSession(
 
     if (!lesson || exercises.length < TARGET_EXERCISE_COUNT) {
       if (lastGenerationError) {
-        console.warn('[portfolio]', 'All session generation attempts failed', {
+        logWarn('portfolio', 'all session generation attempts failed', {
           scenario,
           supportsBrowserVoice,
           requestedTargetExerciseCount: generationTargetExerciseCount,
-          error: lastGenerationError.message,
+          errorType: loggableErrorType(lastGenerationError),
           recentCookieStarts,
         });
       }
@@ -606,14 +612,14 @@ export async function startSession(
     };
   } catch (error) {
     if (controller.signal.aborted) {
-      console.warn('[portfolio]', 'Session generation timed out');
+      logWarn('portfolio', 'session generation timed out');
       return {
         ok: false,
         reason: 'timeout',
         message: 'Session generation timed out. Please try again.',
       };
     }
-    console.warn('[portfolio]', 'Session generation failed', { error: (error as Error).message });
+    logWarn('portfolio', 'session generation failed', { errorType: loggableErrorType(error) });
     return {
       ok: false,
       reason: 'generation_failed',
@@ -739,8 +745,8 @@ export async function completeSession(
   try {
     summaryData = await generatePublicSummary(scenario, lesson, exercises, answers);
   } catch (error) {
-    console.warn('[portfolio]', 'Summary generation failed unexpectedly', {
-      error: (error as Error).message,
+    logWarn('portfolio', 'summary generation failed unexpectedly', {
+      errorType: loggableErrorType(error),
     });
     return { ok: false, reason: 'summary_failed', message: 'Could not create session summary.' };
   }

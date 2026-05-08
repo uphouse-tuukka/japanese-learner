@@ -11,6 +11,7 @@ import {
   validateExerciseSet,
 } from '$lib/server/ai-session-normalizers';
 import { buildPublicChallengePrompt } from '$lib/server/ai-session-prompts';
+import { logInfo, logWarn } from '$lib/server/logger';
 import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import type { Exercise, SessionPlan } from '$lib/types';
 
@@ -49,8 +50,10 @@ export async function generatePublicChallengePlan(input: {
   scenarioLabel: string;
   targetExerciseCount: number;
 }): Promise<SessionPlan> {
-  // eslint-disable-next-line no-console
-  console.log('[ai] Generating public challenge plan for scenario:', input.scenario);
+  logInfo('ai', 'generating public challenge plan', {
+    scenario: input.scenario,
+    targetExerciseCount: input.targetExerciseCount,
+  });
 
   const client = getOpenAiClient();
   const publicChallengePrompt = buildPublicChallengePrompt(input);
@@ -86,7 +89,10 @@ export async function generatePublicChallengePlan(input: {
         normalizePublicChallengeExercise(normalizeExercise(rawExercises[i], i, 'beginner')),
       );
     } catch (err) {
-      console.warn(`[ai] Skipping public challenge exercise ${i}: ${(err as Error).message}`);
+      logWarn('ai', 'skipping invalid public challenge exercise', {
+        exerciseIndex: i,
+        errorType: err instanceof Error ? err.name : typeof err,
+      });
     }
   }
   if (validExercises.length === 0) {

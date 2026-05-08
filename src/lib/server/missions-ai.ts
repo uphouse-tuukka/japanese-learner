@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from './config';
 import { recordTokenUsage } from './db';
+import { logWarn } from './logger';
 import type { Mission, MissionChoice, MissionMode, MissionTurn } from '../types';
 
 const SESSION_MODEL = 'gpt-5.4';
@@ -359,11 +360,11 @@ export async function generateMissionTurn(input: {
       tokenUsage: usage,
     };
   } catch (error) {
-    console.warn('[missions-ai] Failed to parse generateMissionTurn response, using fallback', {
+    logWarn('missions-ai', 'failed to parse generateMissionTurn response, using fallback', {
       missionId: input.mission.id,
       mode: input.mode,
       turnNumber: input.turnNumber,
-      error: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof Error ? error.name : typeof error,
     });
 
     const fallbackTurn: MissionTurn = {
@@ -600,10 +601,11 @@ export async function evaluateUserResponse(input: {
       tokenUsage: usage,
     };
   } catch (error) {
-    console.warn('[missions-ai] Failed to parse evaluateUserResponse output, using fallback', {
+    logWarn('missions-ai', 'failed to parse evaluateUserResponse output, using fallback', {
       missionId: input.mission.id,
+      mode: input.mode,
       turnNumber: input.turnNumber,
-      error: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof Error ? error.name : typeof error,
     });
 
     return {

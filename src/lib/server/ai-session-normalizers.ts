@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { LEVEL_RULES } from '$lib/server/ai-session-prompts';
+import { logWarn } from '$lib/server/logger';
 import type {
   Exercise,
   ExerciseType,
@@ -375,10 +376,10 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
       ? normalizedCorrectAnswer
       : choices[0];
     if (correctAnswer !== normalizedCorrectAnswer) {
-      console.warn('[ai] multiple_choice correctAnswer not in choices; using first choice', {
+      logWarn('ai', 'multiple_choice correctAnswer not in choices; using first choice', {
         exerciseIndex: index,
         type: typeRaw,
-        providedCorrectAnswer: normalizedCorrectAnswer,
+        choiceCount: choices.length,
       });
     }
     return {
@@ -474,10 +475,10 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
     ? normalizedListeningCorrectAnswer
     : listeningChoices[0];
   if (listeningCorrectAnswer !== normalizedListeningCorrectAnswer) {
-    console.warn('[ai] listening correctAnswer not in choices; using first choice', {
+    logWarn('ai', 'listening correctAnswer not in choices; using first choice', {
       exerciseIndex: index,
       type: typeRaw,
-      providedCorrectAnswer: normalizedListeningCorrectAnswer,
+      choiceCount: listeningChoices.length,
     });
   }
   return {

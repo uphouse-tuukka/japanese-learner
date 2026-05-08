@@ -15,6 +15,7 @@ import {
   buildSessionSummaryPrompt,
   buildUpdatedJournalPrompt,
 } from '$lib/server/ai-summary-prompts';
+import { logInfo, logWarn } from '$lib/server/logger';
 import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import { LEVEL_ORDER } from '$lib/types';
 export { generatePublicChallengePlan } from '$lib/server/ai-public-challenge';
@@ -125,7 +126,11 @@ export async function generateSessionPlan(input: {
     try {
       validExercises.push(normalizeExercise(rawExercises[i], i, input.userLevel));
     } catch (err) {
-      console.warn(`[ai] Skipping exercise ${i}: ${(err as Error).message}`);
+      logWarn('ai', 'skipping invalid exercise', {
+        exerciseIndex: i,
+        userLevel: input.userLevel,
+        errorType: err instanceof Error ? err.name : typeof err,
+      });
     }
   }
   if (validExercises.length === 0) {
@@ -164,11 +169,12 @@ export async function generateSessionPlan(input: {
     },
   };
 
-  console.warn('[ai] generated session plan', {
+  logInfo('ai', 'generated session plan', {
     sessionId: plan.id,
     userId: plan.userId,
     exerciseCount: plan.exercises.length,
-    focus: plan.metadata.focus,
+    category: plan.metadata.category,
+    userLevel: plan.metadata.userLevel,
     tokensInput: usage.input,
     tokensOutput: usage.output,
   });
@@ -220,19 +226,14 @@ export async function generateSessionSummary(input: {
     throw new Error('[ai] OpenAI response missing output_text for summary generation');
   }
 
-  console.warn('[ai] raw session summary response', {
+  const usage = getUsageFromResponse(response);
+  logInfo('ai', 'received session summary response', {
     sessionId: input.sessionId,
     responseId: response.id,
     status: response.status,
-  });
-  const summaryOutputTextPreview =
-    response.output_text.length > 100
-      ? `${response.output_text.slice(0, 100)}[truncated]`
-      : response.output_text;
-  console.warn('[ai] raw session summary output_text', {
-    sessionId: input.sessionId,
-    outputTextPreview: summaryOutputTextPreview,
     outputTextLength: response.output_text.length,
+    tokensInput: usage.input,
+    tokensOutput: usage.output,
   });
 
   const parsed = JSON.parse(response.output_text) as Record<string, unknown>;
@@ -288,7 +289,7 @@ export async function generateSessionSummary(input: {
   ]);
   const miniLesson = normalizeMiniLesson(miniLessonRaw);
   if (miniLessonRaw != null && !miniLesson) {
-    console.warn('[ai] mini lesson output was present but could not be normalized', {
+    logWarn('ai', 'mini lesson output was present but could not be normalized', {
       sessionId: input.sessionId,
     });
   }
@@ -354,8 +355,7 @@ export async function generateSessionSummary(input: {
     levelUpRecommendation,
   };
 
-  const usage = getUsageFromResponse(response);
-  console.warn('[ai] generated session summary', {
+  logInfo('ai', 'generated session summary', {
     sessionId: input.sessionId,
     tokensInput: usage.input,
     tokensOutput: usage.output,
@@ -400,7 +400,7 @@ export async function generateUpdatedJournal(input: {
   const usage = getUsageFromResponse(response);
   const journal = assertString(response.output_text, 'journal');
 
-  console.warn('[ai] generated updated progress journal', {
+  logInfo('ai', 'generated updated progress journal', {
     sessionId: input.sessionSummary.sessionId,
     userId: input.sessionSummary.userId,
     tokensInput: usage.input,
