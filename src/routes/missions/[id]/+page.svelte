@@ -15,6 +15,14 @@
     MissionTurn,
   } from '$lib/types';
   import type { PageData } from './$types';
+  import {
+    clearMissionStorage as clearStoredMissionStorage,
+    createMissionStorageKey,
+    hasSavedMissionState as hasStoredMissionState,
+    restoreMissionState as restoreStoredMissionState,
+    saveMissionState as saveStoredMissionState,
+    type MissionStorageState,
+  } from './mission-storage';
 
   type MissionUiState =
     | 'ready'
@@ -68,88 +76,54 @@
     latestTurnElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function getMissionStorageKey(): string {
-    return `jp-mission:${data.mission.id}:${data.selectedUserId}`;
+  const missionStorageKey = $derived(createMissionStorageKey(data.mission.id, data.selectedUserId));
+
+  function getCurrentMissionState(): MissionStorageState {
+    return {
+      mode,
+      userMissionId,
+      turns,
+      currentTurnIndex,
+      sceneDescription,
+      characterName,
+      characterEmoji,
+      totalTurns,
+      correctCount,
+      naturalCount,
+      hintsEnabled,
+      awaitingCompletion,
+    };
   }
 
-  type MissionStorageState = {
-    mode: MissionMode;
-    userMissionId: string;
-    turns: MissionTurn[];
-    currentTurnIndex: number;
-    sceneDescription: string;
-    characterName: string;
-    characterEmoji: string;
-    totalTurns: number;
-    correctCount: number;
-    naturalCount: number;
-    hintsEnabled: boolean;
-    awaitingCompletion: boolean;
-  };
-
   function saveMissionState(): void {
-    try {
-      const stateData: MissionStorageState = {
-        mode,
-        userMissionId,
-        turns,
-        currentTurnIndex,
-        sceneDescription,
-        characterName,
-        characterEmoji,
-        totalTurns,
-        correctCount,
-        naturalCount,
-        hintsEnabled,
-        awaitingCompletion,
-      };
-      sessionStorage.setItem(getMissionStorageKey(), JSON.stringify(stateData));
-    } catch {
-      // ignore
-    }
+    saveStoredMissionState(missionStorageKey, getCurrentMissionState());
   }
 
   function restoreMissionState(): boolean {
-    try {
-      const raw = sessionStorage.getItem(getMissionStorageKey());
-      if (!raw) return false;
-      const saved = JSON.parse(raw) as MissionStorageState;
-      if (!saved.userMissionId || !saved.turns || saved.turns.length === 0) return false;
-      mode = saved.mode;
-      userMissionId = saved.userMissionId;
-      turns = saved.turns;
-      currentTurnIndex = saved.currentTurnIndex;
-      sceneDescription = saved.sceneDescription;
-      characterName = saved.characterName;
-      characterEmoji = saved.characterEmoji;
-      totalTurns = saved.totalTurns;
-      correctCount = saved.correctCount;
-      naturalCount = saved.naturalCount;
-      hintsEnabled = saved.hintsEnabled ?? true;
-      awaitingCompletion = saved.awaitingCompletion ?? false;
-      return true;
-    } catch {
-      return false;
-    }
+    const saved = restoreStoredMissionState(missionStorageKey);
+    if (!saved) return false;
+
+    mode = saved.mode;
+    userMissionId = saved.userMissionId;
+    turns = saved.turns;
+    currentTurnIndex = saved.currentTurnIndex;
+    sceneDescription = saved.sceneDescription;
+    characterName = saved.characterName;
+    characterEmoji = saved.characterEmoji;
+    totalTurns = saved.totalTurns;
+    correctCount = saved.correctCount;
+    naturalCount = saved.naturalCount;
+    hintsEnabled = saved.hintsEnabled;
+    awaitingCompletion = saved.awaitingCompletion;
+    return true;
   }
 
   function hasSavedMissionState(): boolean {
-    try {
-      const raw = sessionStorage.getItem(getMissionStorageKey());
-      if (!raw) return false;
-      const data = JSON.parse(raw);
-      return !!(data?.userMissionId && data?.turns?.length > 0);
-    } catch {
-      return false;
-    }
+    return hasStoredMissionState(missionStorageKey);
   }
 
   function clearMissionStorage(): void {
-    try {
-      sessionStorage.removeItem(getMissionStorageKey());
-    } catch {
-      // ignore
-    }
+    clearStoredMissionStorage(missionStorageKey);
   }
 
   function continueMission(): void {
