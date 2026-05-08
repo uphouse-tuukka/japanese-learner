@@ -9,6 +9,16 @@ import {
 
 type StatementInput = InStatement;
 
+const PORTFOLIO_V2_COLUMN_NAMES = [
+  'scenario',
+  'lesson',
+  'exercises',
+  'answers',
+  'current_step',
+  'summary',
+  'supports_browser_voice',
+] as const;
+
 function sqlText(statement: StatementInput): string {
   return typeof statement === 'string' ? statement : statement.sql;
 }
@@ -23,10 +33,21 @@ class FakeMigrationDb {
   readonly batchCalls: StatementInput[][] = [];
   readonly insertedMigrationKeys: string[] = [];
   private readonly existingMigrationKeys: Set<string>;
+  private readonly portfolioColumns: Set<string>;
+  private readonly portfolioTableExists: boolean;
   private readonly userXpCreateSql: string;
 
-  constructor(input: { existingMigrationKeys?: string[]; userXpCreateSql?: string } = {}) {
+  constructor(
+    input: {
+      existingMigrationKeys?: string[];
+      portfolioColumns?: string[];
+      portfolioTableExists?: boolean;
+      userXpCreateSql?: string;
+    } = {},
+  ) {
     this.existingMigrationKeys = new Set(input.existingMigrationKeys ?? []);
+    this.portfolioColumns = new Set(input.portfolioColumns ?? []);
+    this.portfolioTableExists = input.portfolioTableExists ?? true;
     this.userXpCreateSql = input.userXpCreateSql ?? '';
   }
 
@@ -47,6 +68,19 @@ class FakeMigrationDb {
       return { rows: [{ sql: this.userXpCreateSql }] };
     }
 
+    if (sql.includes('sqlite_master') && firstArg(statement) === 'portfolio_challenge_attempts') {
+      return { rows: this.portfolioTableExists ? [{ found: 1 }] : [] };
+    }
+
+    if (sql.includes('PRAGMA table_info(portfolio_challenge_attempts)')) {
+      return { rows: Array.from(this.portfolioColumns, (name) => ({ name })) };
+    }
+
+    if (sql.includes('ALTER TABLE portfolio_challenge_attempts ADD COLUMN')) {
+      this.addPortfolioColumn(sql);
+      return { rows: [] };
+    }
+
     if (sql.includes('INSERT INTO _migrations')) {
       const key = firstArg(statement);
       this.insertedMigrationKeys.push(String(key));
@@ -59,12 +93,41 @@ class FakeMigrationDb {
 
   async batch(statements: StatementInput[]): Promise<unknown[]> {
     this.batchCalls.push(statements);
+    for (const statement of statements) {
+      const sql = sqlText(statement);
+      if (sql.includes('ALTER TABLE portfolio_challenge_attempts ADD COLUMN')) {
+        this.addPortfolioColumn(sql);
+      }
+    }
     return [];
   }
 
   executeSql(): string[] {
     return this.executeCalls.map(sqlText);
   }
+
+  private addPortfolioColumn(sql: string): void {
+    if (!this.portfolioTableExists) {
+      throw new Error('no such table: portfolio_challenge_attempts');
+    }
+
+    const columnName = sql.match(/ADD COLUMN\s+([a-z_]+)/i)?.[1];
+    if (!columnName) {
+      throw new Error(`Could not parse portfolio ADD COLUMN statement: ${sql}`);
+    }
+
+    if (this.portfolioColumns.has(columnName)) {
+      throw new Error(`duplicate column name: ${columnName}`);
+    }
+
+    this.portfolioColumns.add(columnName);
+  }
+}
+
+function portfolioAlterSql(db: FakeMigrationDb): string[] {
+  return [...db.executeCalls, ...db.batchCalls.flat()]
+    .map(sqlText)
+    .filter((sql) => sql.includes('ALTER TABLE portfolio_challenge_attempts ADD COLUMN'));
 }
 
 describe('hasUserXpMissionReasons', () => {
@@ -87,7 +150,7 @@ describe('hasUserXpMissionReasons', () => {
 });
 
 describe('runDatabaseMigrations', () => {
-  it('keeps the current migration order and statements when migration markers are absent', async () => {
+  it('runs current user_xp migration and adds all portfolio v2 columns when migration markers are absent', async () => {
     const db = new FakeMigrationDb({
       userXpCreateSql:
         "CREATE TABLE user_xp (reason TEXT CHECK(reason IN ('exercise_correct','session_complete','perfect_score','streak_bonus','combo_bonus')))",
@@ -96,14 +159,19 @@ describe('runDatabaseMigrations', () => {
     await runDatabaseMigrations(db);
 
     expect(db.executeSql()[0]).toContain('CREATE TABLE IF NOT EXISTS _migrations');
-    expect(db.batchCalls).toHaveLength(2);
     expect(db.batchCalls[0].map(sqlText).join('\n')).toContain(
       'ALTER TABLE user_xp RENAME TO user_xp_old;',
     );
     expect(db.batchCalls[0].map(sqlText).join('\n')).toContain('mission_natural_phrasing');
-    expect(db.batchCalls[1].map(sqlText).join('\n')).toContain(
+    expect(portfolioAlterSql(db)).toEqual([
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN scenario TEXT DEFAULT NULL;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN lesson TEXT DEFAULT NULL;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN exercises TEXT DEFAULT NULL;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN answers TEXT DEFAULT NULL;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN current_step INTEGER DEFAULT 0;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN summary TEXT DEFAULT NULL;',
       'ALTER TABLE portfolio_challenge_attempts ADD COLUMN supports_browser_voice INTEGER DEFAULT 0;',
-    );
+    ]);
     expect(db.insertedMigrationKeys).toEqual([
       USER_XP_MISSION_REASONS_MIGRATION_KEY,
       PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
@@ -123,5 +191,45 @@ describe('runDatabaseMigrations', () => {
     expect(db.batchCalls).toEqual([]);
     expect(db.insertedMigrationKeys).toEqual([]);
     expect(db.executeSql().some((sql) => sql.includes('sqlite_master'))).toBe(false);
+  });
+
+  it('adds only missing portfolio v2 columns and records the marker when some columns already exist', async () => {
+    const db = new FakeMigrationDb({
+      existingMigrationKeys: [USER_XP_MISSION_REASONS_MIGRATION_KEY],
+      portfolioColumns: ['scenario', 'lesson', 'answers', 'summary'],
+    });
+
+    await runDatabaseMigrations(db);
+
+    expect(portfolioAlterSql(db)).toEqual([
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN exercises TEXT DEFAULT NULL;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN current_step INTEGER DEFAULT 0;',
+      'ALTER TABLE portfolio_challenge_attempts ADD COLUMN supports_browser_voice INTEGER DEFAULT 0;',
+    ]);
+    expect(db.insertedMigrationKeys).toEqual([PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY]);
+  });
+
+  it('records the portfolio marker without ALTERs when all v2 columns already exist', async () => {
+    const db = new FakeMigrationDb({
+      existingMigrationKeys: [USER_XP_MISSION_REASONS_MIGRATION_KEY],
+      portfolioColumns: [...PORTFOLIO_V2_COLUMN_NAMES],
+    });
+
+    await runDatabaseMigrations(db);
+
+    expect(portfolioAlterSql(db)).toEqual([]);
+    expect(db.insertedMigrationKeys).toEqual([PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY]);
+  });
+
+  it('skips portfolio v2 ALTERs and does not record the marker when the table is absent', async () => {
+    const db = new FakeMigrationDb({
+      existingMigrationKeys: [USER_XP_MISSION_REASONS_MIGRATION_KEY],
+      portfolioTableExists: false,
+    });
+
+    await runDatabaseMigrations(db);
+
+    expect(portfolioAlterSql(db)).toEqual([]);
+    expect(db.insertedMigrationKeys).toEqual([]);
   });
 });

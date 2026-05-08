@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`; mission start API boundary batch completed in commit `chore: harden mission start API boundary`; mission response API boundary batch completed in commit `chore: harden mission response API boundary`; mission-start atomicity batch completed in commit `chore: harden mission start atomicity`.
+**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`; mission start API boundary batch completed in commit `chore: harden mission start API boundary`; mission response API boundary batch completed in commit `chore: harden mission response API boundary`; mission-start atomicity batch completed in commit `chore: harden mission start atomicity`; DB migration idempotency batch completed in commit `chore: harden db migration idempotency`.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -412,16 +412,30 @@ Completed task:
 
 - [x] Task 6.1 — Mechanically extracted DB client lifecycle, schema statement construction, migration statement/key helpers, and row mappers from `src/lib/server/db.ts` into `db-client.ts`, `db-schema.ts`, `db-migrations.ts`, and `db-mappers.ts`. `db.ts` remains the public facade for existing imports, extracted modules stay under `src/lib/server/`, schema/migration SQL semantics were preserved, and helper tests now cover extracted pure behavior.
 
+### Completed DB migration idempotency batch
+
+**Completed on:** 2026-05-08
+
+**Commit:** `chore: harden db migration idempotency`
+
+**Validation:** TDD RED was observed before production changes (`3` failing tests / `4` passing tests in `src/lib/server/db-migrations.test.ts`) for duplicate existing portfolio columns and absent table handling. GREEN targeted validation `npm test -- src/lib/server/db-migrations.test.ts` passed with `7` tests, and `npm run validate:ci` passed including format, Svelte check, ESLint, Vitest (`231` tests / `28` files), and production build. `git diff --check` passed. Added-line security scan found no findings after replacing a test-only `RegExp.exec` false-positive with `String.match`.
+
+**Review status:** independent spec-compliance review passed, and independent code-quality/security review approved.
+
+Completed task:
+
+- [x] Task 6.2 — Made the `portfolio_v2_session_columns` migration column-aware and idempotent. Startup now checks whether `portfolio_challenge_attempts` exists, reads existing columns with `PRAGMA table_info`, adds only missing portfolio v2 columns, and records the migration key only after all required columns are present or safely added. The migration does not drop data, rename columns, or remove columns; if the table is absent, it skips ALTERs and leaves the marker unrecorded so a later startup can retry safely.
+
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1 batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2 batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
 
-1. Continue DB internals (Phase 6), starting with Task 6.2 column-aware/idempotent migrations. Do not fold Task 6.3 mission FK/index decisions into the same batch unless explicitly scoped.
-2. Continue AI internals (Phase 7) after the DB 6.2/6.3 boundary work has a clean handoff, or as a separate non-overlapping lane.
+1. Continue DB internals (Phase 6), starting with Task 6.3 mission table FK/index decision work. Keep this as a cautious decision/safety slice; do not fold AI decomposition into the same batch.
+2. Continue AI internals (Phase 7) after the DB 6.3 boundary work has a clean handoff, or as a separate non-overlapping lane.
 3. Continue background task boundary work (Phase 9), then lower-priority Svelte modularization (Phase 10).
 4. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
 
-Still incomplete from the whole plan: DB migration idempotency/mission constraint follow-ups, AI decomposition, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, and Task 6.1 DB module extraction is complete; broader route adoption remains intentionally incomplete.
+Still incomplete from the whole plan: DB mission constraint follow-up, AI decomposition, background task boundary, Svelte modularization, and final documentation closure. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, and Task 6.2 DB migration idempotency is complete; broader route adoption remains intentionally incomplete.
 
 ---
 
@@ -1306,6 +1320,8 @@ npm run build
 ```
 
 ### Task 6.2: Make migrations column-aware/idempotent
+
+**Status:** Completed in the DB migration idempotency batch (`chore: harden db migration idempotency`).
 
 **Objective:** Make startup migrations safer if migration marker state and actual schema diverge.
 
