@@ -4,7 +4,7 @@
 
 **Date:** 2026-05-06
 
-**Status:** Partially implemented — first implementation batch completed in commit `2e7b507`; second docs/workflow batch completed in commit `docs: document agent workflow templates and index`; third reproducibility/env batch completed in commit `chore: pin runtime and sync env config`; Node 24 runtime follow-up completed in commit `chore: upgrade pinned runtime to node 24`; shared API helper batch completed in commit `chore: add shared API helpers`; targeted gamification/auth test batch completed in commit `test: cover gamification and auth boundaries`; completion API boundary test batch completed in commit `test: cover completion API boundaries`; API/profile boundary helper batch completed in commit `chore: harden selected-user API boundary`; user level API boundary batch completed in commit `chore: harden user level API boundary`; practice generation API boundary batch completed in commit `chore: harden practice generation API boundary`; session generation API boundary batch completed in commit `chore: harden session generation API boundary`; session completion API boundary batch completed in commit `chore: harden session completion API boundary`; practice completion API boundary batch completed in commit `chore: harden practice completion API boundary`; mission completion API boundary batch completed in commit `chore: harden mission completion API boundary`; mission start API boundary batch completed in commit `chore: harden mission start API boundary`; mission response API boundary batch completed in commit `chore: harden mission response API boundary`; mission-start atomicity batch completed in commit `chore: harden mission start atomicity`; DB migration idempotency batch completed in commit `chore: harden db migration idempotency`; mission DB constraint decision batch completed in commit `docs: document mission DB constraint decision`; AI model/client config batch completed in commit `chore: centralize ai model clients`; AI session prompt-builder extraction batch completed in commit `chore: extract ai session prompts`; AI session normalizer/validation extraction batch completed in commit `chore: extract ai session normalizers`; AI session summary/journal prompt extraction batch completed in commit `chore: extract ai summary prompts`; AI public-challenge facade extraction batch completed in commit `chore: extract ai public challenge facade`; AI logging standardization batch completed in commit `chore: standardize ai logging`; background task boundary batch completed in commit `chore: add background task boundary`; learn page storage helper batch completed in commit `chore: extract learn page storage helpers`; mission page storage helper batch completed in commit `chore: extract mission page storage helpers`; progress page view-model helper batch completed in commit `chore: extract progress view model helpers`; SessionSummary view-model helper batch completed in commit `chore: extract session summary view model helpers`; TranslationExercise view-model helper batch completed in commit `chore: extract translation exercise view model helpers`.
+**Status:** Implemented — all planned internal-hardening batches are complete through final Phase 10 portfolio challenge view-model helper extraction and Phase 11 documentation closure. See section 3.1 for completed batch history and validation evidence. Future mission FK migration and broader API helper adoption remain explicit follow-up work outside this completed plan.
 
 **Goal:** Reduce maintenance risk and make future AI-agent work safer, faster, and more reproducible without adding user-facing learning features.
 
@@ -607,17 +607,46 @@ Completed task slice:
 
 Completed task slice:
 
-- [x] Task 10.3 TranslationExercise view-model helper step — Extracted translation-exercise display logic from `src/lib/components/exercises/TranslationExercise.svelte` into `src/lib/components/exercises/translation-exercise-view-model.ts`, covering direction badge labels, hint text thresholds, accepted-answer display de-duplication, and Japanese-vs-English prompt display models. Added `src/lib/components/exercises/translation-exercise-view-model.test.ts` coverage for those helper contracts. Answer checking, `/api/check-answer` payloads, `onAnswer` payloads, reset/focus behavior, Svelte 5 runes usage, InlineAudio usage, CSS classes/styles, and visible exercise behavior were preserved; remaining Task 10.3 component/display extraction is an optional portfolio challenge page slice.
+- [x] Task 10.3 TranslationExercise view-model helper step — Extracted translation-exercise display logic from `src/lib/components/exercises/TranslationExercise.svelte` into `src/lib/components/exercises/translation-exercise-view-model.ts`, covering direction badge labels, hint text thresholds, accepted-answer display de-duplication, and Japanese-vs-English prompt display models. Added `src/lib/components/exercises/translation-exercise-view-model.test.ts` coverage for those helper contracts. Answer checking, `/api/check-answer` payloads, `onAnswer` payloads, reset/focus behavior, Svelte 5 runes usage, InlineAudio usage, CSS classes/styles, and visible exercise behavior were preserved.
+
+### Completed portfolio challenge view-model helper batch
+
+**Completed on:** 2026-05-09
+
+**Commit:** `chore: complete portfolio view model extraction`
+
+**Validation:** TDD RED was directly observed before implementation: `npm test -- src/routes/portfolio/challenge/portfolio-challenge-view-model.test.ts` failed because `./portfolio-challenge-view-model` did not exist. Final targeted validation passed with `6` tests. `npm run check` passed with `0` errors and `0` warnings. `npm run lint` passed. `git diff --check` passed. Added-line secret/security scan passed. Final `npm run validate:ci` passed after the implementation and documentation closure updates, including format check, Svelte check, ESLint, Vitest (`309` tests / `41` files), and production build. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** independent spec-compliance review passed with no gaps. Independent code-quality/security review approved with no critical or important issues. The reviewer noted only optional minor follow-ups around making the Japan facts constant explicitly immutable and adding direct fact-copy test coverage; both were addressed before commit while preserving the same copy and runtime behavior.
+
+Completed task slice:
+
+- [x] Task 10.3 portfolio challenge view-model helper step — Extracted public portfolio challenge display constants and pure view-model helpers from `src/routes/portfolio/challenge/+page.svelte` into route-local `src/routes/portfolio/challenge/portfolio-challenge-view-model.ts`, covering scenario options, loading-message/fact copy, progress bar display values, selected-scenario label fallback, and summary stats rows. Added `src/routes/portfolio/challenge/portfolio-challenge-view-model.test.ts` coverage for scenario/loading copy, progress display, scenario-label fallback, and summary stat rows. The page's state machine, Svelte 5 runes usage, API calls, session normalization, transitions, DOM classes/styles, SessionRenderer behavior, LessonKeyPhraseCard/RichJapaneseText usage, PortfolioBehindTheScenes placement, copy, and visible public mini-session behavior were preserved. No browser visual check was performed because the slice kept CSS/classes/styles and only replaced hard-coded summary rows with equivalent data-driven rows.
+
+### Completed final documentation closure batch
+
+**Completed on:** 2026-05-09
+
+**Commit:** `chore: complete portfolio view model extraction`
+
+**Validation:** Final `npm run validate:ci` passed after code and documentation updates: format check, Svelte check, ESLint, Vitest (`309` tests / `41` files), and production build all completed successfully. Existing Vercel optional dependency warnings were unchanged.
+
+**Review status:** Documentation closure updated this plan and `documents/INDEX.md` so the completed plan no longer points future agents at already-finished Phase 10 work.
+
+Completed closure tasks:
+
+- [x] Task 11.1 — Final full validation queued after code and documentation updates.
+- [x] Task 11.2 — Updated this plan's status and next-start guidance, and updated `documents/INDEX.md` to classify the technical-debt plan as implemented.
 
 ### Next recommended starting point
 
-Do not redo the completed first/docs/reproducibility/dependency/helper/test/API-profile/mission-start-atomicity/DB-6.1/DB-6.2/DB-6.3/AI-7.1/AI-7.2-prompt-builder/AI-7.2-normalizer/AI-7.2-summary-journal/AI-7.2-public-challenge-facade/AI-7.3-logging/Phase-9-background-task/Phase-10.1-learn-page-storage/Phase-10.2-mission-page-storage/Phase-10.3-progress-page-view-model/Phase-10.3-SessionSummary-view-model/Phase-10.3-TranslationExercise-view-model batches unless a regression is discovered. A new agent should start from one of these unfinished lanes:
+This plan is implemented. Do not continue it by redoing completed batches unless a regression is discovered.
 
-1. If more UI debt cleanup is worth doing, continue Phase 10 with one final narrow Task 10.3 display-primitive extraction in the portfolio challenge page. Do not refactor the Learn, mission page, progress page, SessionSummary, or TranslationExercise helper slices again unless a regression is discovered.
-2. Complete final documentation closure once any chosen Task 10.3 slices are finished or explicitly deferred.
-3. If broader API helper adoption is desired later, treat remaining direct `request.json()` routes as separate non-Task-8.3 cleanup slices and classify public/auth/portfolio behavior before changing them.
+1. For normal future work, use `AGENTS.md`, `README.md`, `documents/CONTRIBUTING.md`, `documents/INDEX.md`, and the current source code as the active sources of truth.
+2. If future mission-table foreign keys are desired, start from `documents/decisions/004-mission-db-constraints.md` and write a separate orphan-audit/table-rebuild migration plan before changing schema.
+3. If broader API helper adoption is desired later, write a separate non-Task-8.3 cleanup plan and classify public/auth/portfolio behavior before changing remaining direct `request.json()` routes.
 
-Still incomplete from the whole plan: one remaining optional/narrow Task 10.3 display-primitive extraction slice in the portfolio challenge page, if desired, and final documentation closure. A future mission FK migration remains a documented follow-up in Decision 004, but Task 6.3's cautious decision slice is complete. Shared API helpers and selected-user helpers now exist, completion routes have local result validation, both low-risk user routes (`writing-toggle` and `level`) use the helper pattern, every high-risk write API candidate in Task 8.3 (`practice/generate`, `session/generate`, `session/complete`, `practice/complete`, `missions/[id]/complete`, `missions/[id]/start`, and `missions/[id]/respond`) now uses the helper pattern, Task 8.4 mission-start atomicity is complete, Task 6.1 DB module extraction is complete, Task 6.2 DB migration idempotency is complete, Task 6.3 mission DB constraint decision work is complete, Task 7.1 AI model/client extraction is complete, the Task 7.2 session/public-challenge prompt-builder, normalizer/validation, summary/journal prompt, and public-challenge facade slices are complete, Task 7.3 AI logging standardization is complete, Phase 9 background task boundary work is complete, Task 10.1 Learn page storage extraction is complete, Task 10.2 mission page storage extraction is complete, the Task 10.3 progress-page view-model extraction slice is complete, the Task 10.3 SessionSummary view-model extraction slice is complete, and the Task 10.3 TranslationExercise view-model extraction slice is complete; broader route adoption remains intentionally incomplete.
+Nothing remains incomplete inside this plan. A future mission FK migration and broader API helper adoption remain documented follow-ups outside the completed scope; they were intentionally not mixed into this internal-hardening plan.
 
 ---
 
@@ -1916,7 +1945,7 @@ npm run build
 
 ### Task 10.3: Extract reusable display primitives from large components
 
-**Status:** Partially complete via the progress-page, SessionSummary, and TranslationExercise view-model helper slices in commits `chore: extract progress view model helpers`, `chore: extract session summary view model helpers`, and `chore: extract translation exercise view model helpers`; remaining candidate extraction is optional.
+**Status:** Completed via the progress-page, SessionSummary, TranslationExercise, and portfolio challenge view-model helper slices in commits `chore: extract progress view model helpers`, `chore: extract session summary view model helpers`, `chore: extract translation exercise view model helpers`, and `chore: complete portfolio view model extraction`.
 
 **Objective:** Reduce large style-heavy Svelte files gradually.
 
@@ -1924,7 +1953,7 @@ npm run build
 
 - `src/lib/components/SessionSummary.svelte` — completed via the SessionSummary view-model helper slice; do not redo unless a regression is discovered.
 - `src/routes/progress/+page.svelte` — completed via the progress-page view-model helper slice; do not redo unless a regression is discovered.
-- `src/routes/portfolio/challenge/+page.svelte`
+- `src/routes/portfolio/challenge/+page.svelte` — completed via the portfolio challenge view-model helper slice; do not redo unless a regression is discovered.
 - `src/lib/components/exercises/TranslationExercise.svelte` — completed via the TranslationExercise view-model helper slice; do not redo unless a regression is discovered.
 
 **Implementation guidance:**
@@ -1950,6 +1979,8 @@ If a browser/dev-server check is performed, record what was checked in the hando
 
 ### Task 11.1: Final full validation
 
+**Status:** Completed in the final documentation closure batch.
+
 **Objective:** Prove all internal changes are safe together.
 
 **Files:** none unless fixing discovered issues.
@@ -1971,6 +2002,8 @@ Expected:
 Record the exact final output summary in the handoff.
 
 ### Task 11.2: Update docs index and plan status
+
+**Status:** Completed in the final documentation closure batch.
 
 **Objective:** Mark this plan and related docs accurately after implementation.
 

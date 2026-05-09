@@ -7,6 +7,13 @@
   import PortfolioBehindTheScenes from '$lib/components/PortfolioBehindTheScenes.svelte';
   import { isSupported, getJapaneseVoice } from '$lib/utils/tts';
   import type { Exercise, ExerciseAnswerPayload, Lesson } from '$lib/types';
+  import {
+    PORTFOLIO_JAPAN_FACTS,
+    PORTFOLIO_LOADING_MESSAGES,
+    PORTFOLIO_SCENARIOS,
+    buildPortfolioProgressDisplay,
+    buildPortfolioSummaryStatRows,
+  } from './portfolio-challenge-view-model';
 
   type ViewState =
     | 'intro'
@@ -17,8 +24,6 @@
     | 'done'
     | 'quota'
     | 'error';
-
-  type Scenario = { id: string; label: string; emoji: string };
 
   type SessionStatePayload = {
     sessionId: string;
@@ -55,41 +60,6 @@
 
   type ApiError = { ok: false; reason?: string; message?: string };
 
-  const SCENARIOS = [
-    { id: 'food', label: 'Food & Dining', emoji: '🍜' },
-    { id: 'directions', label: 'Asking Directions', emoji: '🗺️' },
-    { id: 'hotel', label: 'Hotel Check-in', emoji: '🏨' },
-    { id: 'transport', label: 'Getting Around', emoji: '🚃' },
-    { id: 'greetings', label: 'Greetings & Basics', emoji: '👋' },
-    { id: 'shopping', label: 'Shopping', emoji: '🛍️' },
-  ] as const satisfies readonly Scenario[];
-
-  const loadingMessages = [
-    'Your sensei is preparing today’s lesson…',
-    'Brewing green tea for the session… 🍵',
-    'Arranging the study materials…',
-    'Writing today’s lesson plan…',
-    'Almost ready…',
-  ];
-
-  const JAPAN_FACTS = [
-    'Japan has over 14,000 islands, though only a few hundred are inhabited.',
-    'Tokyo has more Michelin-starred restaurants than any other city in the world.',
-    'Shinkansen bullet trains are known for average delays measured in seconds, not minutes.',
-    'In Japan, convenience stores often offer high-quality fresh meals and local specialties.',
-    'You can soak in natural onsen hot springs in many regions, from mountain towns to seaside areas.',
-    'Spring cherry blossom forecasts are followed nationwide and influence travel planning.',
-    'Nara is famous for free-roaming deer considered messengers in local Shinto tradition.',
-    'Japanese depachika food halls in department store basements are popular for gourmet takeout.',
-    'Many Japanese cities install decorative manhole covers featuring local history and mascots.',
-    'Hokkaido is especially known for powder snow and winter festivals with ice sculptures.',
-    'Okinawa has a distinct culture, cuisine, and history compared with mainland Japan.',
-    'Traditional yukata are commonly worn at summer festivals and fireworks events.',
-    'Kyoto was Japan’s capital for more than 1,000 years.',
-    'Some ryokan inns serve multi-course kaiseki meals focused on local seasonal ingredients.',
-    'Japanese tea ceremonies emphasize hospitality, mindfulness, and precise ritual.',
-  ];
-
   let viewState = $state<ViewState>('intro');
   let selectedScenario = $state<string | null>(null);
   let lesson = $state<Lesson | null>(null);
@@ -112,14 +82,11 @@
 
   const totalExercises = $derived(exercises.length);
   const currentExercise = $derived(exercises[currentIndex] ?? null);
-  const progressCurrent = $derived(Math.min(currentIndex + 1, Math.max(exercises.length, 1)));
-  const currentJapanFact = $derived(JAPAN_FACTS[currentJapanFactIndex] ?? '');
-  const currentScenarioLabel = $derived(
-    SCENARIOS.find((scenario) => scenario.id === selectedScenario)?.label ??
-      summaryData?.stats.scenario ??
-      'Travel',
+  const progressDisplay = $derived(buildPortfolioProgressDisplay(currentIndex, totalExercises));
+  const currentJapanFact = $derived(PORTFOLIO_JAPAN_FACTS[currentJapanFactIndex] ?? '');
+  const summaryStatRows = $derived(
+    summaryData ? buildPortfolioSummaryStatRows(summaryData.stats, selectedScenario) : [],
   );
-  const keyPhrasesForStats = $derived(summaryData?.stats.phrasesLearned ?? []);
 
   async function detectBrowserVoice(): Promise<boolean> {
     if (!isSupported()) return false;
@@ -137,11 +104,11 @@
   }
 
   function createFactShuffleBag(): number[] {
-    return shuffleArray(Array.from({ length: JAPAN_FACTS.length }, (_, index) => index));
+    return shuffleArray(Array.from({ length: PORTFOLIO_JAPAN_FACTS.length }, (_, index) => index));
   }
 
   function getNextFactIndexFromBag(): number {
-    if (JAPAN_FACTS.length === 0) return 0;
+    if (PORTFOLIO_JAPAN_FACTS.length === 0) return 0;
     if (factShuffleBag.length === 0) {
       factShuffleBag = createFactShuffleBag();
     }
@@ -401,7 +368,7 @@
     const intervalId = setInterval(() => {
       loadingMsgVisible = false;
       timeoutId = setTimeout(() => {
-        loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+        loadingMsgIndex = (loadingMsgIndex + 1) % PORTFOLIO_LOADING_MESSAGES.length;
         loadingMsgVisible = true;
       }, 400);
     }, 2800);
@@ -457,7 +424,7 @@
         </p>
 
         <div class="scenario-grid" role="list" aria-label="Travel scenarios">
-          {#each SCENARIOS as scenario}
+          {#each PORTFOLIO_SCENARIOS as scenario}
             <button
               type="button"
               class="scenario-tile"
@@ -491,7 +458,7 @@
           <span class="enso-kanji" aria-hidden="true">学</span>
         </div>
         <p class="loading-text" style:opacity={loadingMsgVisible ? 1 : 0}>
-          {loadingMessages[loadingMsgIndex]}
+          {PORTFOLIO_LOADING_MESSAGES[loadingMsgIndex]}
         </p>
         <div class="loading-fact-card">
           <p class="loading-fact-label">Did you know?</p>
@@ -539,9 +506,9 @@
     {:else if viewState === 'active'}
       <section class="card active-card">
         <ProgressBar
-          current={progressCurrent}
-          total={totalExercises}
-          label={`${progressCurrent} / ${totalExercises}`}
+          current={progressDisplay.current}
+          total={progressDisplay.total}
+          label={progressDisplay.label}
         />
         {#if currentExercise}
           <SessionRenderer exercise={currentExercise} {onAnswer} />
@@ -586,18 +553,12 @@
         <p class="summary-text">{summaryData.summary}</p>
 
         <dl class="stats-grid">
-          <div>
-            <dt>Correct answers</dt>
-            <dd>{summaryData.stats.totalCorrect} / {summaryData.stats.totalExercises}</dd>
-          </div>
-          <div>
-            <dt>Scenario</dt>
-            <dd>{currentScenarioLabel}</dd>
-          </div>
-          <div>
-            <dt>Phrases learned</dt>
-            <dd>{keyPhrasesForStats.length}</dd>
-          </div>
+          {#each summaryStatRows as row (row.label)}
+            <div>
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          {/each}
         </dl>
 
         <section class="feedback-section strengths">
