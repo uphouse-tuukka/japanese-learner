@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { canCompleteMission } from '$lib/utils/mission-state';
+import {
+  canCompleteMission,
+  getMissionCompletionPrimaryAction,
+  shouldShowMissionResponseControls,
+} from '$lib/utils/mission-state';
 
 describe('canCompleteMission', () => {
   it('returns true when the final practice step is waiting for completion submission', () => {
@@ -20,5 +24,35 @@ describe('canCompleteMission', () => {
         userMissionId: 'usermission-123',
       }),
     ).toBe(false);
+  });
+});
+
+describe('shouldShowMissionResponseControls', () => {
+  it('hides final-turn practice answer choices while mission completion is being submitted', () => {
+    expect(
+      shouldShowMissionResponseControls({
+        awaitingCompletion: true,
+        uiState: 'responding',
+      }),
+    ).toBe(false);
+  });
+
+  it('shows response controls only for active missions that are not awaiting completion', () => {
+    expect(
+      shouldShowMissionResponseControls({
+        awaitingCompletion: false,
+        uiState: 'active',
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('getMissionCompletionPrimaryAction', () => {
+  it('keeps practice completion on the same mission so the user can start immersion mode', () => {
+    expect(getMissionCompletionPrimaryAction('practice')).toBe('start-immersion');
+  });
+
+  it('returns to the mission list after a completed immersion mission', () => {
+    expect(getMissionCompletionPrimaryAction('immersion')).toBe('back-to-missions');
   });
 });

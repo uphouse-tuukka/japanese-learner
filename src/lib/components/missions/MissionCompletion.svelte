@@ -1,12 +1,14 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { getMissionCompletionPrimaryAction } from '$lib/utils/mission-state';
   import type { Mission, MissionCompleteResponse, MissionMode } from '$lib/types';
 
-  let { data, mission, mode, onTryAgain } = $props<{
+  let { data, mission, mode, onTryAgain, onTryImmersion } = $props<{
     data: MissionCompleteResponse;
     mission: Mission;
     mode: MissionMode;
     onTryAgain?: () => void;
+    onTryImmersion?: () => void;
   }>();
 
   const isImmersion = $derived(mode === 'immersion');
@@ -17,6 +19,11 @@
   }
 
   async function primaryAction(): Promise<void> {
+    if (getMissionCompletionPrimaryAction(mode) === 'start-immersion' && onTryImmersion) {
+      onTryImmersion();
+      return;
+    }
+
     await goto('/missions');
   }
 

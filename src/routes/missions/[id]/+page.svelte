@@ -5,7 +5,7 @@
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
-  import { canCompleteMission } from '$lib/utils/mission-state';
+  import { canCompleteMission, shouldShowMissionResponseControls } from '$lib/utils/mission-state';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -145,6 +145,9 @@
 
   const canStart = $derived(data.unlocked && uiState === 'ready');
   const currentTurn = $derived(turns[currentTurnIndex] ?? null);
+  const showResponseControls = $derived(
+    shouldShowMissionResponseControls({ awaitingCompletion, uiState }),
+  );
 
   $effect(() => {
     if (hasSavedMissionState() && uiState === 'ready' && data.unlocked) {
@@ -452,14 +455,14 @@
             Complete Mission
           </button>
         </div>
-      {:else if currentTurn && mode === 'practice' && currentTurn.choices}
+      {:else if currentTurn && mode === 'practice' && currentTurn.choices && showResponseControls}
         <MissionChoices
           choices={currentTurn.choices}
           onselect={handlePracticeSelect}
           disabled={uiState !== 'active'}
           selectedIndex={selectedChoiceIndex}
         />
-      {:else if currentTurn && mode === 'immersion'}
+      {:else if currentTurn && mode === 'immersion' && showResponseControls}
         <form class="immersion-form" onsubmit={handleImmersionSubmit}>
           <label for="mission-input">Your response</label>
           <input
@@ -500,6 +503,13 @@
         resetMissionState();
         uiState = 'ready';
         mode = 'practice';
+        hintsEnabled = true;
+      }}
+      onTryImmersion={() => {
+        clearMissionStorage();
+        resetMissionState();
+        uiState = 'ready';
+        mode = 'immersion';
         hintsEnabled = true;
       }}
     />
