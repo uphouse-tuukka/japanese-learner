@@ -86,9 +86,16 @@ function getExpectedAnswerDetails(exercise: Exercise | undefined): {
     };
   }
 
+  if (exercise.type === 'listening') {
+    return {
+      expectedAnswer: exercise.correctAnswer,
+      acceptedAnswers: [exercise.correctAnswer],
+    };
+  }
+
   return {
-    expectedAnswer: exercise.correctAnswer,
-    acceptedAnswers: [exercise.correctAnswer],
+    expectedAnswer: exercise.expectedAnswer,
+    acceptedAnswers: exercise.acceptedAnswers,
   };
 }
 

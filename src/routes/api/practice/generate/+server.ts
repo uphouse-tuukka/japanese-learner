@@ -25,6 +25,7 @@ const EXERCISE_TYPES: ExerciseType[] = [
   'reorder',
   'reading',
   'listening',
+  'speaking',
 ];
 
 function isExerciseType(value: string): value is ExerciseType {

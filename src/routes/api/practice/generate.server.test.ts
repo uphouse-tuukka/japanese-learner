@@ -274,4 +274,26 @@ describe('POST /api/practice/generate', () => {
     });
     expect(mockAttachExercisesToSession).toHaveBeenCalledWith('session-1', debugExercises);
   });
+
+  it('accepts speaking as a dev debug exercise type', async () => {
+    const debugSession = { ...session, model: 'debug' };
+    mockCreateSessionRecord.mockResolvedValueOnce(debugSession);
+
+    const response = await generatePractice(
+      { userId: 'user-1', exerciseCount: 2, debugExerciseType: 'speaking' },
+      'user-1',
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'active',
+      session: debugSession,
+      lesson: null,
+      exercises: debugExercises,
+    });
+    expect(mockGetDebugExercises).toHaveBeenCalledWith('speaking', 2);
+    expect(mockBuildPracticeSession).not.toHaveBeenCalled();
+    expect(mockAttachExercisesToSession).toHaveBeenCalledWith('session-1', debugExercises);
+  });
 });
