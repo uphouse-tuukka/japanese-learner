@@ -6,6 +6,7 @@
   import ReorderExercise from '$lib/components/exercises/ReorderExercise.svelte';
   import ReadingExercise from '$lib/components/exercises/ReadingExercise.svelte';
   import ListeningExercise from '$lib/components/exercises/ListeningExercise.svelte';
+  import SpeakingExercise from '$lib/components/exercises/SpeakingExercise.svelte';
 
   let { exercise, onAnswer }: { exercise: Exercise; onAnswer: OnAnswer } = $props();
 </script>
@@ -23,6 +24,8 @@
     <ReadingExercise {exercise} {onAnswer} />
   {:else if exercise.type === 'listening'}
     <ListeningExercise {exercise} {onAnswer} />
+  {:else if exercise.type === 'speaking'}
+    <SpeakingExercise {exercise} {onAnswer} />
   {:else}
     <p class="exercise-error">
       Unknown exercise type: {(exercise as Record<string, unknown>).type}
