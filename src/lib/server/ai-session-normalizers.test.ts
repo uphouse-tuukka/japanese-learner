@@ -126,6 +126,99 @@ describe('ai session normalizers', () => {
       });
     });
 
+    it('normalizes speaking exercises with aliases, fallback answers, and recording clamp', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'speak-1',
+          type: 'speaking',
+          japanese: 'トイレはどこですか。',
+          romaji: 'toire wa doko desu ka',
+          englishContext: 'Asking for the restroom',
+          difficulty: 2,
+          tags: ['travel'],
+          prompt: 'Speak Japanese to ask where the restroom is.',
+          responseKind: 'translation_en_to_ja',
+          expected_answer: 'トイレはどこですか。',
+          expected_romaji: 'toire wa doko desu ka',
+          alternatives: ['お手洗いはどこですか。'],
+          rubric: 'Accept a natural question asking where the restroom is.',
+          maxRecordingSeconds: 99,
+        },
+        2,
+        'pre_intermediate',
+      );
+
+      expect(exercise).toMatchObject({
+        id: 'speak-1',
+        type: 'speaking',
+        title: 'Speaking Practice',
+        responseKind: 'translation_en_to_ja',
+        expectedAnswer: 'トイレはどこですか。',
+        expectedRomaji: 'toire wa doko desu ka',
+        acceptedAnswers: ['お手洗いはどこですか。'],
+        rubric: 'Accept a natural question asking where the restroom is.',
+        maxRecordingSeconds: 20,
+      });
+    });
+
+    it('defaults speaking response kind, accepted answers, and recording duration', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'speak-2',
+          type: 'speaking',
+          japanese: '水をください。',
+          romaji: 'mizu o kudasai',
+          englishContext: 'Ordering water',
+          difficulty: 2,
+          prompt: 'Speak Japanese to ask for water.',
+          responseKind: 'unexpected',
+          expectedAnswer: '水をください。',
+          expectedRomaji: 'mizu o kudasai',
+          rubric: 'Accept a polite request for water.',
+          maxRecordingSeconds: 1,
+        },
+        3,
+        'elementary',
+      );
+
+      expect(exercise.type).toBe('speaking');
+      if (exercise.type !== 'speaking') return;
+      expect(exercise.responseKind).toBe('situational_response');
+      expect(exercise.acceptedAnswers).toEqual(['水をください。', 'mizu o kudasai']);
+      expect(exercise.maxRecordingSeconds).toBe(5);
+    });
+
+    it('rejects speaking by level and elementary translation-style speaking', () => {
+      const situational = normalizeExercise(
+        {
+          id: 'speak-3',
+          type: 'speaking',
+          japanese: '水をください。',
+          romaji: 'mizu o kudasai',
+          englishContext: 'Ordering water',
+          difficulty: 2,
+          prompt: 'Speak Japanese to ask for water.',
+          responseKind: 'situational_response',
+          expectedAnswer: '水をください。',
+          expectedRomaji: 'mizu o kudasai',
+          rubric: 'Accept a polite request for water.',
+        },
+        4,
+        'elementary',
+      );
+      const translationStyle = { ...situational, responseKind: 'translation_en_to_ja' as const };
+
+      expect(() => validateExerciseSet([situational], 'beginner')).toThrow(
+        '[ai] Invalid exercise type for beginner: speaking',
+      );
+      expect(() => validateExerciseSet([translationStyle], 'elementary')).toThrow(
+        '[ai] elementary speaking exercises must use situational_response',
+      );
+      expect(validateExerciseSet([translationStyle], 'pre_intermediate')).toEqual([
+        translationStyle,
+      ]);
+    });
+
     it('rejects disallowed exercise types and translation directions for a level', () => {
       const fillBlank = normalizeExercise(
         {

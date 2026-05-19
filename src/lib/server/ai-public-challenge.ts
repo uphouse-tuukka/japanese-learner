@@ -84,9 +84,21 @@ export async function generatePublicChallengePlan(input: {
   const validExercises: Exercise[] = [];
   const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
   for (let i = 0; i < rawExercises.length; i += 1) {
+    const rawExercise = rawExercises[i];
+    if (
+      rawExercise &&
+      typeof rawExercise === 'object' &&
+      (rawExercise as Record<string, unknown>).type === 'speaking'
+    ) {
+      logWarn('ai', 'skipping public challenge speaking exercise', {
+        exerciseIndex: i,
+      });
+      continue;
+    }
+
     try {
       validExercises.push(
-        normalizePublicChallengeExercise(normalizeExercise(rawExercises[i], i, 'beginner')),
+        normalizePublicChallengeExercise(normalizeExercise(rawExercise, i, 'beginner')),
       );
     } catch (err) {
       logWarn('ai', 'skipping invalid public challenge exercise', {

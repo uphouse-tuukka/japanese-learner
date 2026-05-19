@@ -262,7 +262,8 @@ function isExerciseType(value: unknown): value is ExerciseType {
     value === 'fill_blank' ||
     value === 'reorder' ||
     value === 'reading' ||
-    value === 'listening'
+    value === 'listening' ||
+    value === 'speaking'
   );
 }
 
@@ -322,6 +323,14 @@ export function normalizeLesson(raw: unknown): Lesson {
   };
 }
 
+function normalizeRecordingSeconds(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 12;
+  }
+  return Math.min(20, Math.max(5, Math.round(parsed)));
+}
+
 const EXERCISE_TYPE_TITLES: Record<string, string> = {
   multiple_choice: 'Multiple Choice',
   translation: 'Translation',
@@ -329,6 +338,7 @@ const EXERCISE_TYPE_TITLES: Record<string, string> = {
   reorder: 'Word Order',
   reading: 'Reading Comprehension',
   listening: 'Listening Exercise',
+  speaking: 'Speaking Practice',
 };
 
 export function normalizeExercise(raw: unknown, index: number, level: UserLevel): Exercise {
@@ -467,6 +477,46 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
     };
   }
 
+  if (typeRaw === 'speaking') {
+    const expectedAnswer = requireString(
+      row,
+      'expectedAnswer',
+      'expectedAnswer',
+      'expected_answer',
+      'answer',
+      'correct',
+    );
+    const expectedRomaji = requireString(
+      row,
+      'expectedRomaji',
+      'expectedRomaji',
+      'expected_romaji',
+      'romaji_answer',
+    );
+    const responseKind =
+      row.responseKind === 'translation_en_to_ja' || row.response_kind === 'translation_en_to_ja'
+        ? 'translation_en_to_ja'
+        : 'situational_response';
+
+    return {
+      ...base,
+      type: 'speaking',
+      prompt: requireString(row, 'prompt', 'prompt', 'question', 'text'),
+      responseKind,
+      expectedAnswer,
+      expectedRomaji,
+      acceptedAnswers: toStringArray(
+        row.acceptedAnswers ?? row.accepted_answers ?? row.alternatives,
+        'acceptedAnswers',
+        [expectedAnswer, expectedRomaji],
+      ),
+      rubric: requireString(row, 'rubric', 'rubric', 'criteria', 'gradingRubric'),
+      maxRecordingSeconds: normalizeRecordingSeconds(
+        row.maxRecordingSeconds ?? row.max_recording_seconds,
+      ),
+    };
+  }
+
   const listeningChoices = shuffleArray(
     toStringArray(row.choices ?? row.options ?? row.answers, 'choices'),
   );
@@ -512,6 +562,14 @@ export function validateExerciseSet(exercises: Exercise[], level: UserLevel): Ex
       throw new Error(
         `[ai] ${level} translation direction must be one of ${rules.translationDirections.join(', ')}`,
       );
+    }
+    if (exercise.type === 'speaking') {
+      if (level === 'absolute_beginner' || level === 'beginner') {
+        throw new Error(`[ai] Invalid exercise type for ${level}: speaking`);
+      }
+      if (level === 'elementary' && exercise.responseKind === 'translation_en_to_ja') {
+        throw new Error('[ai] elementary speaking exercises must use situational_response');
+      }
     }
   }
 

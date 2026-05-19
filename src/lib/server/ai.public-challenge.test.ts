@@ -238,6 +238,89 @@ describe('generatePublicChallengePlan', () => {
     expect(plan.exercises[0]?.type).toBe('translation');
   });
 
+  it('skips speaking exercises from public challenge output when valid public exercises remain', async () => {
+    mockPublicChallengeModelOutput({
+      lesson: {
+        topic: 'Ordering food',
+        category: 'food_dining',
+        explanation: 'You can order politely at restaurants.',
+        keyPhrases: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      },
+      exercises: [
+        {
+          type: 'speaking',
+          japanese: '水をください。',
+          romaji: 'mizu o kudasai',
+          englishContext: 'Ordering water',
+          tags: ['restaurant'],
+          difficulty: 2,
+          prompt: 'Speak Japanese to ask for water.',
+          responseKind: 'situational_response',
+          expectedAnswer: '水をください。',
+          expectedRomaji: 'mizu o kudasai',
+          rubric: 'Accept a polite request for water.',
+        },
+        {
+          type: 'translation',
+          japanese: 'お願いします',
+          romaji: 'onegaishimasu',
+          englishContext: 'Polite request phrase',
+          tags: ['restaurant'],
+          difficulty: 1,
+          direction: 'ja_to_en',
+          prompt: 'Translate: お願いします (onegaishimasu)',
+          expectedAnswer: 'Please',
+          acceptedAnswers: ['Please', 'Please do', 'I request'],
+        },
+      ],
+      focus: 'food_dining',
+    });
+
+    const plan = await generatePublicChallengePlan({
+      scenario: 'food_dining',
+      scenarioLabel: 'Ordering at a restaurant',
+      targetExerciseCount: 1,
+    });
+
+    expect(plan.exercises).toHaveLength(1);
+    expect(plan.exercises[0]?.type).toBe('translation');
+  });
+
+  it('fails safely when public challenge output only contains speaking exercises', async () => {
+    mockPublicChallengeModelOutput({
+      lesson: {
+        topic: 'Ordering food',
+        category: 'food_dining',
+        explanation: 'You can order politely at restaurants.',
+        keyPhrases: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      },
+      exercises: [
+        {
+          type: 'speaking',
+          japanese: '水をください。',
+          romaji: 'mizu o kudasai',
+          englishContext: 'Ordering water',
+          tags: ['restaurant'],
+          difficulty: 2,
+          prompt: 'Speak Japanese to ask for water.',
+          responseKind: 'situational_response',
+          expectedAnswer: '水をください。',
+          expectedRomaji: 'mizu o kudasai',
+          rubric: 'Accept a polite request for water.',
+        },
+      ],
+      focus: 'food_dining',
+    });
+
+    await expect(
+      generatePublicChallengePlan({
+        scenario: 'food_dining',
+        scenarioLabel: 'Ordering at a restaurant',
+        targetExerciseCount: 1,
+      }),
+    ).rejects.toThrow('[ai] No valid exercises could be parsed from public challenge output');
+  });
+
   it('keeps a valid scenario-style multiple_choice with Japanese choices and romaji', async () => {
     mockPublicChallengeModelOutput({
       lesson: {
