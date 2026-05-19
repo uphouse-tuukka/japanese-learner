@@ -19,6 +19,7 @@ Status: In implementation
 - 2026-05-19 Task 0 complete: pulled latest `origin/master`, confirmed clean checkout at `b6954ed`, and reviewed required project/docs/decision files before editing.
 - 2026-05-19 Task 1 complete: added shared `speaking` exercise type and union shape in `src/lib/types.ts`. `npm run check` now intentionally exposes the next type surfaces to update (`ai-session-prompts.ts`, `ai-summary-prompts.ts`, `debug-exercises.ts`, `SessionRenderer.svelte`).
 - 2026-05-19 Task 2 complete: added speaking debug fixtures, allowed `debugExerciseType: 'speaking'` in dev practice generation, and adjusted summary expected-answer extraction for speaking results. `npm test -- src/routes/api/practice/generate.server.test.ts` passes; `npm run check` is down to planned Task 3/8 surfaces (`ai-session-prompts.ts`, `SessionRenderer.svelte`).
+- 2026-05-19 Task 3 complete: private prompts now allow speaking for `elementary` and above with response-kind rules, public challenge prompt uses an explicit no-microphone allowed-type boundary, and prompt wording distinguishes typed Japanese-writing restrictions from microphone speaking. `npm test -- src/lib/server/ai-session-prompts.test.ts` passes; `npm run check` is down to the planned renderer branch.
 
 ## Current checkout evidence
 

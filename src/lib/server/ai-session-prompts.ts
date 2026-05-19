@@ -24,7 +24,7 @@ export const LEVEL_RULES: Record<
   elementary: {
     minDifficulty: 1,
     maxDifficulty: 3,
-    allowedTypes: ['multiple_choice', 'translation', 'listening', 'fill_blank'],
+    allowedTypes: ['multiple_choice', 'translation', 'listening', 'fill_blank', 'speaking'],
     translationDirections: ['ja_to_en'],
   },
   pre_intermediate: {
@@ -37,6 +37,7 @@ export const LEVEL_RULES: Record<
       'fill_blank',
       'reorder',
       'reading',
+      'speaking',
     ],
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
@@ -50,6 +51,7 @@ export const LEVEL_RULES: Record<
       'fill_blank',
       'reorder',
       'reading',
+      'speaking',
     ],
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
@@ -63,6 +65,7 @@ export const LEVEL_RULES: Record<
       'fill_blank',
       'reorder',
       'reading',
+      'speaking',
     ],
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
@@ -76,6 +79,7 @@ export const LEVEL_RULES: Record<
       'fill_blank',
       'reorder',
       'reading',
+      'speaking',
     ],
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
@@ -89,6 +93,7 @@ export const LEVEL_RULES: Record<
       'fill_blank',
       'reorder',
       'reading',
+      'speaking',
     ],
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
@@ -160,7 +165,15 @@ const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
   reading: '- reading: passage, passageRomaji, passageEnglish, question, answer.',
   listening:
     '- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice). For listening exercises, prompt must be short English-only instruction, e.g. "Listen and choose the correct meaning". Do NOT include Japanese text or romaji in prompt.',
+  speaking:
+    '- speaking: prompt, responseKind ("situational_response" or "translation_en_to_ja"), expectedAnswer (Japanese script only), expectedRomaji (romanization only), acceptedAnswers (string array of natural Japanese-script alternatives; romaji alternatives allowed only for future typed fallback), rubric (semantic correctness criteria), maxRecordingSeconds (optional, 5-20). The prompt must tell the learner to speak Japanese. Grade semantic correctness, not exact wording.',
 };
+
+const PUBLIC_CHALLENGE_ALLOWED_TYPES: ExerciseType[] = [
+  'multiple_choice',
+  'translation',
+  'listening',
+];
 
 export type AiPromptMessage = {
   role: 'system' | 'user';
@@ -239,6 +252,7 @@ function levelInstructions(level: UserLevel): string {
       'Difficulty range is strictly 1-2.',
       'Translation direction must be ja_to_en only.',
       'Do not require Japanese typing.',
+      'Speaking exercises are not allowed.',
     ].join(' ');
 
   if (level === 'beginner')
@@ -248,20 +262,23 @@ function levelInstructions(level: UserLevel): string {
       'Allowed exercise types: multiple_choice, translation, listening.',
       'Difficulty range is strictly 1-3.',
       'Translation direction must be ja_to_en only.',
+      'Speaking exercises are not allowed.',
     ].join(' ');
 
   if (level === 'elementary')
     return [
       'User level is elementary.',
-      'Allowed exercise types: multiple_choice, translation, listening, fill_blank.',
+      'Allowed exercise types: multiple_choice, translation, listening, fill_blank, speaking.',
       'Difficulty range is strictly 1-3.',
       'Translation can be ja_to_en or en_to_ja.',
+      'Elementary speaking exercises must use responseKind="situational_response" only.',
     ].join(' ');
 
   if (level === 'pre_intermediate')
     return [
       'User level is pre_intermediate.',
-      'All exercise types are allowed.',
+      'All exercise types are allowed, including speaking.',
+      'Speaking exercises may use responseKind="situational_response" or "translation_en_to_ja".',
       'Difficulty range is strictly 2-4.',
       'Translation can be ja_to_en or en_to_ja.',
     ].join(' ');
@@ -269,7 +286,8 @@ function levelInstructions(level: UserLevel): string {
   if (level === 'intermediate')
     return [
       'User level is intermediate.',
-      'All exercise types are allowed.',
+      'All exercise types are allowed, including speaking.',
+      'Speaking exercises may use responseKind="situational_response" or "translation_en_to_ja".',
       'Difficulty range is strictly 2-5.',
       'Translation can be ja_to_en or en_to_ja.',
     ].join(' ');
@@ -277,7 +295,8 @@ function levelInstructions(level: UserLevel): string {
   if (level === 'upper_intermediate')
     return [
       'User level is upper_intermediate.',
-      'All exercise types are allowed.',
+      'All exercise types are allowed, including speaking.',
+      'Speaking exercises may use responseKind="situational_response" or "translation_en_to_ja".',
       'Difficulty range is strictly 3-5.',
       'Translation can be ja_to_en or en_to_ja.',
     ].join(' ');
@@ -285,14 +304,16 @@ function levelInstructions(level: UserLevel): string {
   if (level === 'advanced')
     return [
       'User level is advanced.',
-      'All exercise types are allowed.',
+      'All exercise types are allowed, including speaking.',
+      'Speaking exercises may use responseKind="situational_response" or "translation_en_to_ja".',
       'Difficulty range is strictly 3-5.',
       'Translation can be ja_to_en or en_to_ja.',
     ].join(' ');
 
   return [
     'User level is ready_for_japan.',
-    'All exercise types are allowed.',
+    'All exercise types are allowed, including speaking.',
+    'Speaking exercises may use responseKind="situational_response" or "translation_en_to_ja".',
     'Difficulty range is strictly 3-5.',
     'Translation can be ja_to_en or en_to_ja.',
   ].join(' ');
@@ -311,7 +332,17 @@ function exerciseFieldRequirements(level: UserLevel): string[] {
   if (level === 'beginner') {
     return [...requirements, 'For beginner, translation direction must always be "ja_to_en".'];
   }
+  if (level === 'elementary') {
+    return [
+      ...requirements,
+      'For elementary, speaking responseKind must be "situational_response" only.',
+    ];
+  }
   return requirements;
+}
+
+function fieldRequirementsForTypes(types: ExerciseType[]): string[] {
+  return types.map((type) => EXERCISE_FIELD_REQUIREMENTS[type]);
 }
 
 export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPlanPrompt {
@@ -421,7 +452,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '3) Translation robustness:',
           'For every translation exercise, acceptedAnswers must include AT LEAST 3 valid English variants. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
           '',
-          '4) CRITICAL ROMAJI RULE: Every Japanese string anywhere in the output must include romaji in parentheses. Example: こんにちは (konnichiwa). Never output Japanese script without romaji.',
+          '4) CRITICAL ROMAJI RULE: Learner-visible free-text Japanese must include romaji in parentheses. Structured fields may separate script and romaji: fields named "japanese" and speaking "expectedAnswer" must contain Japanese script only, with paired romanization in "romaji" or "expectedRomaji".',
           '',
           '5) Exercise quality:',
           '- Vary exercise types within level constraints.',
@@ -437,7 +468,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 'Japanese writing input is enabled for this learner. You may include writing-style prompts when useful.',
               ]
             : [
-                'Japanese writing input is disabled. All expected learner input must be in romaji or English only.',
+                'Japanese writing input is disabled. Do not require typed Japanese script answers; microphone speaking exercises may still ask the learner to speak Japanese.',
               ]),
           'Use practical language the learner can immediately use in Japan.',
           'Keep content coherent around the chosen topic.',
@@ -533,8 +564,11 @@ export function buildPublicChallengePrompt(
           'SCRIPT FORMATTING RULE: In fields named "japanese", output Japanese script only (no inline romaji and no parentheses). Put romanization only in fields named "romaji".',
           'PUBLIC CHALLENGE MULTIPLE_CHOICE RULE: Only two patterns are allowed. Pattern 1: question is an English scenario asking what to say; all choices must be Japanese and include romaji in parentheses. Pattern 2: question includes a Japanese phrase and asks what it means; all choices must be English only.',
           'NEVER generate English-scenario + English-only choices in public challenge.',
+          'Public challenge must not include speaking exercises or require microphone access.',
+          `Public challenge allowed exercise types: ${PUBLIC_CHALLENGE_ALLOWED_TYPES.join(', ')}.`,
           'Exercise type-specific required fields:',
-          ...exerciseFieldRequirements('beginner'),
+          ...fieldRequirementsForTypes(PUBLIC_CHALLENGE_ALLOWED_TYPES),
+          'For public challenge, translation direction must always be "ja_to_en".',
           '',
           'For every translation exercise, acceptedAnswers must include AT LEAST 3 valid English variants. Prioritize communicative intent: if a native speaker would understand the meaning correctly, include it as accepted.',
           '',

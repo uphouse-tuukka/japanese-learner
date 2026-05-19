@@ -190,6 +190,64 @@ describe('ai session prompt builders', () => {
     expect(promptText).not.toContain('This fifth cultural note should not be included.');
   });
 
+  it('allows private elementary prompts to include speaking with microphone-specific rules', () => {
+    const prompt = buildSessionPlanPrompt({
+      ...baseSessionInput(),
+      userLevel: 'elementary',
+      japaneseWritingEnabled: false,
+    });
+    const promptText = systemPrompt(prompt);
+
+    expect(promptText).toContain(
+      'Allowed exercise types: multiple_choice, translation, listening, fill_blank, speaking.',
+    );
+    expect(promptText).toContain('- speaking:');
+    expect(promptText).toContain('responseKind');
+    expect(promptText).toContain('expectedRomaji');
+    expect(promptText).toContain(
+      'Elementary speaking exercises must use responseKind="situational_response" only.',
+    );
+    expect(promptText).toContain(
+      'Japanese writing input is disabled. Do not require typed Japanese script answers; microphone speaking exercises may still ask the learner to speak Japanese.',
+    );
+    expect(promptText).not.toContain(
+      'All expected learner input must be in romaji or English only.',
+    );
+  });
+
+  it('keeps absolute beginner and beginner private prompts out of speaking exercises', () => {
+    const absoluteBeginnerPrompt = buildSessionPlanPrompt({
+      ...baseSessionInput(),
+      userLevel: 'absolute_beginner',
+    });
+    const beginnerPrompt = buildSessionPlanPrompt(baseSessionInput());
+
+    expect(systemPrompt(absoluteBeginnerPrompt)).toContain('Speaking exercises are not allowed.');
+    expect(systemPrompt(absoluteBeginnerPrompt)).not.toContain('- speaking:');
+    expect(systemPrompt(beginnerPrompt)).toContain('Speaking exercises are not allowed.');
+    expect(systemPrompt(beginnerPrompt)).not.toContain('- speaking:');
+  });
+
+  it('keeps public challenge requirements on the explicit public type boundary', () => {
+    const prompt = buildPublicChallengePrompt({
+      scenario: 'food_dining',
+      scenarioLabel: 'Ordering at a restaurant',
+      targetExerciseCount: 4,
+    });
+    const promptText = systemPrompt(prompt);
+
+    expect(promptText).toContain(
+      'Public challenge must not include speaking exercises or require microphone access.',
+    );
+    expect(promptText).not.toContain('- speaking:');
+    expect(promptText).not.toContain('fill_blank:');
+    expect(promptText).not.toContain('reorder:');
+    expect(promptText).not.toContain('reading:');
+    expect(promptText).toContain('- multiple_choice:');
+    expect(promptText).toContain('- translation:');
+    expect(promptText).toContain('- listening:');
+  });
+
   it('buildPublicChallengePrompt preserves the public multiple_choice contract and target count behavior', () => {
     const prompt = buildPublicChallengePrompt({
       scenario: 'food_dining',
