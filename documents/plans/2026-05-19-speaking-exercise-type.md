@@ -12,7 +12,12 @@ Created: 2026-05-19 16:30:38
 
 Updated: 2026-05-19 after current-checkout review
 
-Status: Ready for implementation
+Status: In implementation
+
+## Implementation progress
+
+- 2026-05-19 Task 0 complete: pulled latest `origin/master`, confirmed clean checkout at `b6954ed`, and reviewed required project/docs/decision files before editing.
+- 2026-05-19 Task 1 complete: added shared `speaking` exercise type and union shape in `src/lib/types.ts`. `npm run check` now intentionally exposes the next type surfaces to update (`ai-session-prompts.ts`, `ai-summary-prompts.ts`, `debug-exercises.ts`, `SessionRenderer.svelte`).
 
 ## Current checkout evidence
 

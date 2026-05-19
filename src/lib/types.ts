@@ -63,7 +63,8 @@ export type ExerciseType =
   | 'fill_blank'
   | 'reorder'
   | 'reading'
-  | 'listening';
+  | 'listening'
+  | 'speaking';
 
 export interface BaseExercise {
   id: string;
@@ -127,13 +128,25 @@ export interface ListeningExercise extends BaseExercise {
   correctAnswer: string;
 }
 
+export interface SpeakingExercise extends BaseExercise {
+  type: 'speaking';
+  prompt: string;
+  responseKind: 'situational_response' | 'translation_en_to_ja';
+  expectedAnswer: string;
+  expectedRomaji: string;
+  acceptedAnswers: string[];
+  rubric: string;
+  maxRecordingSeconds?: number;
+}
+
 export type Exercise =
   | MultipleChoiceExercise
   | TranslationExercise
   | FillBlankExercise
   | ReorderExercise
   | ReadingExercise
-  | ListeningExercise;
+  | ListeningExercise
+  | SpeakingExercise;
 
 export interface SessionExercise {
   sessionId: string;
