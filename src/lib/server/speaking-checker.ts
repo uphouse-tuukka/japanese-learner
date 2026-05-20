@@ -182,7 +182,7 @@ function buildGradingPrompt(input: SpeakingCheckInput, transcript: string): stri
     '',
     'Is the transcript semantically correct for the speaking exercise?',
     'Grade semantic correctness and communicative intent. Do not grade pronunciation, accent, or exact wording.',
-    'Reply JSON only: {"correct":true/false,"confidence":"high"/"medium"/"low","feedback":"short learner-facing feedback"}',
+    'Reply JSON only: {"correct":true/false,"confidence":"high"/"medium"/"low","feedback":"short learner-facing feedback in English"}',
   ]
     .filter(Boolean)
     .join('\n');
@@ -235,7 +235,7 @@ async function gradeTranscript(
       {
         role: 'system',
         content:
-          'You evaluate Japanese speaking exercise transcripts. Be fair and concise. Reply ONLY with JSON.',
+          'You evaluate Japanese speaking exercise transcripts. Be fair and concise. The learner-facing feedback field must be in English. Reply ONLY with JSON.',
       },
       {
         role: 'user',

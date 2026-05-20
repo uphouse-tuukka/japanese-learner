@@ -267,14 +267,14 @@
     <div class="result-panel" class:correct={isCorrect} class:incorrect={!isCorrect} tabindex="-1">
       <p class="result-title">{isCorrect ? 'Correct!' : 'Not quite'}</p>
       <div class="result-grid">
-        <div>
+        <div class="answer-card">
           <span class="label">Transcript</span>
-          <p>{transcript}</p>
+          <p class="answer-text">{transcript}</p>
         </div>
-        <div>
+        <div class="answer-card">
           <span class="label">Expected</span>
-          <p>{exercise.expectedAnswer}</p>
-          <p class="romaji">{exercise.expectedRomaji}</p>
+          <p class="answer-text">{exercise.expectedAnswer}</p>
+          <p class="expected-romaji"><span>Romaji:</span> {exercise.expectedRomaji}</p>
         </div>
       </div>
       {#if feedback}
@@ -395,15 +395,29 @@
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
 
+  .answer-card {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+  }
+
+  .answer-text,
+  .expected-romaji {
+    margin: 0;
+  }
+
   .label {
     display: block;
     margin-bottom: 0.25rem;
     font-weight: var(--weight-medium, 600);
   }
 
-  .romaji {
+  .expected-romaji {
     color: var(--text-muted, #64748b);
-    font-style: italic;
+  }
+
+  .expected-romaji span {
+    font-weight: var(--weight-medium, 600);
   }
 
   .feedback,

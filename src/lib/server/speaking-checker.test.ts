@@ -162,5 +162,9 @@ describe('checkSpeakingAnswer', () => {
     expect(prompt).toContain('Response kind: situational_response');
     expect(prompt).toContain('semantically correct');
     expect(prompt).toContain('Do not grade pronunciation');
+    expect(prompt).toContain('feedback in English');
+    expect(mockClient.responses.create.mock.calls[0]?.[0].input[0].content).toContain(
+      'feedback field must be in English',
+    );
   });
 });
