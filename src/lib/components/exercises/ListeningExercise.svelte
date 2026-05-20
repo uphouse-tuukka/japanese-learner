@@ -72,13 +72,23 @@
 <ExerciseFrame title={exercise.title}>
   <p>Listen and choose the correct meaning.</p>
 
-  <div class="exercise-actions exercise-actions--full audio-actions">
-    <button type="button" class="btn btn-primary" onclick={playAudio} disabled={answered}>
-      {loading ? 'Loading…' : speaking ? 'Playing…' : 'Play audio'}
-    </button>
-    <button type="button" class="btn btn-ghost" onclick={handleStop} disabled={answered}
-      >Stop</button
-    >
+  <div class="audio-panel" aria-label="Listening audio controls">
+    <div class="audio-panel__copy">
+      <span class="audio-panel__label">Audio prompt</span>
+      <p>{loading ? 'Preparing audio…' : speaking ? 'Playing now' : 'Ready when you are'}</p>
+    </div>
+
+    <div class="exercise-actions audio-actions">
+      <button class="btn btn-secondary" type="button" onclick={playAudio} disabled={answered}>
+        {loading ? 'Loading…' : speaking ? 'Replay audio' : 'Play audio'}
+      </button>
+      <button
+        class="btn btn-ghost"
+        type="button"
+        onclick={handleStop}
+        disabled={answered || (!speaking && !loading)}>Stop</button
+      >
+    </div>
   </div>
 
   <div class="exercise-choice-grid">
@@ -115,8 +125,35 @@
 </ExerciseFrame>
 
 <style>
-  .audio-actions {
-    margin-bottom: var(--space-1);
+  .audio-panel {
+    display: grid;
+    gap: var(--space-3);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: var(--bg-washi);
+    padding: var(--space-4);
+  }
+
+  .audio-panel__copy {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .audio-panel__label {
+    color: var(--text-usuzumi);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .audio-panel__copy p {
+    color: var(--text-bokashi);
+    margin: 0;
+  }
+
+  .audio-actions .btn {
+    flex: 1 1 9rem;
   }
 
   .selected {

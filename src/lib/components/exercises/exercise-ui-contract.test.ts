@@ -97,4 +97,12 @@ describe('exercise UI contract', () => {
       reading.indexOf('class="reading-question"'),
     );
   });
+
+  it('keeps listening playback controls secondary to answer submission', () => {
+    const listening = readExerciseComponent(join(exerciseDir, 'ListeningExercise.svelte'));
+
+    expect(listening).toContain('class="audio-panel"');
+    expect(listening).toMatch(/class="btn btn-secondary"[\s\S]*onclick=\{playAudio\}/);
+    expect(listening).not.toMatch(/class="btn btn-primary"[\s\S]*onclick=\{playAudio\}/);
+  });
 });
