@@ -38,14 +38,18 @@
 </script>
 
 <ExerciseFrame title={exercise.title}>
-  <p class="text-japanese">
-    {exercise.passage}
-    <InlineAudio japanese={exercise.passage} size="md" />
-  </p>
-  {#if exercise.passageRomaji}
-    <p class="romaji">{exercise.passageRomaji}</p>
-  {/if}
-  <p>{exercise.question}</p>
+  <div class="reading-prompt">
+    <div class="reading-passage">
+      <p class="text-japanese reading-passage__text">
+        {exercise.passage}
+        <InlineAudio japanese={exercise.passage} size="md" />
+      </p>
+      {#if exercise.passageRomaji}
+        <p class="romaji">{exercise.passageRomaji}</p>
+      {/if}
+    </div>
+    <p class="reading-question">{exercise.question}</p>
+  </div>
 
   <div class="exercise-control-stack">
     <textarea bind:value={answer} rows="3" placeholder="Type your answer" disabled={answered}
@@ -71,6 +75,29 @@
 </ExerciseFrame>
 
 <style>
+  .reading-prompt,
+  .reading-passage {
+    display: grid;
+  }
+
+  .reading-prompt {
+    gap: var(--space-3);
+  }
+
+  .reading-passage {
+    gap: var(--space-1);
+  }
+
+  .reading-passage__text,
+  .reading-question {
+    margin: 0;
+  }
+
+  .reading-question {
+    color: var(--text-sumi);
+    font-weight: var(--weight-medium);
+  }
+
   .romaji {
     color: var(--text-usuzumi);
     font-size: var(--text-sm);

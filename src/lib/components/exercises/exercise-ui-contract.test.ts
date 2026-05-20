@@ -86,4 +86,15 @@ describe('exercise UI contract', () => {
     const styles = styleBlocks(readFileSync(path, 'utf8'));
     expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b/i);
   });
+
+  it('keeps the reading passage and romaji grouped before the question', () => {
+    const reading = readExerciseComponent(join(exerciseDir, 'ReadingExercise.svelte'));
+
+    expect(reading).toContain('class="reading-prompt"');
+    expect(reading).toContain('class="reading-passage"');
+    expect(reading).toContain('class="reading-question"');
+    expect(reading.indexOf('class="reading-passage"')).toBeLessThan(
+      reading.indexOf('class="reading-question"'),
+    );
+  });
 });

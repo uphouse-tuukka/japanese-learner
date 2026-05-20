@@ -25,6 +25,7 @@
 - 2026-05-20: Task 8 complete. Migrated `SpeakingExercise` to `ExerciseFrame`, duration meta, `ExerciseStatusPanel`, `ExerciseResultPanel`, shared action rhythm, and token-only styling while preserving microphone recording, retry, backend submission, and continue-without-credit flow. `npm run check`, speaking API/server tests, and all exercise contract checks except the planned `SessionRenderer` error-colour case passed.
 - 2026-05-20: Task 9 complete. Tokenised `SessionRenderer` unknown-exercise error styling and changed the portfolio challenge active state to render progress in its own card with `SessionRenderer` outside it, matching learn/practice frame ownership. `npm run check`, portfolio view-model tests, and the exercise UI contract test passed.
 - 2026-05-20: Task 10 complete. Expanded `documents/design/exercise-ui-guidelines.md` with the final shared primitive names, usage example, presentational-only boundary, and guardrail test command; tightened the contributor guide exercise-UI rule; refreshed the documentation index entry. `npm run format:check` passed.
+- 2026-05-20: Manual QA follow-up, reading polish complete. Grouped the Japanese reading passage with its romaji in a local `reading-passage` stack, separated the actual question with a smaller deliberate gap, and added a static contract guard for the grouping. `npm test -- src/lib/components/exercises/exercise-ui-contract.test.ts` and `npm run check` passed.
 
 ---
 
