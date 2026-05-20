@@ -2,6 +2,9 @@
   import type { FillBlankExercise, OnAnswer } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
   import { normalizeForComparison } from '$lib/utils/text';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
+  import ExerciseStatusPanel from './shared/ExerciseStatusPanel.svelte';
 
   let { exercise, onAnswer }: { exercise: FillBlankExercise; onAnswer: OnAnswer } = $props();
   let answer = $state('');
@@ -80,8 +83,7 @@
   });
 </script>
 
-<section class="card">
-  <h2>{exercise.title}</h2>
+<ExerciseFrame title={exercise.title}>
   <p class="text-japanese">
     {exercise.sentence}
     <InlineAudio japanese={exercise.sentence} size="md" />
@@ -90,91 +92,58 @@
     <p class="romaji">{exercise.sentenceRomaji}</p>
   {/if}
   <p>{exercise.sentenceEnglish}</p>
-  <div class="answer-area">
+
+  <div class="exercise-control-stack">
     <input bind:value={answer} placeholder="Fill the blank" disabled={answered || checking} />
 
     {#if checking}
-      <div class="checking-indicator">
-        <span class="checking-dot"></span>
-        <span>Checking your answer…</span>
-      </div>
+      <ExerciseStatusPanel tone="neutral">
+        <span class="checking-row">
+          <span class="checking-dot"></span>
+          <span>Checking your answer…</span>
+        </span>
+      </ExerciseStatusPanel>
     {/if}
 
     {#if answered}
-      <div class="result-panel">
-        {#if isCorrect}
-          <p class="result-correct">
-            Correct! {#if aiVerified}<span class="ai-badge">AI verified</span>{/if}
-            <span class="ink-reward">+10 墨</span>
-          </p>
-        {:else}
-          <p class="result-incorrect">Not quite</p>
+      <ExerciseResultPanel
+        state={isCorrect ? 'correct' : 'incorrect'}
+        title={isCorrect ? 'Correct!' : 'Not quite'}
+        {aiVerified}
+      >
+        {#if !isCorrect}
           <p>The correct answer: {exercise.answer}</p>
           {#if exercise.answerRomaji}
             <p class="romaji">({exercise.answerRomaji})</p>
           {/if}
         {/if}
-      </div>
+      </ExerciseResultPanel>
     {/if}
 
-    <button
-      class="btn btn-primary"
-      type="button"
-      onclick={answered ? continueToNext : submit}
-      disabled={checking}
-    >
-      {#if checking}Checking…{:else}{answered ? 'Continue' : 'Submit answer'}{/if}
-    </button>
+    <div class="exercise-actions exercise-actions--full">
+      <button
+        class="btn btn-primary"
+        type="button"
+        onclick={answered ? continueToNext : submit}
+        disabled={checking}
+      >
+        {#if checking}Checking…{:else}{answered ? 'Continue' : 'Submit answer'}{/if}
+      </button>
+    </div>
   </div>
-</section>
+</ExerciseFrame>
 
 <style>
-  .answer-area {
-    display: grid;
-    gap: var(--space-3);
-    margin-top: var(--space-3);
-  }
-
   .romaji {
     color: var(--text-usuzumi);
     font-size: var(--text-sm);
     margin: 0;
   }
 
-  .result-panel {
-    background: var(--bg-washi);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-  }
-
-  .result-correct {
-    color: var(--state-success);
-    font-weight: var(--weight-medium);
-  }
-
-  .result-incorrect {
-    color: var(--state-error);
-    font-weight: var(--weight-medium);
-  }
-
-  .ink-reward {
-    display: inline;
-    margin-left: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-regular, 400);
-    color: var(--text-usuzumi);
-    opacity: 0.85;
-  }
-
-  .checking-indicator {
+  .checking-row {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    background: var(--bg-kinu);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    color: var(--text-bokashi);
   }
 
   .checking-dot {
@@ -183,16 +152,6 @@
     border-radius: 50%;
     background: var(--accent-shu);
     animation: pulse 1s ease-in-out infinite;
-  }
-
-  .ai-badge {
-    font-size: var(--text-xs);
-    background: var(--accent-matcha-wash);
-    color: var(--state-success);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    margin-left: var(--space-1);
-    font-weight: var(--weight-regular, 400);
   }
 
   @keyframes pulse {

@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { OnAnswer, ReadingExercise } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
 
   let { exercise, onAnswer }: { exercise: ReadingExercise; onAnswer: OnAnswer } = $props();
   let answer = $state('');
@@ -35,8 +37,7 @@
   });
 </script>
 
-<section class="card">
-  <h2>{exercise.title}</h2>
+<ExerciseFrame title={exercise.title}>
   <p class="text-japanese">
     {exercise.passage}
     <InlineAudio japanese={exercise.passage} size="md" />
@@ -45,60 +46,34 @@
     <p class="romaji">{exercise.passageRomaji}</p>
   {/if}
   <p>{exercise.question}</p>
-  <div class="answer-area">
+
+  <div class="exercise-control-stack">
     <textarea bind:value={answer} rows="3" placeholder="Type your answer" disabled={answered}
     ></textarea>
+
     {#if answered}
-      <div class="result-panel">
-        {#if isCorrect}
-          <p class="result-correct">Correct! <span class="ink-reward">+10 墨</span></p>
-        {:else}
-          <p class="result-incorrect">Not quite</p>
+      <ExerciseResultPanel
+        state={isCorrect ? 'correct' : 'incorrect'}
+        title={isCorrect ? 'Correct!' : 'Not quite'}
+      >
+        {#if !isCorrect}
           <p>Expected answer: {exercise.answer}</p>
         {/if}
-      </div>
+      </ExerciseResultPanel>
     {/if}
-    <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
-      {answered ? 'Continue' : 'Submit answer'}
-    </button>
+
+    <div class="exercise-actions exercise-actions--full">
+      <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
+        {answered ? 'Continue' : 'Submit answer'}
+      </button>
+    </div>
   </div>
-</section>
+</ExerciseFrame>
 
 <style>
-  .answer-area {
-    display: grid;
-    gap: var(--space-3);
-    margin-top: var(--space-3);
-  }
-
   .romaji {
     color: var(--text-usuzumi);
     font-size: var(--text-sm);
     margin: 0;
-  }
-
-  .result-panel {
-    background: var(--bg-washi);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-  }
-
-  .result-correct {
-    color: var(--state-success);
-    font-weight: var(--weight-medium);
-  }
-
-  .result-incorrect {
-    color: var(--state-error);
-    font-weight: var(--weight-medium);
-  }
-
-  .ink-reward {
-    display: inline;
-    margin-left: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-regular, 400);
-    color: var(--text-usuzumi);
-    opacity: 0.85;
   }
 </style>
