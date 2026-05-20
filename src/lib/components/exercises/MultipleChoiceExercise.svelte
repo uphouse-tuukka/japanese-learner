@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { MultipleChoiceExercise, OnAnswer } from '$lib/types';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
 
   let { exercise, onAnswer }: { exercise: MultipleChoiceExercise; onAnswer: OnAnswer } = $props();
   let selected = $state('');
@@ -28,10 +30,10 @@
   }
 </script>
 
-<section class="card">
-  <h2>{exercise.title}</h2>
+<ExerciseFrame title={exercise.title}>
   <p>{exercise.question}</p>
-  <div class="choices">
+
+  <div class="exercise-choice-grid">
     {#each exercise.choices as choice}
       <button
         type="button"
@@ -48,31 +50,27 @@
   </div>
 
   {#if answered}
-    <div class="result-panel">
-      {#if isCorrect}
-        <p class="result-correct">Correct! <span class="ink-reward">+10 墨</span></p>
-      {:else}
-        <p class="result-incorrect">Not quite</p>
+    <ExerciseResultPanel
+      state={isCorrect ? 'correct' : 'incorrect'}
+      title={isCorrect ? 'Correct!' : 'Not quite'}
+    >
+      {#if !isCorrect}
         <p>The correct answer: {exercise.correctAnswer}</p>
       {/if}
       {#if exercise.explanation}
         <p class="explanation">{exercise.explanation}</p>
       {/if}
-    </div>
+    </ExerciseResultPanel>
   {/if}
 
-  <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
-    {answered ? 'Continue' : 'Submit answer'}
-  </button>
-</section>
+  <div class="exercise-actions exercise-actions--full">
+    <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
+      {answered ? 'Continue' : 'Submit answer'}
+    </button>
+  </div>
+</ExerciseFrame>
 
 <style>
-  .choices {
-    display: grid;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-
   .selected {
     border-color: var(--accent-shu);
     background: var(--accent-shu-wash);
@@ -80,13 +78,13 @@
 
   .correct {
     border-color: var(--state-success);
-    background: var(--accent-matcha-wash, #dcfce7);
+    background: var(--accent-matcha-wash);
     color: var(--state-success);
   }
 
   .incorrect {
     border-color: var(--state-error);
-    background: var(--accent-shu-wash, #fee2e2);
+    background: var(--accent-shu-wash);
     color: var(--state-error);
   }
 
@@ -95,54 +93,8 @@
     pointer-events: none;
   }
 
-  .result-panel {
-    background: var(--bg-washi);
-    border-radius: var(--radius-lg, 0.75rem);
-    padding: var(--space-4, 1rem);
-    margin-top: var(--space-3);
-    animation: resultReveal 300ms var(--ease-out, ease-out);
-  }
-
-  .result-correct {
-    color: var(--state-success);
-    font-weight: var(--weight-medium, 600);
-    font-size: var(--text-lg, 1.1rem);
-  }
-
-  .result-incorrect {
-    color: var(--state-error);
-    font-weight: var(--weight-medium, 600);
-    font-size: var(--text-lg, 1.1rem);
-  }
-
   .explanation {
-    margin-top: var(--space-2);
-    font-size: var(--text-sm);
     color: var(--text-bokashi);
-  }
-
-  .ink-reward {
-    display: inline;
-    margin-left: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-regular, 400);
-    color: var(--text-usuzumi);
-    opacity: 0.85;
-  }
-
-  .btn {
-    width: 100%;
-    margin-top: var(--space-4);
-  }
-
-  @keyframes resultReveal {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    font-size: var(--text-sm);
   }
 </style>

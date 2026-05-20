@@ -20,6 +20,7 @@
 - 2026-05-20: Task 3 started. Added the static exercise UI contract test and confirmed RED: `npm test -- src/lib/components/exercises/exercise-ui-contract.test.ts` fails on the planned pre-migration drift (missing shared frames, raw/fallback tokens, Translation custom buttons, and SessionRenderer raw error colour). The test file will be committed once migrations make it green.
 - 2026-05-20: Task 4 complete. Added exercise rhythm tokens and shared exercise utility classes to `src/app.css`; `npm run check` passed. The Task 3 contract test still fails as expected until component migrations are complete.
 - 2026-05-20: Task 5 complete. Migrated `FillBlankExercise`, `ReorderExercise`, and `ReadingExercise` to `ExerciseFrame`/`ExerciseResultPanel`/`ExerciseStatusPanel` as applicable. `npm run check` passed; the contract test now reports remaining drift only in choice, translation, speaking, and SessionRenderer lanes.
+- 2026-05-20: Task 6 complete. Migrated `MultipleChoiceExercise` and `ListeningExercise` to `ExerciseFrame`/`ExerciseResultPanel`, shared choice/action rhythm, and token-only choice states. `npm run check` passed; the contract test now reports remaining drift only in `TranslationExercise`, `SpeakingExercise`, and `SessionRenderer`.
 
 ---
 

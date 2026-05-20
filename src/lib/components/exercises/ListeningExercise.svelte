@@ -2,6 +2,8 @@
   import type { ListeningExercise, OnAnswer } from '$lib/types';
   import { isSpeaking, speak, stop } from '$lib/utils/tts';
   import { stripParentheticalRomaji } from '$lib/utils/text';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
 
   let { exercise, onAnswer }: { exercise: ListeningExercise; onAnswer: OnAnswer } = $props();
   let selected = $state('');
@@ -67,10 +69,10 @@
   });
 </script>
 
-<section class="card">
-  <h2>{exercise.title}</h2>
+<ExerciseFrame title={exercise.title}>
   <p>Listen and choose the correct meaning.</p>
-  <div class="audio-actions">
+
+  <div class="exercise-actions exercise-actions--full audio-actions">
     <button type="button" class="btn btn-primary" onclick={playAudio} disabled={answered}>
       {loading ? 'Loading…' : speaking ? 'Playing…' : 'Play audio'}
     </button>
@@ -78,7 +80,8 @@
       >Stop</button
     >
   </div>
-  <div class="choices">
+
+  <div class="exercise-choice-grid">
     {#each exercise.choices as choice}
       <button
         type="button"
@@ -93,29 +96,29 @@
   </div>
 
   {#if answered}
-    <div class="result-panel">
-      {#if isCorrect}
-        <p class="result-correct">Correct! <span class="ink-reward">+10 墨</span></p>
-      {:else}
-        <p class="result-incorrect">Not quite</p>
+    <ExerciseResultPanel
+      state={isCorrect ? 'correct' : 'incorrect'}
+      title={isCorrect ? 'Correct!' : 'Not quite'}
+    >
+      {#if !isCorrect}
         <p>The correct answer: {exercise.correctAnswer}</p>
       {/if}
       <p><strong>{exercise.japanese}</strong> ({exercise.romaji})</p>
-    </div>
+    </ExerciseResultPanel>
   {/if}
 
-  <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
-    {answered ? 'Continue' : 'Submit answer'}
-  </button>
-</section>
+  <div class="exercise-actions exercise-actions--full">
+    <button class="btn btn-primary" type="button" onclick={answered ? continueToNext : submit}>
+      {answered ? 'Continue' : 'Submit answer'}
+    </button>
+  </div>
+</ExerciseFrame>
 
 <style>
-  .audio-actions,
-  .choices {
-    display: grid;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
+  .audio-actions {
+    margin-bottom: var(--space-1);
   }
+
   .selected {
     border-color: var(--accent-shu);
     background: var(--accent-shu-wash);
@@ -123,48 +126,18 @@
 
   .correct {
     border-color: var(--state-success);
-    background: var(--accent-matcha-wash, #dcfce7);
+    background: var(--accent-matcha-wash);
     color: var(--state-success);
   }
 
   .incorrect {
     border-color: var(--state-error);
-    background: var(--accent-shu-wash, #fee2e2);
+    background: var(--accent-shu-wash);
     color: var(--state-error);
   }
 
   .dimmed {
     opacity: 0.5;
     pointer-events: none;
-  }
-
-  .result-panel {
-    background: var(--bg-washi);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    margin-bottom: var(--space-3);
-  }
-
-  .result-correct {
-    color: var(--state-success);
-    font-weight: var(--weight-medium);
-  }
-
-  .result-incorrect {
-    color: var(--state-error);
-    font-weight: var(--weight-medium);
-  }
-
-  .ink-reward {
-    display: inline;
-    margin-left: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-regular, 400);
-    color: var(--text-usuzumi);
-    opacity: 0.85;
-  }
-
-  .btn {
-    width: 100%;
   }
 </style>
