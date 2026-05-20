@@ -1,13 +1,16 @@
 <script lang="ts">
-  import type { OnAnswer, TranslationExercise as TranslationExerciseData } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
+  import type { OnAnswer, TranslationExercise as TranslationExerciseData } from '$lib/types';
+  import { normalizeForComparison } from '$lib/utils/text';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
+  import ExerciseStatusPanel from './shared/ExerciseStatusPanel.svelte';
   import {
     buildAcceptedAnswers,
     buildDirectionDisplay,
     buildHintText,
     buildPromptDisplay,
   } from './translation-exercise-view-model';
-  import { normalizeForComparison } from '$lib/utils/text';
 
   interface Props {
     exercise: TranslationExerciseData;
@@ -125,14 +128,14 @@
   });
 </script>
 
-<section class="translation-exercise" aria-label="Translation exercise">
-  <div class="direction-badge">
-    <span>{directionDisplay.sourceLabel}</span>
-    <span class="arrow">→</span>
-    <span>{directionDisplay.targetLabel}</span>
-  </div>
-
-  <p class="exercise-title">{exercise.title}</p>
+<ExerciseFrame title={exercise.title} ariaLabel="Translation exercise">
+  {#snippet meta()}
+    <div class="direction-badge">
+      <span>{directionDisplay.sourceLabel}</span>
+      <span class="direction-badge__arrow">→</span>
+      <span>{directionDisplay.targetLabel}</span>
+    </div>
+  {/snippet}
 
   <div class="prompt-area">
     {#if promptDisplay.kind === 'japanese'}
@@ -163,84 +166,76 @@
     />
 
     {#if !answered && !checking}
-      <div class="button-row">
-        <button type="button" class="hint-btn" onclick={showHint} disabled={hintLevel >= 2}>
+      <div class="exercise-actions translation-actions">
+        <button type="button" class="btn btn-ghost" onclick={showHint} disabled={hintLevel >= 2}>
           {hintLevel === 0 ? 'Show Hint' : 'More Hint'}
         </button>
 
-        <button type="submit" class="check-btn" disabled={!userInput.trim()}> Check </button>
+        <button type="submit" class="btn btn-primary" disabled={!userInput.trim()}>Check</button>
       </div>
     {/if}
 
     {#if checking}
-      <div class="checking-indicator">
-        <span class="checking-dot"></span>
-        <span>Checking your answer…</span>
-      </div>
+      <ExerciseStatusPanel>
+        <span class="checking-line">
+          <span class="checking-dot"></span>
+          <span>Checking your answer…</span>
+        </span>
+      </ExerciseStatusPanel>
     {/if}
   </form>
 
   {#if hintLevel > 0 && !answered}
-    <div class="hint-area">
+    <ExerciseStatusPanel role="note">
       <p class="hint-label">Hint</p>
       <p class="hint-text">{hintText}</p>
-    </div>
+    </ExerciseStatusPanel>
   {/if}
 
   {#if answered}
-    <section class="result-panel" bind:this={resultRef} tabindex="-1" aria-live="polite">
-      {#if isCorrect}
-        <div class="result-header correct">
-          <span class="result-icon">✓</span>
-          <span class="result-title"
-            >Correct! {#if aiVerified}<span class="ai-badge">AI verified</span>{/if}
-            <span class="ink-reward">+10 墨</span></span
-          >
-        </div>
-      {:else}
-        <div class="result-header incorrect">
-          <span class="result-title">Not quite</span>
-        </div>
+    <div class="result-focus-target" bind:this={resultRef} tabindex="-1">
+      <ExerciseResultPanel
+        state={isCorrect ? 'correct' : 'incorrect'}
+        title={isCorrect ? 'Correct!' : 'Not quite'}
+        {aiVerified}
+      >
+        {#if !isCorrect}
+          <div class="result-answers">
+            <p class="result-item">
+              <span class="result-label">Your answer</span>
+              <span class="user-answer-text">{submittedAnswer}</span>
+            </p>
 
-        <div class="result-answers">
-          <p class="result-item">
-            <span class="result-label">Your answer</span>
-            <span class="user-answer-text">{userInput}</span>
-          </p>
+            <p class="result-item">
+              <span class="result-label">Expected</span>
+              <span class="expected-answer-text">{exercise.expectedAnswer}</span>
+              {#if exercise.expectedRomaji}
+                <span class="expected-romaji">({exercise.expectedRomaji})</span>
+              {/if}
+            </p>
+          </div>
+        {/if}
 
-          <p class="result-item">
-            <span class="result-label">Expected</span>
-            <span class="expected-answer-text">{exercise.expectedAnswer}</span>
-            {#if exercise.expectedRomaji}
-              <span class="expected-romaji">({exercise.expectedRomaji})</span>
-            {/if}
-          </p>
+        <div class="accepted-section">
+          <p class="accepted-label">All accepted answers</p>
+          <div class="accepted-list">
+            {#each allAcceptedAnswers as answer}
+              <span class="accepted-pill">{answer}</span>
+            {/each}
+          </div>
         </div>
-      {/if}
+      </ExerciseResultPanel>
+    </div>
 
-      <div class="accepted-section">
-        <p class="accepted-label">All accepted answers</p>
-        <div class="accepted-list">
-          {#each allAcceptedAnswers as answer}
-            <span class="accepted-pill">{answer}</span>
-          {/each}
-        </div>
-      </div>
-
-      <button type="button" class="continue-btn" onclick={continueToNext}> Continue </button>
-    </section>
+    <div class="exercise-actions exercise-actions--full">
+      <button type="button" class="btn btn-primary" onclick={continueToNext}>Continue</button>
+    </div>
   {/if}
 
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-</section>
+</ExerciseFrame>
 
 <style>
-  .translation-exercise {
-    padding: var(--space-6);
-    max-width: 32rem;
-    margin: 0 auto;
-  }
-
   .direction-badge {
     display: inline-flex;
     gap: var(--space-2);
@@ -248,54 +243,51 @@
     background: var(--bg-kinu);
     border-radius: var(--radius-md);
     padding: var(--space-1) var(--space-3);
-    font-size: var(--text-xs);
     color: var(--text-bokashi);
-    margin-bottom: var(--space-4);
+    font-size: var(--text-xs);
+    line-height: var(--leading-tight);
   }
 
-  .arrow {
+  .direction-badge__arrow {
     color: var(--text-usuzumi);
-  }
-
-  .exercise-title {
-    font-size: var(--text-sm);
-    color: var(--text-usuzumi);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    margin: 0 0 var(--space-2) 0;
   }
 
   .prompt-area {
+    display: grid;
+    gap: var(--space-1);
     text-align: center;
-    margin-bottom: var(--space-8);
   }
 
   .prompt-japanese {
-    font-size: var(--text-3xl);
     color: var(--text-sumi);
+    font-size: var(--text-3xl);
     font-feature-settings: 'palt';
     letter-spacing: var(--tracking-wider);
-    margin: 0 0 var(--space-1) 0;
+    margin: 0;
   }
 
   .prompt-romaji {
-    font-size: var(--text-sm);
     color: var(--text-usuzumi);
+    font-size: var(--text-sm);
     margin: 0;
   }
 
   .prompt-english {
-    font-size: var(--text-2xl);
     color: var(--text-sumi);
+    font-size: var(--text-2xl);
     margin: 0;
   }
 
+  .input-area {
+    display: grid;
+    gap: var(--exercise-control-gap);
+  }
+
   .input-label {
+    color: var(--text-bokashi);
+    display: block;
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
-    color: var(--text-bokashi);
-    margin-bottom: var(--space-2);
-    display: block;
   }
 
   .translation-input {
@@ -303,10 +295,10 @@
     background: var(--bg-shoji);
     border: 1.5px solid var(--border-light);
     border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-4);
-    font-size: var(--text-lg);
     color: var(--text-sumi);
     font-family: var(--font-sans);
+    font-size: var(--text-lg);
+    padding: var(--space-3) var(--space-4);
     transition:
       border-color var(--duration-normal) var(--ease-out),
       box-shadow var(--duration-normal) var(--ease-out);
@@ -329,226 +321,24 @@
   }
 
   .translation-input:disabled {
-    opacity: 0.8;
     cursor: default;
+    opacity: 0.8;
   }
 
   .translation-input::placeholder {
     color: var(--text-usuzumi);
   }
 
-  .button-row {
-    display: flex;
-    gap: var(--space-3);
+  .translation-actions {
     align-items: center;
-    margin-top: var(--space-4);
+    justify-content: space-between;
+    margin-top: var(--space-1);
   }
 
-  .hint-btn {
-    background: transparent;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-4);
-    font-size: var(--text-sm);
-    color: var(--text-bokashi);
-    cursor: pointer;
-    font-family: var(--font-sans);
-    transition: all var(--duration-fast) var(--ease-out);
-  }
-
-  .hint-btn:hover:not(:disabled) {
-    background: var(--bg-washi);
-    border-color: var(--border-mid);
-  }
-
-  .hint-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .check-btn {
-    margin-left: auto;
-    background: var(--accent-shu);
-    color: var(--bg-shoji);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-6);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    letter-spacing: var(--tracking-wide);
-    cursor: pointer;
-    font-family: var(--font-sans);
-    transition: background var(--duration-fast) var(--ease-out);
-  }
-
-  .check-btn:hover:not(:disabled) {
-    background: var(--accent-shu-deep);
-  }
-
-  .check-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .continue-btn {
-    width: 100%;
-    margin-top: var(--space-4);
-    background: var(--accent-shu);
-    color: var(--bg-shoji);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-6);
-    font-size: var(--text-base);
-    font-weight: var(--weight-medium);
-    cursor: pointer;
-    font-family: var(--font-sans);
-    transition: background var(--duration-fast) var(--ease-out);
-  }
-
-  .continue-btn:hover {
-    background: var(--accent-shu-deep);
-  }
-
-  .hint-area {
-    background: var(--bg-kinu);
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-4);
-    margin-top: var(--space-3);
-    animation: slideDown 200ms var(--ease-out);
-  }
-
-  .hint-label {
-    font-size: var(--text-xs);
-    color: var(--text-usuzumi);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    margin: 0 0 var(--space-1) 0;
-  }
-
-  .hint-text {
-    font-size: var(--text-base);
-    color: var(--text-bokashi);
-    margin: 0;
-  }
-
-  .result-panel {
-    background: var(--bg-washi);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    margin-top: var(--space-6);
-    animation: resultReveal 300ms var(--ease-out);
-    outline: none;
-  }
-
-  .result-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-  }
-
-  .result-header.correct .result-icon {
-    font-size: var(--text-2xl);
-    color: var(--state-success);
-    animation: popIn 400ms var(--ease-out);
-  }
-
-  .result-header.correct .result-title {
-    font-size: var(--text-lg);
-    color: var(--state-success);
-    font-weight: var(--weight-medium);
-  }
-
-  .result-header.incorrect .result-title {
-    font-size: var(--text-lg);
-    color: var(--state-error);
-    font-weight: var(--weight-medium);
-  }
-
-  .ink-reward {
-    display: inline;
-    margin-left: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-regular, 400);
-    color: var(--text-usuzumi);
-    opacity: 0.85;
-  }
-
-  .result-answers {
-    margin-bottom: var(--space-3);
-  }
-
-  .result-item {
-    margin: 0 0 var(--space-2) 0;
-  }
-
-  .result-label {
-    font-size: var(--text-xs);
-    color: var(--text-usuzumi);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    display: block;
-    margin-bottom: var(--space-1);
-  }
-
-  .user-answer-text {
-    text-decoration: line-through;
-    color: var(--state-error);
-    font-size: var(--text-base);
-  }
-
-  .expected-answer-text {
-    color: var(--state-success);
-    font-weight: var(--weight-medium);
-    font-size: var(--text-base);
-  }
-
-  .expected-romaji {
-    color: var(--text-usuzumi);
-    font-size: var(--text-sm);
-    margin-left: var(--space-2);
-  }
-
-  .accepted-section {
-    border-top: 1px solid var(--border-light);
-    margin-top: var(--space-4);
-    padding-top: var(--space-4);
-  }
-
-  .accepted-label {
-    font-size: var(--text-xs);
-    color: var(--text-usuzumi);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    margin: 0 0 var(--space-2) 0;
-  }
-
-  .accepted-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .accepted-pill {
-    background: var(--bg-kinu);
-    border-radius: var(--radius-md);
-    padding: var(--space-1) var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--text-bokashi);
-    display: inline-block;
-  }
-
-  .checking-indicator {
-    display: flex;
-    align-items: center;
+  .checking-line {
+    display: inline-flex;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    margin-top: var(--space-3);
-    background: var(--bg-kinu);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    color: var(--text-bokashi);
-    animation: slideDown 200ms var(--ease-out);
+    align-items: center;
   }
 
   .checking-dot {
@@ -559,66 +349,69 @@
     animation: pulse 1s ease-in-out infinite;
   }
 
-  .ai-badge {
+  .hint-label,
+  .accepted-label,
+  .result-label {
+    color: var(--text-usuzumi);
     font-size: var(--text-xs);
-    background: var(--accent-matcha-wash);
+    letter-spacing: var(--tracking-wide);
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .hint-text {
+    color: var(--text-bokashi);
+    font-size: var(--text-base);
+    margin: 0;
+  }
+
+  .result-focus-target {
+    outline: none;
+  }
+
+  .result-answers,
+  .accepted-section {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .result-item {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+  }
+
+  .user-answer-text {
+    color: var(--state-error);
+    font-size: var(--text-base);
+    text-decoration: line-through;
+  }
+
+  .expected-answer-text {
     color: var(--state-success);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    margin-left: var(--space-1);
-    font-weight: var(--weight-regular, 400);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
   }
 
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+  .expected-romaji {
+    color: var(--text-usuzumi);
+    font-size: var(--text-sm);
+    margin-left: var(--space-2);
   }
 
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .accepted-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
   }
 
-  @keyframes resultReveal {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes popIn {
-    0% {
-      transform: scale(0);
-      opacity: 0;
-    }
-
-    60% {
-      transform: scale(1.2);
-    }
-
-    100% {
-      transform: scale(1);
-      opacity: 1;
-    }
+  .accepted-pill {
+    display: inline-block;
+    background: var(--bg-kinu);
+    border-radius: var(--radius-md);
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-3);
   }
 
   @keyframes pulse {
@@ -626,6 +419,7 @@
     100% {
       opacity: 0.4;
     }
+
     50% {
       opacity: 1;
     }
