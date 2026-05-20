@@ -1,17 +1,11 @@
 <script lang="ts">
   import { dev } from '$app/environment';
+  import { debugPanelExerciseTypes } from '$lib/components/debug-panel-exercise-types';
   import type { ExerciseType } from '$lib/types';
 
   let { onGenerateDebug }: { onGenerateDebug: (type: ExerciseType) => void } = $props();
 
-  const exerciseTypes: ExerciseType[] = [
-    'multiple_choice',
-    'translation',
-    'fill_blank',
-    'reorder',
-    'reading',
-    'listening',
-  ];
+  const exerciseTypes = debugPanelExerciseTypes;
 
   let isOpen = $state(false);
   let selectedType = $state<ExerciseType>('multiple_choice');
