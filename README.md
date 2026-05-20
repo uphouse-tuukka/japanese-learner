@@ -53,7 +53,7 @@ Important values:
 - `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`: optional app access gate.
 - `AUTH_SECRET`: optional cookie/session signing override; defaults to a derived secret from `BASIC_AUTH_PASSWORD`. Recommended for production/public deployments, especially if `BASIC_AUTH_PASSWORD` is unset or weak.
 - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`: required database connection.
-- `OPENAI_API_KEY`: required for AI-backed session generation, answer checking, missions, and server TTS.
+- `OPENAI_API_KEY`: required for AI-backed session generation, answer checking, missions, server TTS, and speaking transcription/evaluation.
 - `USE_OPENAI_TTS`: set `true` to enable OpenAI-backed TTS from server-provided layout data.
 - `DAILY_TOKEN_LIMIT`: per-user daily token cap; monthly token cap is derived as `DAILY_TOKEN_LIMIT * 31`.
 - `MONTHLY_COST_LIMIT`: monthly USD cost value surfaced with budget data.
@@ -90,13 +90,14 @@ Important values:
 - `/api/missions/*`: mission listing, start, response, and completion endpoints
 - `/api/portfolio/session/*`: portfolio challenge session start/current/progress/complete endpoints
 - `/api/check-answer`: answer evaluation helper
+- `/api/speaking/check`: authenticated multipart speaking exercise transcription and evaluation helper
 - `/api/tts`: server fallback TTS
 
 ## Architecture summary
 
 - `src/lib/server/db.ts`: DB initialization, schema setup, migrations, query helpers, and mission seed loading
 - `src/lib/server/missions-seed.ts`: current mission definition seed data
-- `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to 6 exercise components
+- `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to the exercise components
 - `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
 - `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
 

@@ -10,9 +10,9 @@
 
 Created: 2026-05-19 16:30:38
 
-Updated: 2026-05-19 after current-checkout review
+Updated: 2026-05-20 after implementation validation
 
-Status: In implementation
+Status: Ready for review / browser acceptance
 
 ## Implementation progress
 
@@ -25,6 +25,8 @@ Status: In implementation
 - 2026-05-19 Task 6 complete: added authenticated multipart `/api/speaking/check` route with selected-user cookie requirement, budget gate, bounded metadata parsing, safe client/server errors, and route tests. `npm test -- src/routes/api/speaking/check.server.test.ts` passes; `npm run check` remains blocked only by the planned renderer branch.
 - 2026-05-19 Task 7 complete: added `SpeakingExercise.svelte` with explicit click-to-record MediaRecorder flow, MIME negotiation, auto-stop, track cleanup, `/api/speaking/check` multipart submission, transcript/result display, retry/error states, and continue-without-credit fallback. Fixed the Svelte state diagnostics by consistently using `recordingState` and `$state<RecordingState>()`. `npm run check` now reports only the planned `SessionRenderer.svelte` missing `speaking` branch.
 - 2026-05-19 Task 8 complete: wired `SpeakingExercise.svelte` into `SessionRenderer.svelte`, kept the existing keyed reset behavior, and inspected learn, practice, and portfolio challenge route surfaces for renderer pass-through assumptions. Server-side public challenge guards remain responsible for excluding speaking from portfolio. `npm run check` passes.
+- 2026-05-20 Task 9 complete: updated `README.md` and `documents/plans/ai-session-guidelines.md` with the speaking route, privacy boundary, level rules, response kinds, and structured romaji pairing.
+- 2026-05-20 Task 10 CI validation complete: `npm run validate:ci` passes locally. Manual browser microphone acceptance remains the next verification step because it needs an interactive browser/microphone environment.
 
 ## Current checkout evidence
 

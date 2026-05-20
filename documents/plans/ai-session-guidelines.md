@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-03-20  
+**Last updated:** 2026-05-20
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -22,6 +22,18 @@
 - **All Japanese text must include romaji** for beginner accessibility
 - Format: "ありがとうございます (arigatou gozaimasu)"
 - This applies to exercise prompts, lesson key phrases, and any user-facing Japanese
+- Structured exercise fields may split script and romanization when the schema has paired fields. For speaking exercises, `expectedAnswer` is Japanese script only and `expectedRomaji` is the matching romanization.
+
+### Speaking Exercises
+
+- Speaking exercises are private learn/practice exercises only. Public portfolio challenge output must not include `speaking` or require microphone access.
+- Raw audio is transient: validate it, send it for transcription/evaluation, then discard it. The transcript is stored as the learner's `answerText`; raw audio, confidence, and feedback are not persisted in the MVP.
+- Grade transcript semantic correctness, not pronunciation scoring. Show the transcript and expected Japanese + romaji after processing.
+- Supported response kinds:
+  - `situational_response`: learner speaks an appropriate Japanese response for the situation.
+  - `translation_en_to_ja`: learner speaks a Japanese translation of an English prompt.
+- Required speaking fields: `prompt`, `responseKind`, `expectedAnswer`, `expectedRomaji`, `acceptedAnswers`, `rubric`; optional `maxRecordingSeconds` is clamped to 5-20 seconds.
+- `japaneseWritingEnabled` only controls typed Japanese-writing input. It does not block microphone-based spoken Japanese exercises.
 
 ### Exercise Count
 
@@ -43,7 +55,8 @@
 
 - **absolute_beginner:** multiple_choice + translation (ja→en only), difficulty 1-2
 - **beginner:** + listening, translation both directions, difficulty 1-3
-- **lower_intermediate:** all types, difficulty 2-4
+- **elementary:** adds fill_blank and speaking `situational_response`; no spoken translation yet
+- **pre_intermediate and above:** all private exercise types, including speaking `situational_response` and `translation_en_to_ja`
 
 ### Personalization
 
