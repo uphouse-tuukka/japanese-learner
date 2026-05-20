@@ -17,6 +17,8 @@
 - 2026-05-20: Task 0 complete. Preflight read `AGENTS.md`, `README.md`, `documents/CONTRIBUTING.md`, `documents/INDEX.md`, and this plan. Baseline `git status --short --branch` was `## master...origin/master` with only this untracked `.hermes/` plan present. Baseline `npm run check` passed with 0 errors and 0 warnings.
 - 2026-05-20: Task 1 complete. Added `documents/design/exercise-ui-guidelines.md`, linked it from `AGENTS.md`, `documents/CONTRIBUTING.md`, and `documents/INDEX.md`, and validated with `npm run format:check`.
 - 2026-05-20: Task 2 complete. Added shared `ExerciseFrame`, `ExerciseResultPanel`, and `ExerciseStatusPanel` primitives under `src/lib/components/exercises/shared/`; validation `npm run check` passed.
+- 2026-05-20: Task 3 started. Added the static exercise UI contract test and confirmed RED: `npm test -- src/lib/components/exercises/exercise-ui-contract.test.ts` fails on the planned pre-migration drift (missing shared frames, raw/fallback tokens, Translation custom buttons, and SessionRenderer raw error colour). The test file will be committed once migrations make it green.
+- 2026-05-20: Task 4 complete. Added exercise rhythm tokens and shared exercise utility classes to `src/app.css`; `npm run check` passed. The Task 3 contract test still fails as expected until component migrations are complete.
 
 ---
 

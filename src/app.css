@@ -105,6 +105,13 @@
   --space-20: 5rem; /* 80px */
   --space-24: 6rem; /* 96px */
 
+  /* — Exercise UI rhythm —
+     Shared aliases for exercise cards, controls, actions, and results. */
+  --exercise-frame-gap: var(--space-4);
+  --exercise-control-gap: var(--space-3);
+  --exercise-action-gap: var(--space-4);
+  --exercise-result-padding: var(--space-4);
+
   /* — Layout — */
   --content-width: 52rem; /* 832px — comfortable reading */
   --content-wide: 68rem; /* 1088px — wider layouts */
@@ -427,6 +434,59 @@ label {
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   box-shadow: var(--shadow-card);
+}
+
+/* ------------------------------------------------------------
+   Exercise UI shared classes
+   ------------------------------------------------------------ */
+.exercise-control-stack,
+.exercise-choice-grid {
+  display: grid;
+  gap: var(--exercise-control-gap);
+}
+
+.exercise-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--exercise-action-gap);
+}
+
+.exercise-actions--stacked {
+  display: grid;
+  gap: var(--exercise-action-gap);
+}
+
+.exercise-actions--full .btn,
+.exercise-actions--full button {
+  width: 100%;
+}
+
+.exercise-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--text-bokashi);
+  font-size: var(--text-sm);
+}
+
+.exercise-note {
+  margin: 0;
+  color: var(--text-usuzumi);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 37.5rem) {
+  .exercise-actions {
+    display: grid;
+  }
+
+  .exercise-actions .btn,
+  .exercise-actions button {
+    width: 100%;
+  }
 }
 
 /* ------------------------------------------------------------
