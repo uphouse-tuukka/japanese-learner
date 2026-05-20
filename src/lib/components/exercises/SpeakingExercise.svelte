@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import type { OnAnswer, SpeakingExercise as SpeakingExerciseData } from '$lib/types';
+  import ExerciseFrame from './shared/ExerciseFrame.svelte';
+  import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
+  import ExerciseStatusPanel from './shared/ExerciseStatusPanel.svelte';
 
   interface Props {
     exercise: SpeakingExerciseData;
@@ -229,43 +232,45 @@
   });
 </script>
 
-<section class="speaking-exercise card" aria-label="Speaking exercise">
-  <div class="speaking-header">
-    <p class="exercise-kicker">Speaking practice</p>
+<ExerciseFrame title={exercise.title} ariaLabel="Speaking exercise" kicker="Speaking practice">
+  {#snippet meta()}
     <span class="duration-pill">Up to {maxRecordingSeconds}s</span>
-  </div>
+  {/snippet}
 
-  <h2>{exercise.title}</h2>
   <p class="prompt">{exercise.prompt}</p>
 
   {#if recordingState === 'unsupported'}
-    <div class="status-panel warning" role="status">
+    <ExerciseStatusPanel tone="warning">
       <p>{errorMessage || 'Microphone recording is not supported in this browser.'}</p>
       <p class="small">You can continue without credit and try this exercise later.</p>
-    </div>
+    </ExerciseStatusPanel>
   {:else if recordingState === 'requesting_permission'}
-    <div class="status-panel" role="status">
+    <ExerciseStatusPanel>
       <p>Requesting microphone permission…</p>
-    </div>
+    </ExerciseStatusPanel>
   {:else if recordingState === 'recording'}
-    <div class="recording-panel" role="status" aria-live="polite">
-      <span class="recording-dot" aria-hidden="true"></span>
-      <span>Recording {recordingLabel}</span>
-    </div>
+    <ExerciseStatusPanel>
+      <span class="recording-line" aria-live="polite">
+        <span class="recording-dot" aria-hidden="true"></span>
+        <span>Recording {recordingLabel}</span>
+      </span>
+    </ExerciseStatusPanel>
   {:else if recordingState === 'processing'}
-    <div class="status-panel" role="status">
+    <ExerciseStatusPanel>
       <p>Transcribing and checking your answer…</p>
-    </div>
+    </ExerciseStatusPanel>
   {:else if recordingState === 'error'}
-    <div class="status-panel error" role="alert">
+    <ExerciseStatusPanel tone="error" role="alert">
       <p>{errorMessage}</p>
       <p class="small">Raw audio is discarded after the check attempt.</p>
-    </div>
+    </ExerciseStatusPanel>
   {/if}
 
   {#if recordingState === 'answered'}
-    <div class="result-panel" class:correct={isCorrect} class:incorrect={!isCorrect} tabindex="-1">
-      <p class="result-title">{isCorrect ? 'Correct!' : 'Not quite'}</p>
+    <ExerciseResultPanel
+      state={isCorrect ? 'correct' : 'incorrect'}
+      title={isCorrect ? 'Correct!' : 'Not quite'}
+    >
       <div class="result-grid">
         <div class="answer-card">
           <span class="label">Transcript</span>
@@ -280,10 +285,10 @@
       {#if feedback}
         <p class="feedback">{feedback}</p>
       {/if}
-    </div>
+    </ExerciseResultPanel>
   {/if}
 
-  <div class="actions">
+  <div class="exercise-actions speaking-actions">
     {#if recordingState === 'recording'}
       <button class="btn btn-primary" type="button" onclick={stopRecording}>Stop and check</button>
       <button class="btn btn-ghost" type="button" onclick={cancelRecording}>Cancel</button>
@@ -291,138 +296,90 @@
       <button class="btn btn-primary" type="button" disabled>Working…</button>
     {:else if recordingState === 'answered'}
       <button class="btn btn-primary" type="button" onclick={continueToNext}>Continue</button>
+    {:else if recordingState === 'unsupported'}
+      <button class="btn btn-ghost" type="button" onclick={continueToNext}
+        >Continue without credit</button
+      >
     {:else}
       <button class="btn btn-primary" type="button" onclick={startRecording}>Start recording</button
       >
       {#if canContinue}
-        <button class="btn btn-ghost" type="button" onclick={continueToNext}
-          >Continue without credit</button
-        >
+        <button class="btn btn-ghost" type="button" onclick={continueToNext}>
+          Continue without credit
+        </button>
       {/if}
     {/if}
   </div>
 
-  <p class="privacy-note">
+  <p class="exercise-note">
     Audio is sent for transcription, then discarded. Only the transcript is used as your answer.
   </p>
-</section>
+</ExerciseFrame>
 
 <style>
-  .speaking-exercise {
-    display: grid;
-    gap: var(--space-4, 1rem);
-  }
-
-  .speaking-header,
-  .actions,
-  .recording-panel {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3, 0.75rem);
-    flex-wrap: wrap;
-  }
-
-  .speaking-header {
-    justify-content: space-between;
-  }
-
-  .exercise-kicker,
-  .label,
-  .privacy-note,
-  .small {
-    color: var(--text-muted, #64748b);
-    font-size: var(--text-sm, 0.875rem);
-  }
-
-  .exercise-kicker {
-    margin: 0;
-    font-weight: var(--weight-medium, 600);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
   .duration-pill {
-    border: 1px solid var(--border-subtle, #dbe4ee);
+    border: 1px solid var(--border-light);
     border-radius: 999px;
-    padding: 0.25rem 0.65rem;
-    font-size: var(--text-sm, 0.875rem);
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-3);
   }
 
   .prompt {
-    font-size: var(--text-lg, 1.1rem);
+    color: var(--text-sumi);
+    font-size: var(--text-lg);
     margin: 0;
   }
 
-  .status-panel,
-  .recording-panel,
-  .result-panel {
-    border-radius: var(--radius-lg, 0.75rem);
-    padding: var(--space-4, 1rem);
-    background: var(--bg-washi, #f8fafc);
+  .small,
+  .label,
+  .expected-romaji {
+    color: var(--text-usuzumi);
+    font-size: var(--text-sm);
   }
 
-  .status-panel.warning {
-    border: 1px solid var(--accent-kin, #f59e0b);
-  }
-
-  .status-panel.error,
-  .result-panel.incorrect {
-    border: 1px solid var(--state-error, #dc2626);
-    background: var(--accent-shu-wash, #fee2e2);
-  }
-
-  .result-panel.correct {
-    border: 1px solid var(--state-success, #16a34a);
-    background: var(--accent-matcha-wash, #dcfce7);
+  .recording-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .recording-dot {
     width: 0.75rem;
     height: 0.75rem;
     border-radius: 999px;
-    background: var(--state-error, #dc2626);
+    background: var(--state-error);
     animation: pulse 1s infinite;
-  }
-
-  .result-title {
-    font-weight: var(--weight-medium, 600);
-    margin-top: 0;
   }
 
   .result-grid {
     display: grid;
-    gap: var(--space-3, 0.75rem);
+    gap: var(--space-3);
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
 
   .answer-card {
     display: grid;
     align-content: start;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 
   .answer-text,
-  .expected-romaji {
+  .expected-romaji,
+  .feedback,
+  .small {
     margin: 0;
   }
 
   .label {
     display: block;
-    margin-bottom: 0.25rem;
-    font-weight: var(--weight-medium, 600);
-  }
-
-  .expected-romaji {
-    color: var(--text-muted, #64748b);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
   }
 
   .expected-romaji span {
-    font-weight: var(--weight-medium, 600);
-  }
-
-  .feedback,
-  .privacy-note {
-    margin-bottom: 0;
+    font-weight: var(--weight-medium);
   }
 
   @keyframes pulse {
@@ -430,6 +387,7 @@
     100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.35;
     }
