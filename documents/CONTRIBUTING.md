@@ -138,7 +138,8 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 - Use `$props()`, `$state()`, `$derived()` runes (Svelte 5)
 - Scoped `<style>` blocks per component
 - Use CSS custom properties from `src/app.css` design tokens
-- Exercise components must follow `documents/design/exercise-ui-guidelines.md`: shared exercise frame/result/status primitives, global button classes, and the exercise UI contract test for exercise UI changes
+- Exercise components must follow `documents/design/exercise-ui-guidelines.md`: shared exercise frame/result/status primitives, global button classes, and token-only styling from `src/app.css`
+- When changing exercise UI, run `npm test -- src/lib/components/exercises/exercise-ui-contract.test.ts` in addition to the task's normal validation
 - Keep components focused — one responsibility per file
 
 ### Server Code

@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-05-09
+**Last updated:** 2026-05-20
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -102,7 +102,7 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/design/exercise-ui-guidelines.md`
 
 - Status: active
-- Description: Shared exercise UI contract for frame ownership, spacing, buttons, result/status treatment, and token hygiene.
+- Description: Shared exercise UI contract for frame ownership, shared frame/result/status primitives, spacing, buttons, result/status treatment, token hygiene, and the Vitest guardrail command.
 - Source files affected: `src/app.css`, `src/lib/components/SessionRenderer.svelte`, `src/lib/components/exercises/**`, exercise route framing
 - Last verified: 2026-05-20
 

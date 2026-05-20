@@ -29,6 +29,39 @@ Every exercise should follow this order:
 
 Type-specific affordances are expected. Examples: translation direction badges, listening audio controls, speaking privacy state, multiple-choice selected/correct/incorrect choices, and reading passage formatting.
 
+## Shared primitives
+
+Use the shared exercise UI primitives before adding component-local visual structure:
+
+- `ExerciseFrame.svelte` owns the single card-like exercise surface, header, optional kicker, optional meta snippet, body rhythm, and action row.
+- `ExerciseResultPanel.svelte` owns correct/incorrect/neutral result treatment, optional AI verification badge, optional reward display, and rich result details.
+- `ExerciseStatusPanel.svelte` owns transient neutral/warning/error/success status surfaces such as checking, recording, processing, unsupported, and unavailable states.
+
+Typical shape:
+
+```svelte
+<ExerciseFrame title="Translate" kicker="Japanese to English">
+  <div class="exercise-prompt">...</div>
+  <div class="exercise-answer-area">...</div>
+
+  {#if status}
+    <ExerciseStatusPanel tone="neutral">Checking your answer…</ExerciseStatusPanel>
+  {/if}
+
+  {#if result}
+    <ExerciseResultPanel state={result.correct ? 'correct' : 'incorrect'} title={result.title}>
+      <p>Expected answer: {expectedAnswer}</p>
+    </ExerciseResultPanel>
+  {/if}
+
+  {#snippet actions()}
+    <button class="btn btn-primary" type="button">Check answer</button>
+  {/snippet}
+</ExerciseFrame>
+```
+
+Keep exercise logic, answer normalisation, scoring, microphone handling, TTS calls, and API submission logic inside the exercise component or its existing helpers. The shared primitives are presentational only.
+
 ## Spacing rhythm
 
 Use existing spacing tokens, or exercise-level aliases that map to them in `src/app.css`:
@@ -81,3 +114,13 @@ Before review, confirm the new exercise:
 - Covers initial, disabled, transient status, correct, incorrect/error, and continue states where applicable.
 - Runs `npm run check` and the exercise UI contract test.
 - Updates this guide if it needs a genuinely new shared UI rule.
+
+## Guardrail test
+
+When changing exercise UI, run:
+
+```bash
+npm test -- src/lib/components/exercises/exercise-ui-contract.test.ts
+```
+
+The contract test verifies first-party exercise components use `ExerciseFrame`, avoid raw hex colours and fallback token syntax, only reference tokens defined in `src/app.css`, keep translation on global/shared button classes, and keep `SessionRenderer` error styling tokenised.
