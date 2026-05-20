@@ -239,33 +239,6 @@
 
   <p class="prompt">{exercise.prompt}</p>
 
-  {#if recordingState === 'unsupported'}
-    <ExerciseStatusPanel tone="warning">
-      <p>{errorMessage || 'Microphone recording is not supported in this browser.'}</p>
-      <p class="small">You can continue without credit and try this exercise later.</p>
-    </ExerciseStatusPanel>
-  {:else if recordingState === 'requesting_permission'}
-    <ExerciseStatusPanel>
-      <p>Requesting microphone permission…</p>
-    </ExerciseStatusPanel>
-  {:else if recordingState === 'recording'}
-    <ExerciseStatusPanel>
-      <span class="recording-line" aria-live="polite">
-        <span class="recording-dot" aria-hidden="true"></span>
-        <span>Recording {recordingLabel}</span>
-      </span>
-    </ExerciseStatusPanel>
-  {:else if recordingState === 'processing'}
-    <ExerciseStatusPanel>
-      <p>Transcribing and checking your answer…</p>
-    </ExerciseStatusPanel>
-  {:else if recordingState === 'error'}
-    <ExerciseStatusPanel tone="error" role="alert">
-      <p>{errorMessage}</p>
-      <p class="small">Raw audio is discarded after the check attempt.</p>
-    </ExerciseStatusPanel>
-  {/if}
-
   {#if recordingState === 'answered'}
     <ExerciseResultPanel
       state={isCorrect ? 'correct' : 'incorrect'}
@@ -279,7 +252,9 @@
         <div class="answer-card">
           <span class="label">Expected</span>
           <p class="answer-text">{exercise.expectedAnswer}</p>
-          <p class="expected-romaji"><span>Romaji:</span> {exercise.expectedRomaji}</p>
+          {#if exercise.expectedRomaji}
+            <p class="expected-romaji">({exercise.expectedRomaji})</p>
+          {/if}
         </div>
       </div>
       {#if feedback}
@@ -311,9 +286,38 @@
     {/if}
   </div>
 
-  <p class="exercise-note">
-    Audio is sent for transcription, then discarded. Only the transcript is used as your answer.
-  </p>
+  <div class="speaking-status">
+    {#if recordingState === 'unsupported'}
+      <ExerciseStatusPanel tone="warning">
+        <p>{errorMessage || 'Microphone recording is not supported in this browser.'}</p>
+        <p class="small">You can continue without credit and try this exercise later.</p>
+      </ExerciseStatusPanel>
+    {:else if recordingState === 'requesting_permission'}
+      <ExerciseStatusPanel>
+        <p>Requesting microphone permission…</p>
+      </ExerciseStatusPanel>
+    {:else if recordingState === 'recording'}
+      <ExerciseStatusPanel>
+        <span class="recording-line" aria-live="polite">
+          <span class="recording-dot" aria-hidden="true"></span>
+          <span>Recording {recordingLabel}</span>
+        </span>
+      </ExerciseStatusPanel>
+    {:else if recordingState === 'processing'}
+      <ExerciseStatusPanel>
+        <p>Transcribing and checking your answer…</p>
+      </ExerciseStatusPanel>
+    {:else if recordingState === 'error'}
+      <ExerciseStatusPanel tone="error" role="alert">
+        <p>{errorMessage}</p>
+        <p class="small">Raw audio is discarded after the check attempt.</p>
+      </ExerciseStatusPanel>
+    {:else}
+      <p class="exercise-note">
+        Audio is sent for transcription, then discarded. Only the transcript is used as your answer.
+      </p>
+    {/if}
+  </div>
 </ExerciseFrame>
 
 <style>
@@ -378,8 +382,8 @@
     text-transform: uppercase;
   }
 
-  .expected-romaji span {
-    font-weight: var(--weight-medium);
+  .speaking-status {
+    display: grid;
   }
 
   @keyframes pulse {

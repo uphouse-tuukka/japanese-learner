@@ -105,4 +105,14 @@ describe('exercise UI contract', () => {
     expect(listening).toMatch(/class="btn btn-secondary"[\s\S]*onclick=\{playAudio\}/);
     expect(listening).not.toMatch(/class="btn btn-primary"[\s\S]*onclick=\{playAudio\}/);
   });
+
+  it('keeps speaking controls stable before recording status copy', () => {
+    const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
+
+    expect(speaking).not.toContain('Romaji:');
+    expect(speaking).toContain('class="speaking-status"');
+    expect(speaking.indexOf('class="exercise-actions speaking-actions"')).toBeLessThan(
+      speaking.indexOf('class="speaking-status"'),
+    );
+  });
 });
