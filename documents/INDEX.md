@@ -99,6 +99,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Source files affected: documentation only
 - Last verified: 2026-05-06
 
+### `documents/design/exercise-ui-guidelines.md`
+
+- Status: active
+- Description: Shared exercise UI contract for frame ownership, spacing, buttons, result/status treatment, and token hygiene.
+- Source files affected: `src/app.css`, `src/lib/components/SessionRenderer.svelte`, `src/lib/components/exercises/**`, exercise route framing
+- Last verified: 2026-05-20
+
 ## Plans
 
 ### `documents/plans/2026-05-06-technical-debt-agentic-workflow-improvements.md`

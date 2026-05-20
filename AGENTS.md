@@ -27,6 +27,7 @@ Before editing, read:
 - Keep TypeScript strict-mode compatible.
 - Put server-only code in `src/lib/server/`.
 - Use design tokens from `src/app.css` for UI styling.
+- Exercise components must follow `documents/design/exercise-ui-guidelines.md` before adding component-local visual structure.
 
 ## Validation
 

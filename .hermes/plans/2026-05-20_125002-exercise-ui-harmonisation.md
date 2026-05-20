@@ -15,6 +15,7 @@
 ## Implementation progress
 
 - 2026-05-20: Task 0 complete. Preflight read `AGENTS.md`, `README.md`, `documents/CONTRIBUTING.md`, `documents/INDEX.md`, and this plan. Baseline `git status --short --branch` was `## master...origin/master` with only this untracked `.hermes/` plan present. Baseline `npm run check` passed with 0 errors and 0 warnings.
+- 2026-05-20: Task 1 complete. Added `documents/design/exercise-ui-guidelines.md`, linked it from `AGENTS.md`, `documents/CONTRIBUTING.md`, and `documents/INDEX.md`, and validated with `npm run format:check`.
 
 ---
 
