@@ -35,7 +35,7 @@
 
 <style>
   .exercise-error {
-    color: #dc2626;
-    padding: 0.5rem;
+    color: var(--state-error);
+    padding: var(--space-2);
   }
 </style>

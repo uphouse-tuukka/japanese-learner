@@ -504,16 +504,16 @@
         </p>
       </section>
     {:else if viewState === 'active'}
-      <section class="card active-card">
+      <section class="card active-progress-card">
         <ProgressBar
           current={progressDisplay.current}
           total={progressDisplay.total}
           label={progressDisplay.label}
         />
-        {#if currentExercise}
-          <SessionRenderer exercise={currentExercise} {onAnswer} />
-        {/if}
       </section>
+      {#if currentExercise}
+        <SessionRenderer exercise={currentExercise} {onAnswer} />
+      {/if}
     {:else if viewState === 'summarizing'}
       <section class="card loading-card" aria-live="polite" aria-busy="true">
         <div class="loading-visual">
@@ -753,7 +753,7 @@
     gap: var(--space-3);
   }
 
-  .active-card {
+  .active-progress-card {
     display: grid;
     gap: var(--space-4);
   }
