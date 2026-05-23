@@ -16,16 +16,14 @@
   let submittedAnswer = $state('');
 
   const audioButtonLabel = $derived(
-    loading ? 'Loading…' : speaking ? 'Playing audio…' : played ? 'Replay audio' : 'Play audio',
+    loading || speaking ? 'Playing audio…' : played ? 'Replay audio' : 'Play audio',
   );
   const audioStatusLabel = $derived(
-    loading
-      ? 'Preparing audio…'
-      : speaking
-        ? 'Playing now'
-        : played
-          ? 'Audio played. Replay when you are ready.'
-          : 'Ready when you are',
+    loading || speaking
+      ? 'Playing now'
+      : played
+        ? 'Audio played. Replay when you are ready.'
+        : 'Ready when you are',
   );
 
   async function playAudio(): Promise<void> {

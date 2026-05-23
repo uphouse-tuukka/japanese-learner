@@ -113,6 +113,22 @@ describe('exercise UI contract', () => {
     expect(listening).not.toContain("speaking ? 'Replay audio'");
   });
 
+  it('does not flash loading copy in the listening audio button', () => {
+    const listening = readExerciseComponent(join(exerciseDir, 'ListeningExercise.svelte'));
+
+    expect(listening).not.toContain('Loading…');
+    expect(listening).not.toContain('Preparing audio…');
+  });
+
+  it('only shows speaking Working copy while answer checking is processing', () => {
+    const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
+
+    expect(speaking).toContain("recordingState === 'processing'");
+    expect(speaking).not.toContain(
+      "recordingState === 'processing' || recordingState === 'requesting_permission'",
+    );
+  });
+
   it('keeps speaking controls stable before recording status copy', () => {
     const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
 

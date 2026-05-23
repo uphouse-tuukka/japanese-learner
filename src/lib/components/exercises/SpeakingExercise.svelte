@@ -292,7 +292,9 @@
     {#if recordingState === 'recording'}
       <button class="btn btn-primary" type="button" onclick={stopRecording}>Stop and check</button>
       <button class="btn btn-ghost" type="button" onclick={cancelRecording}>Cancel</button>
-    {:else if recordingState === 'processing' || recordingState === 'requesting_permission'}
+    {:else if recordingState === 'requesting_permission'}
+      <button class="btn btn-primary" type="button" disabled>Start recording</button>
+    {:else if recordingState === 'processing'}
       <button class="btn btn-primary" type="button" disabled>Working…</button>
     {:else if recordingState === 'answered'}
       <button class="btn btn-primary" type="button" onclick={continueToNext}>Continue</button>
