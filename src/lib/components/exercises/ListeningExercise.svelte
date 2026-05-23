@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { ListeningExercise, OnAnswer } from '$lib/types';
   import { isSpeaking, speak, stop } from '$lib/utils/tts';
   import { stripParentheticalRomaji } from '$lib/utils/text';
@@ -9,9 +10,23 @@
   let selected = $state('');
   let speaking = $state(false);
   let loading = $state(false);
+  let played = $state(false);
   let answered = $state(false);
   let isCorrect = $state(false);
   let submittedAnswer = $state('');
+
+  const audioButtonLabel = $derived(
+    loading ? 'Loading…' : speaking ? 'Playing audio…' : played ? 'Replay audio' : 'Play audio',
+  );
+  const audioStatusLabel = $derived(
+    loading
+      ? 'Preparing audio…'
+      : speaking
+        ? 'Playing now'
+        : played
+          ? 'Audio played. Replay when you are ready.'
+          : 'Ready when you are',
+  );
 
   async function playAudio(): Promise<void> {
     loading = true;
@@ -29,8 +44,9 @@
       speaking = isSpeaking();
       loading = false;
       await playback;
+      played = true;
     } finally {
-      speaking = isSpeaking();
+      speaking = false;
       loading = false;
     }
   }
@@ -39,6 +55,7 @@
     stop();
     speaking = false;
     loading = false;
+    played = true;
   }
 
   function submit(): void {
@@ -60,12 +77,18 @@
 
   $effect(() => {
     exercise.id;
+    stop();
     selected = '';
     speaking = false;
     loading = false;
+    played = false;
     answered = false;
     isCorrect = false;
     submittedAnswer = '';
+  });
+
+  onDestroy(() => {
+    stop();
   });
 </script>
 
@@ -75,12 +98,17 @@
   <div class="audio-panel" aria-label="Listening audio controls">
     <div class="audio-panel__copy">
       <span class="audio-panel__label">Audio prompt</span>
-      <p>{loading ? 'Preparing audio…' : speaking ? 'Playing now' : 'Ready when you are'}</p>
+      <p>{audioStatusLabel}</p>
     </div>
 
     <div class="exercise-actions audio-actions">
-      <button class="btn btn-secondary" type="button" onclick={playAudio} disabled={answered}>
-        {loading ? 'Loading…' : speaking ? 'Replay audio' : 'Play audio'}
+      <button
+        class="btn btn-secondary"
+        type="button"
+        onclick={playAudio}
+        disabled={answered || loading || speaking}
+      >
+        {audioButtonLabel}
       </button>
       <button
         class="btn btn-ghost"

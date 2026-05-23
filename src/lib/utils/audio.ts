@@ -1,5 +1,6 @@
 let audioContext: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
+let currentPlaybackResolve: (() => void) | null = null;
 let playing = false;
 
 function getAudioContext(): AudioContext {
@@ -34,6 +35,9 @@ function markStopped(source: AudioBufferSourceNode | null): void {
   if (currentSource === source) {
     currentSource = null;
     playing = false;
+    const resolvePlayback = currentPlaybackResolve;
+    currentPlaybackResolve = null;
+    resolvePlayback?.();
   }
 }
 
@@ -53,13 +57,17 @@ export async function playAudio(audioData: ArrayBuffer | Blob): Promise<void> {
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.connect(context.destination);
-  source.onended = () => {
-    markStopped(source);
-  };
 
   currentSource = source;
   playing = true;
-  source.start(0);
+
+  await new Promise<void>((resolve) => {
+    currentPlaybackResolve = resolve;
+    source.onended = () => {
+      markStopped(source);
+    };
+    source.start(0);
+  });
 }
 
 export async function playFromUrl(url: string): Promise<void> {

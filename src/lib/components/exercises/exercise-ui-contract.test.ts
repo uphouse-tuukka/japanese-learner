@@ -106,6 +106,13 @@ describe('exercise UI contract', () => {
     expect(listening).not.toMatch(/class="btn btn-primary"[\s\S]*onclick=\{playAudio\}/);
   });
 
+  it('keeps active listening playback labelled as playing, not replay', () => {
+    const listening = readExerciseComponent(join(exerciseDir, 'ListeningExercise.svelte'));
+
+    expect(listening).toContain('Playing audio…');
+    expect(listening).not.toContain("speaking ? 'Replay audio'");
+  });
+
   it('keeps speaking controls stable before recording status copy', () => {
     const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
 
@@ -113,6 +120,15 @@ describe('exercise UI contract', () => {
     expect(speaking).toContain('class="speaking-status"');
     expect(speaking.indexOf('class="exercise-actions speaking-actions"')).toBeLessThan(
       speaking.indexOf('class="speaking-status"'),
+    );
+  });
+
+  it('prevents speaking cancel from submitting recorder output for grading', () => {
+    const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
+
+    expect(speaking).toContain("recordingStopIntent = 'cancel'");
+    expect(speaking).toMatch(
+      /if \(shouldSubmitStoppedRecording\(stopIntent, audio\.size\)\) \{\s*void submitAudio\(audio\);/,
     );
   });
 });

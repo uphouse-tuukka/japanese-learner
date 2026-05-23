@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import type { OnAnswer, SpeakingExercise as SpeakingExerciseData } from '$lib/types';
+  import {
+    shouldSubmitStoppedRecording,
+    type RecordingStopIntent,
+  } from './speaking-recorder-state';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
   import ExerciseStatusPanel from './shared/ExerciseStatusPanel.svelte';
@@ -45,6 +49,7 @@
   let mediaRecorder: MediaRecorder | null = null;
   let mediaStream: MediaStream | null = null;
   let chunks: Blob[] = [];
+  let recordingStopIntent: RecordingStopIntent = 'submit';
   let stopTimer: ReturnType<typeof setTimeout> | null = null;
   let tickTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -80,6 +85,7 @@
   }
 
   function resetRecorder(): void {
+    recordingStopIntent = 'cancel';
     stopTimers();
     releaseStream();
     mediaRecorder = null;
@@ -160,6 +166,7 @@
     feedback = '';
     recordingSeconds = 0;
     chunks = [];
+    recordingStopIntent = 'submit';
 
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -173,11 +180,21 @@
       };
 
       mediaRecorder.onstop = () => {
+        const stopIntent = recordingStopIntent;
         stopTimers();
         releaseStream();
         const audio = new Blob(chunks, { type: selectedMimeType || 'audio/webm' });
         chunks = [];
-        void submitAudio(audio);
+        mediaRecorder = null;
+        recordingStopIntent = 'submit';
+
+        if (shouldSubmitStoppedRecording(stopIntent, audio.size)) {
+          void submitAudio(audio);
+          return;
+        }
+
+        recordingState = 'idle';
+        recordingSeconds = 0;
       };
 
       mediaRecorder.onerror = () => {
@@ -203,15 +220,23 @@
   }
 
   function stopRecording(): void {
+    recordingStopIntent = 'submit';
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
     }
   }
 
   function cancelRecording(): void {
-    resetRecorder();
+    recordingStopIntent = 'cancel';
+    stopTimers();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    } else {
+      resetRecorder();
+    }
     recordingState = 'idle';
     recordingSeconds = 0;
+    errorMessage = '';
   }
 
   function continueToNext(): void {
