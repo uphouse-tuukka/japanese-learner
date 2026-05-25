@@ -154,11 +154,12 @@ export const TOPIC_CATEGORIES = [
 
 export type TopicCategoryKey = (typeof TOPIC_CATEGORIES)[number]['key'];
 
-const EXERCISE_FIELD_REQUIREMENTS: Record<ExerciseType, string> = {
+const TRANSLATION_FIELD_REQUIREMENT_SUFFIX =
+  'prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).';
+
+const EXERCISE_FIELD_REQUIREMENTS: Record<NonTranslationExerciseType, string> = {
   multiple_choice:
     '- multiple_choice: question, choices (string array of 4 options), correctAnswer (must match one choice), explanation (optional). For multiple_choice exercises: the "japanese" and "romaji" fields are metadata only and will NOT be shown to the user. They should contain the key phrase being tested for internal tracking. The "question" field must be completely self-contained — if it references Japanese text, include it inline in the question string. The question field is the ONLY text shown to the user above the choices, so it must be completely self-contained. CRITICAL for multiple_choice: the question must NEVER require looking at japanese/romaji fields to make sense. The question + choices must form a complete, self-contained quiz on their own. For multiple_choice exercises, every choice that contains Japanese must include romaji in parentheses. Example choice: "すみません (sumimasen)". This applies to ALL choices in the array and to correctAnswer. For multiple_choice exercises, the question MUST provide clear context and be self-contained so the learner understands exactly what is being tested. Use one of these patterns: (a) ask what a Japanese phrase means, e.g. "What does [phrase] mean?"; (b) present a real-life scenario and ask which phrase fits, e.g. "You are at a restaurant and want to get the waiter\'s attention. What would you say?"; (c) ask the learner to identify the correct translation/usage, e.g. "Which phrase means [English meaning]?". NEVER write a vague question like "Which phrase is most appropriate?" without a scenario. IMPORTANT: The \'japanese\' and \'romaji\' fields are metadata only and are NOT displayed to the user. The \'question\' field is the ONLY text shown above the choices, so it must be completely self-contained. If the question references a Japanese phrase (e.g. \'What does すみません (sumimasen) mean?\'), include it directly in the question string.',
-  translation:
-    '- translation: direction ("ja_to_en" or "en_to_ja"), prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).',
   fill_blank:
     '- fill_blank: sentence, sentenceRomaji, sentenceEnglish, blank, answer, answerRomaji.',
   reorder: '- reorder: prompt, tokens (string array), correctOrder (string array).',
@@ -270,7 +271,7 @@ function levelInstructions(level: UserLevel): string {
       'User level is elementary.',
       'Allowed exercise types: multiple_choice, translation, listening, fill_blank, speaking.',
       'Difficulty range is strictly 1-3.',
-      'Translation can be ja_to_en or en_to_ja.',
+      'Translation direction must be ja_to_en only.',
       'Elementary speaking exercises must use responseKind="situational_response" only.',
     ].join(' ');
 
@@ -319,9 +320,34 @@ function levelInstructions(level: UserLevel): string {
   ].join(' ');
 }
 
+type TranslationDirection = 'ja_to_en' | 'en_to_ja';
+type NonTranslationExerciseType = Exclude<ExerciseType, 'translation'>;
+
+function formatTranslationDirections(directions: TranslationDirection[]): string {
+  const quotedDirections = directions.map((direction) => `"${direction}"`);
+  return quotedDirections.length === 1
+    ? `${quotedDirections[0]} only`
+    : quotedDirections.join(' or ');
+}
+
+function translationFieldRequirement(directions: TranslationDirection[]): string {
+  return `- translation: direction (${formatTranslationDirections(directions)}), ${TRANSLATION_FIELD_REQUIREMENT_SUFFIX}`;
+}
+
+function exerciseFieldRequirement(
+  type: ExerciseType,
+  translationDirections: TranslationDirection[],
+): string {
+  if (type === 'translation') {
+    return translationFieldRequirement(translationDirections);
+  }
+  return EXERCISE_FIELD_REQUIREMENTS[type as NonTranslationExerciseType];
+}
+
 function exerciseFieldRequirements(level: UserLevel): string[] {
-  const requirements = LEVEL_RULES[level].allowedTypes.map(
-    (type) => EXERCISE_FIELD_REQUIREMENTS[type],
+  const rules = LEVEL_RULES[level];
+  const requirements = rules.allowedTypes.map((type) =>
+    exerciseFieldRequirement(type, rules.translationDirections),
   );
   if (level === 'absolute_beginner') {
     return [
@@ -335,6 +361,7 @@ function exerciseFieldRequirements(level: UserLevel): string[] {
   if (level === 'elementary') {
     return [
       ...requirements,
+      'For elementary, translation direction must always be "ja_to_en".',
       'For elementary, speaking responseKind must be "situational_response" only.',
     ];
   }
@@ -342,7 +369,7 @@ function exerciseFieldRequirements(level: UserLevel): string[] {
 }
 
 function fieldRequirementsForTypes(types: ExerciseType[]): string[] {
-  return types.map((type) => EXERCISE_FIELD_REQUIREMENTS[type]);
+  return types.map((type) => exerciseFieldRequirement(type, ['ja_to_en']));
 }
 
 export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPlanPrompt {

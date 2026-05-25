@@ -207,6 +207,13 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'Elementary speaking exercises must use responseKind="situational_response" only.',
     );
+    expect(promptText).toContain('Translation direction must be ja_to_en only.');
+    expect(promptText).toContain('- translation: direction ("ja_to_en" only),');
+    expect(promptText).toContain(
+      'For elementary, translation direction must always be "ja_to_en".',
+    );
+    expect(promptText).not.toContain('- translation: direction ("ja_to_en" or "en_to_ja")');
+    expect(promptText).not.toContain('Translation can be ja_to_en or en_to_ja.');
     expect(promptText).toContain(
       'Japanese writing input is disabled. Do not require typed Japanese script answers; microphone speaking exercises may still ask the learner to speak Japanese.',
     );

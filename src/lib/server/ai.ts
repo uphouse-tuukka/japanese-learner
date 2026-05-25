@@ -124,7 +124,9 @@ export async function generateSessionPlan(input: {
   const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
   for (let i = 0; i < rawExercises.length; i += 1) {
     try {
-      validExercises.push(normalizeExercise(rawExercises[i], i, input.userLevel));
+      const exercise = normalizeExercise(rawExercises[i], i, input.userLevel);
+      validateExerciseSet([exercise], input.userLevel);
+      validExercises.push(exercise);
     } catch (err) {
       logWarn('ai', 'skipping invalid exercise', {
         exerciseIndex: i,

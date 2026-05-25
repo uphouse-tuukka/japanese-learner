@@ -485,6 +485,49 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
   });
 });
 
+describe('generateSessionPlan — exercise-level validation resilience', () => {
+  beforeEach(() => {
+    mockResponsesCreate.mockReset();
+  });
+
+  it('skips a level-invalid model exercise instead of failing a usable session plan', async () => {
+    const payload = minimalSessionPlanPayload();
+    const [firstValidExercise, secondValidExercise] = payload.exercises;
+    mockModelOutput({
+      ...payload,
+      exercises: [
+        {
+          id: 'translation-en-to-ja',
+          type: 'translation',
+          title: 'Translate to Japanese',
+          japanese: '水をください',
+          romaji: 'mizu o kudasai',
+          englishContext: 'Asking for water',
+          tags: ['food_dining'],
+          difficulty: 2,
+          direction: 'en_to_ja',
+          prompt: 'Translate: Please give me water.',
+          expectedAnswer: '水をください',
+          expectedRomaji: 'mizu o kudasai',
+          acceptedAnswers: ['水をください', 'お水をください', '水お願いします'],
+        },
+        firstValidExercise,
+        secondValidExercise,
+      ],
+    });
+
+    const plan = await generateSessionPlan({
+      userId: 'user-1',
+      userName: 'Tester',
+      userLevel: 'elementary',
+      exerciseCount: 4,
+    });
+
+    expect(plan.exercises).toHaveLength(2);
+    expect(plan.exercises.map((exercise) => exercise.id)).not.toContain('translation-en-to-ja');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // generateSessionPlan — prior handoff notes (handoffNotes vs nextSteps)
 // ---------------------------------------------------------------------------

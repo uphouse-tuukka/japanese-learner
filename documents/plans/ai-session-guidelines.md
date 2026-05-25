@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-05-20
+**Last updated:** 2026-05-25
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -54,9 +54,9 @@
 ### Level Constraints
 
 - **absolute_beginner:** multiple_choice + translation (ja→en only), difficulty 1-2
-- **beginner:** + listening, translation both directions, difficulty 1-3
-- **elementary:** adds fill_blank and speaking `situational_response`; no spoken translation yet
-- **pre_intermediate and above:** all private exercise types, including speaking `situational_response` and `translation_en_to_ja`
+- **beginner:** + listening, translation ja→en only, difficulty 1-3
+- **elementary:** adds fill_blank and speaking `situational_response`; translation remains ja→en only; no spoken translation yet
+- **pre_intermediate and above:** all private exercise types, including typed translation both directions plus speaking `situational_response` and `translation_en_to_ja`
 
 ### Personalization
 

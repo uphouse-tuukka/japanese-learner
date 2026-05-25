@@ -94,6 +94,20 @@ const generatedPlan = {
   metadata: {},
 };
 
+function buildMockUser(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'user-1',
+    name: 'Test User',
+    level: 'beginner',
+    japaneseWritingEnabled: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    lastActiveAt: null,
+    progressJournal: null,
+    ...overrides,
+  };
+}
+
 function buildRequest(body: unknown): Request {
   return new Request('http://localhost/api/session/generate', {
     method: 'POST',
@@ -154,11 +168,7 @@ describe('POST /api/session/generate', () => {
     mockGetUser.mockReset();
 
     mockCheckBudget.mockResolvedValue({ allowed: true });
-    mockGetUser.mockResolvedValue({
-      id: 'user-1',
-      name: 'Test User',
-      level: 'beginner',
-    });
+    mockGetUser.mockResolvedValue(buildMockUser());
     mockGetSessionsForUser.mockResolvedValue([]);
     mockGetExerciseResultsForUser.mockResolvedValue([]);
     mockGenerateSessionPlan.mockResolvedValue(generatedPlan);
@@ -187,6 +197,7 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         userId: 'user-1',
         exerciseCount: 12,
+        japaneseWritingEnabled: false,
       }),
     );
     expect(mockCreateSessionRecord).toHaveBeenCalledWith({
@@ -223,6 +234,23 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         userId: 'user-1',
         exerciseCount: 4,
+      }),
+    );
+  });
+
+  it('passes the persisted Japanese writing preference into session generation', async () => {
+    mockGetUser.mockResolvedValueOnce(buildMockUser({ japaneseWritingEnabled: true }));
+
+    const response = await generateSession(
+      { userId: 'user-1', exerciseCount: 8, japaneseWritingEnabled: false },
+      'user-1',
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        japaneseWritingEnabled: true,
       }),
     );
   });

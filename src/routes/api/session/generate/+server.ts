@@ -268,6 +268,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               userId: user.id,
               userName: user.name,
               userLevel: user.level,
+              japaneseWritingEnabled: user.japaneseWritingEnabled,
               exerciseCount,
               sessionHistory,
               recentAccuracy,
