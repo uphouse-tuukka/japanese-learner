@@ -10,7 +10,10 @@ import {
   toStringArray,
   validateExerciseSet,
 } from '$lib/server/ai-session-normalizers';
-import { buildSessionPlanPrompt } from '$lib/server/ai-session-prompts';
+import {
+  buildSessionPlanPrompt,
+  type SessionPlanPromptInput,
+} from '$lib/server/ai-session-prompts';
 import {
   buildSessionSummaryPrompt,
   buildUpdatedJournalPrompt,
@@ -20,14 +23,7 @@ import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-cli
 import { LEVEL_ORDER } from '$lib/types';
 export { generatePublicChallengePlan } from '$lib/server/ai-public-challenge';
 export { TOPIC_CATEGORIES, type TopicCategoryKey } from '$lib/server/ai-session-prompts';
-import type {
-  Exercise,
-  SessionMiniLesson,
-  SessionPlan,
-  SessionSummary,
-  TokenUsage,
-  UserLevel,
-} from '$lib/types';
+import type { Exercise, SessionPlan, SessionSummary, TokenUsage, UserLevel } from '$lib/types';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -59,41 +55,7 @@ function getUsageFromResponse(response: OpenAI.Responses.Response): {
   };
 }
 
-export async function generateSessionPlan(input: {
-  userId: string;
-  userName: string;
-  userLevel: UserLevel;
-  japaneseWritingEnabled?: boolean;
-  exerciseCount?: number;
-  sessionHistory?: Array<{
-    date: string;
-    category?: string;
-    topic: string;
-    accuracy: number;
-    strengths: string[];
-    weaknesses: string[];
-    nextSteps?: string[];
-    handoffNotes?: string[];
-    culturalNote?: string;
-    miniLesson?: SessionMiniLesson | null;
-    keyPhrases: string[];
-  }>;
-  recentAccuracy?: number;
-  coveredTopics?: string[];
-  categoryRotation?: {
-    currentCategory: string | null;
-    currentCategoryStreak: number;
-    recentCategories: Array<{ category: string; sessionsAgo: number }>;
-    neverVisited: string[];
-  };
-  totalSessionCount?: number;
-  performanceInsights?: {
-    overallAccuracy: number;
-    weakExerciseIds: string[];
-    strongExerciseIds: string[];
-    recentWrongAnswers: string[];
-  };
-}): Promise<SessionPlan> {
+export async function generateSessionPlan(input: SessionPlanPromptInput): Promise<SessionPlan> {
   const client = getOpenAiClient();
   const sessionPrompt = buildSessionPlanPrompt(input);
   const { targetExerciseCount } = sessionPrompt;

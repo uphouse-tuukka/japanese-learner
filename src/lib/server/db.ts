@@ -492,6 +492,56 @@ export async function getSessionsForUser(userId: string, limit = 20): Promise<Se
   return result.rows.map((row) => mapSessionRow(row as Record<string, unknown>));
 }
 
+export async function getCompletedAiSessionsForUser(userId: string): Promise<Session[]> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+FROM sessions
+WHERE user_id = ? AND mode = 'ai' AND status = 'completed'
+ORDER BY datetime(created_at) DESC
+`,
+    args: [userId],
+  });
+  return result.rows.map((row) => mapSessionRow(row as Record<string, unknown>));
+}
+
+export async function getCompletedAiExerciseResultsForUser(userId: string): Promise<
+  Array<{
+    exerciseId: string;
+    sessionId: string;
+    isCorrect: boolean;
+    answerText: string;
+    createdAt: string;
+    exercise: Exercise;
+  }>
+> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+SELECT r.exercise_id, r.session_id, r.is_correct, r.answer_text, r.created_at, e.content_json
+FROM user_exercise_results r
+JOIN sessions s ON s.id = r.session_id
+JOIN exercises e ON e.id = r.exercise_id
+WHERE r.user_id = ?
+  AND s.user_id = ?
+  AND s.mode = 'ai'
+  AND s.status = 'completed'
+ORDER BY datetime(r.created_at) DESC
+`,
+    args: [userId, userId],
+  });
+
+  return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+    exerciseId: asString(row.exercise_id),
+    sessionId: asString(row.session_id),
+    isCorrect: asNumber(row.is_correct) === 1,
+    answerText: asString(row.answer_text),
+    createdAt: asIso(row.created_at),
+    exercise: parseExercise(row.content_json),
+  }));
+}
+
 export async function deleteStaleGhostSessions(userId: string): Promise<void> {
   const db = await getDb();
   const staleWhereClause =

@@ -1,4 +1,5 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/server/topic-categories';
+import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
 
 export {
@@ -127,6 +128,7 @@ const PUBLIC_CHALLENGE_ALLOWED_TYPES: ExerciseType[] = [
   'translation',
   'listening',
 ];
+const MAX_LEARNING_JOURNAL_CONTEXT_CHARS = 4000;
 
 export type AiPromptMessage = {
   role: 'system' | 'user';
@@ -169,6 +171,8 @@ export type SessionPlanPromptInput = {
     strongExerciseIds: string[];
     recentWrongAnswers: string[];
   };
+  coverageEvidence?: CompactCoverageEvidence;
+  learningJournal?: string | null;
 };
 
 export type SessionPlanPrompt = {
@@ -194,6 +198,77 @@ function compactSingleLine(value: string, maxLength = 160): string {
     return singleLine;
   }
   return `${singleLine.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function boundedOptionalBlock(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= MAX_LEARNING_JOURNAL_CONTEXT_CHARS) return trimmed;
+  return `${trimmed.slice(0, MAX_LEARNING_JOURNAL_CONTEXT_CHARS - 1).trimEnd()}…`;
+}
+
+function joinList(values: string[]): string {
+  return values.length > 0 ? values.join(', ') : 'none';
+}
+
+function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
+  if (!evidence) return '';
+
+  const rotation = evidence.categoryRotation;
+  const categoryCoverage = evidence.categoryCoverage
+    .map((category) => `${category.category}×${category.count} last ${category.lastSeenAt}`)
+    .join('; ');
+  const avoidTopics = evidence.avoidTopics
+    .map((topic) => `${topic.topic}${topic.category ? ` [${topic.category}]` : ''}`)
+    .join('; ');
+  const avoidKeyPhrases = evidence.avoidKeyPhrases
+    .map((phrase) => `${phrase.display}${phrase.topic ? ` [${phrase.topic}]` : ''}`)
+    .join('; ');
+  const reviewCandidates = evidence.reviewCandidates
+    .map(
+      (candidate) =>
+        `${candidate.type} ${candidate.display} (${candidate.reasonCodes.join('+')}, strength ${candidate.strength})`,
+    )
+    .join('; ');
+
+  return [
+    'COVERAGE EVIDENCE — AUTHORITATIVE APP-SIDE RAILS:',
+    `Source: ${evidence.source.parseableCompletedAiSessions}/${evidence.source.totalCompletedAiSessions} completed AI session(s) parseable; ${evidence.source.ignoredCompletedAiSessions} ignored as hard coverage.`,
+    `Target Topic Category: "${rotation.selectedCategory}" (${rotation.selectionReason}).`,
+    `Current category streak: ${rotation.currentCategory ? `"${rotation.currentCategory}" × ${rotation.currentCategoryStreak} session(s)` : 'none (first session)'}.`,
+    rotation.mustRotate
+      ? 'Mandatory rotation is active; do not generate another lesson in the current category.'
+      : 'Mandatory rotation is not active; still obey the selected target category.',
+    `Lesson category MUST be exactly "${rotation.selectedCategory}".`,
+    `Allowed Topic Categories: ${joinList(rotation.allowedCategories)}.`,
+    `Preferred Topic Categories: ${joinList(rotation.preferredCategories)}.`,
+    rotation.blockedCategories.length > 0
+      ? `Blocked Topic Categories: ${rotation.blockedCategories.join(', ')}.`
+      : 'Blocked Topic Categories: none.',
+    categoryCoverage ? `Covered category counts: ${categoryCoverage}.` : '',
+    avoidTopics
+      ? `Avoid covered Lesson Topics unless listed as Review Candidates: ${avoidTopics}.`
+      : '',
+    avoidKeyPhrases
+      ? `Avoid covered Lesson Key Phrases unless listed as Review Candidates: ${avoidKeyPhrases}.`
+      : '',
+    reviewCandidates
+      ? `Review Candidates: ${reviewCandidates}. Use only when pedagogically useful and make the review intentional.`
+      : 'Review Candidates: none. Avoid repeating covered topics and Lesson Key Phrases.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatLearningJournalContext(learningJournal: string | null): string {
+  if (!learningJournal) return '';
+  return [
+    'LEARNING JOURNAL — ADVISORY TUTOR MEMORY:',
+    learningJournal,
+    'Use this for learner tendencies, persistent weak spots, semantic continuity, and Review Candidate interpretation.',
+    'It is not exact proof of covered categories, lesson topics, or phrases; Coverage Evidence remains authoritative for exact coverage and validation.',
+  ].join('\n');
 }
 
 function levelInstructions(level: UserLevel): string {
@@ -339,28 +414,37 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
   const categoryList = TOPIC_CATEGORY_DEFINITIONS.map(
     (c) => `${c.key}: ${c.label} (${c.examples})`,
   ).join('; ');
+  const coverageEvidenceContext = formatCoverageEvidenceContext(input.coverageEvidence);
+  const learningJournal = boundedOptionalBlock(input.learningJournal);
+  const learningJournalContext = formatLearningJournalContext(learningJournal);
   const categoryRotation = input.categoryRotation;
-  const categoryContext = categoryRotation
+  const categoryContext = coverageEvidenceContext
     ? [
-        'TOPIC CATEGORY ROTATION:',
         `Available categories: ${categoryList}.`,
-        `Current category streak: ${categoryRotation.currentCategory ? `"${categoryRotation.currentCategory}" × ${categoryRotation.currentCategoryStreak} session(s)` : 'none (first session)'}. `,
-        categoryRotation.currentCategoryStreak >= 3
-          ? `MUST switch to a different category — 3 sessions reached.`
-          : categoryRotation.currentCategoryStreak >= 2
-            ? `You may continue this category one more time or switch — your choice based on learner progress.`
-            : `Continue this category to build depth, or switch if the learner seems ready.`,
-        categoryRotation.recentCategories.length > 0
-          ? `Recently visited (do NOT return to these yet): ${categoryRotation.recentCategories.map((c) => c.category).join(', ')}.`
-          : '',
-        categoryRotation.neverVisited.length > 0
-          ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
-          : '',
-        'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow.',
-      ]
-        .filter(Boolean)
-        .join(' ')
-    : '';
+        coverageEvidenceContext,
+        'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow only when it does not conflict with the selected target category.',
+      ].join('\n')
+    : categoryRotation
+      ? [
+          'TOPIC CATEGORY ROTATION:',
+          `Available categories: ${categoryList}.`,
+          `Current category streak: ${categoryRotation.currentCategory ? `"${categoryRotation.currentCategory}" × ${categoryRotation.currentCategoryStreak} session(s)` : 'none (first session)'}. `,
+          categoryRotation.currentCategoryStreak >= 3
+            ? `MUST switch to a different category — 3 sessions reached.`
+            : categoryRotation.currentCategoryStreak >= 2
+              ? `You may continue this category one more time or switch — your choice based on learner progress.`
+              : `Continue this category to build depth, or switch if the learner seems ready.`,
+          categoryRotation.recentCategories.length > 0
+            ? `Recently visited (do NOT return to these yet): ${categoryRotation.recentCategories.map((c) => c.category).join(', ')}.`
+            : '',
+          categoryRotation.neverVisited.length > 0
+            ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
+            : '',
+          'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow.',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : '';
 
   const priorNotes = sessionHistory
     .slice(0, 3)
@@ -408,6 +492,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           `Current user level: ${input.userLevel}. Apply levelInstructions() as hard constraints for allowed exercise types, difficulty range, and translation directions.`,
           '',
           categoryContext,
+          '',
+          learningJournalContext,
           '',
           priorNotesBlock,
           '',
@@ -471,6 +557,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
               strongExerciseIds: [],
               recentWrongAnswers: [],
             },
+            coverageEvidence: input.coverageEvidence ?? null,
+            learningJournal,
           },
           targetExerciseCount,
           requiredOutputExample: {

@@ -6,9 +6,15 @@ import {
   attachExercisesToSession,
   createSessionRecord,
   deleteStaleGhostSessions,
+  getCompletedAiExerciseResultsForUser,
+  getCompletedAiSessionsForUser,
   getExerciseResultsForUser,
   getSessionsForUser,
 } from '$lib/server/db';
+import {
+  buildCoverageEvidence,
+  parseCoverageSourceSessions,
+} from '$lib/server/session-coverage-evidence';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { withAbort } from '$lib/server/async';
 import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
@@ -102,6 +108,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     }
 
     const priorSessions = await getSessionsForUser(userId, 10);
+    const completedAiSessions = await getCompletedAiSessionsForUser(userId);
+    const completedAiExerciseResults = await getCompletedAiExerciseResultsForUser(userId);
+    const parsedCoverageSources = parseCoverageSourceSessions(completedAiSessions);
+    const coverageEvidence = buildCoverageEvidence({
+      sessions: parsedCoverageSources.sessions,
+      totalCompletedAiSessionCount: parsedCoverageSources.totalCompletedAiSessions,
+      ignoredCompletedAiSessionCount: parsedCoverageSources.ignoredCompletedAiSessions,
+      exerciseResults: completedAiExerciseResults,
+      learningJournal: user.progressJournal,
+    });
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
       .map((session): SessionHistoryItem | null => {
         const parsedMeta = parseSessionMeta(session.summary);
@@ -273,8 +289,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               sessionHistory,
               recentAccuracy,
               coveredTopics,
-              totalSessionCount: priorSessions.length,
+              totalSessionCount: coverageEvidence.source.totalCompletedAiSessions,
               categoryRotation,
+              coverageEvidence: coverageEvidence.promptSnapshot,
+              learningJournal: user.progressJournal,
               performanceInsights: {
                 overallAccuracy,
                 weakExerciseIds,

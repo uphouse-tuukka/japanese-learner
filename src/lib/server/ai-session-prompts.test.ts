@@ -190,6 +190,107 @@ describe('ai session prompt builders', () => {
     expect(promptText).not.toContain('This fifth cultural note should not be included.');
   });
 
+  it('buildSessionPlanPrompt treats Coverage Evidence as authoritative rails and the Learning Journal as advisory memory', () => {
+    const prompt = buildSessionPlanPrompt({
+      ...baseSessionInput(),
+      coverageEvidence: {
+        source: {
+          totalCompletedAiSessions: 3,
+          parseableCompletedAiSessions: 2,
+          ignoredCompletedAiSessions: 1,
+        },
+        categoryRotation: {
+          currentCategory: 'food_dining',
+          currentCategoryStreak: 3,
+          selectedCategory: 'transport',
+          selectionReason: 'mandatory_rotation_after_three_session_streak',
+          mustRotate: true,
+          allowedCategories: ['transport', 'shopping'],
+          preferredCategories: ['transport', 'shopping'],
+          blockedCategories: ['food_dining'],
+        },
+        categoryCoverage: [
+          {
+            category: 'food_dining',
+            count: 3,
+            lastSeenAt: '2026-05-03T08:00:00.000Z',
+          },
+        ],
+        avoidTopics: [
+          {
+            identity: 'ordering food',
+            topic: 'Ordering food',
+            category: 'food_dining',
+            count: 2,
+            lastSeenAt: '2026-05-03T08:00:00.000Z',
+          },
+        ],
+        avoidKeyPhrases: [
+          {
+            primaryIdentity: 'ja:すみません',
+            identities: ['ja:すみません', 'romaji:sumimasen'],
+            display: 'すみません (sumimasen)',
+            category: 'food_dining',
+            topic: 'Ordering food',
+            count: 2,
+            lastSeenAt: '2026-05-03T08:00:00.000Z',
+          },
+        ],
+        reviewCandidates: [
+          {
+            type: 'key_phrase',
+            identity: 'ja:ください',
+            display: 'ください (kudasai)',
+            category: 'food_dining',
+            topic: 'Ordering food',
+            topicIdentity: 'ordering food',
+            strength: 7,
+            reasonCodes: ['wrong_exercise_result', 'learning_journal_mention'],
+            evidenceSessionIds: ['session-2'],
+            lastSeenAt: '2026-05-03T08:00:00.000Z',
+          },
+        ],
+      },
+      learningJournal:
+        'The learner understands greetings, but still hesitates when using ください (kudasai) in requests.',
+    });
+
+    const promptText = systemPrompt(prompt);
+    const payload = userPayload<{
+      user: {
+        coverageEvidence: {
+          categoryRotation: { selectedCategory: string; blockedCategories: string[] };
+          avoidKeyPhrases: Array<{ display: string }>;
+          reviewCandidates: Array<{ display: string }>;
+        };
+        learningJournal: string;
+      };
+    }>(prompt);
+
+    expect(promptText).toContain('COVERAGE EVIDENCE — AUTHORITATIVE APP-SIDE RAILS:');
+    expect(promptText).toContain('Target Topic Category: "transport"');
+    expect(promptText).toContain('Lesson category MUST be exactly "transport".');
+    expect(promptText).toContain('Blocked Topic Categories: food_dining.');
+    expect(promptText).toContain(
+      'Avoid covered Lesson Key Phrases unless listed as Review Candidates:',
+    );
+    expect(promptText).toContain('すみません (sumimasen) [Ordering food]');
+    expect(promptText).toContain('Review Candidates: key_phrase ください (kudasai)');
+    expect(promptText).toContain('LEARNING JOURNAL — ADVISORY TUTOR MEMORY:');
+    expect(promptText).toContain(
+      'not exact proof of covered categories, lesson topics, or phrases',
+    );
+    expect(payload.user.coverageEvidence.categoryRotation.selectedCategory).toBe('transport');
+    expect(payload.user.coverageEvidence.categoryRotation.blockedCategories).toEqual([
+      'food_dining',
+    ]);
+    expect(payload.user.coverageEvidence.avoidKeyPhrases[0].display).toBe('すみません (sumimasen)');
+    expect(payload.user.coverageEvidence.reviewCandidates[0].display).toBe('ください (kudasai)');
+    expect(payload.user.learningJournal).toBe(
+      'The learner understands greetings, but still hesitates when using ください (kudasai) in requests.',
+    );
+  });
+
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {
     const prompt = buildSessionPlanPrompt({
       ...baseSessionInput(),

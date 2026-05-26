@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockGenerateSessionPlan,
   mockDeleteStaleGhostSessions,
+  mockGetCompletedAiExerciseResultsForUser,
+  mockGetCompletedAiSessionsForUser,
   mockGetExerciseResultsForUser,
   mockGetSessionsForUser,
   mockCreateSessionRecord,
@@ -13,6 +15,8 @@ const {
 } = vi.hoisted(() => ({
   mockGenerateSessionPlan: vi.fn(),
   mockDeleteStaleGhostSessions: vi.fn(),
+  mockGetCompletedAiExerciseResultsForUser: vi.fn(),
+  mockGetCompletedAiSessionsForUser: vi.fn(),
   mockGetExerciseResultsForUser: vi.fn(),
   mockGetSessionsForUser: vi.fn(),
   mockCreateSessionRecord: vi.fn(),
@@ -31,6 +35,8 @@ vi.mock('$lib/server/db', () => ({
   attachExercisesToSession: mockAttachExercisesToSession,
   createSessionRecord: mockCreateSessionRecord,
   deleteStaleGhostSessions: mockDeleteStaleGhostSessions,
+  getCompletedAiExerciseResultsForUser: mockGetCompletedAiExerciseResultsForUser,
+  getCompletedAiSessionsForUser: mockGetCompletedAiSessionsForUser,
   getExerciseResultsForUser: mockGetExerciseResultsForUser,
   getSessionsForUser: mockGetSessionsForUser,
 }));
@@ -94,6 +100,86 @@ const generatedPlan = {
   metadata: {},
 };
 
+function buildSessionSummary(input: {
+  category: string;
+  topic: string;
+  accuracy?: number;
+  keyPhraseDetails?: Array<{
+    japanese?: string;
+    romaji?: string;
+    english?: string;
+    usage?: string;
+  }>;
+  keyPhrases?: string[];
+  weaknesses?: string[];
+  handoffNotes?: string[];
+}) {
+  const keyPhraseDetails = input.keyPhraseDetails ?? [];
+  return JSON.stringify({
+    summaryText: `Summary for ${input.topic}`,
+    category: input.category,
+    topic: input.topic,
+    accuracy: input.accuracy ?? 80,
+    strengths: [],
+    weaknesses: input.weaknesses ?? [],
+    nextSteps: [],
+    handoffNotes: input.handoffNotes ?? [],
+    exerciseTypes: ['multiple_choice'],
+    keyPhrases:
+      input.keyPhrases ??
+      keyPhraseDetails
+        .map((phrase) => phrase.japanese ?? phrase.romaji ?? phrase.english ?? '')
+        .filter(Boolean),
+    keyPhraseDetails,
+  });
+}
+
+function buildCompletedAiSession(input: {
+  id: string;
+  createdAt: string;
+  category: string;
+  topic: string;
+  accuracy?: number;
+  keyPhraseDetails?: Array<{
+    japanese?: string;
+    romaji?: string;
+    english?: string;
+    usage?: string;
+  }>;
+  weaknesses?: string[];
+  handoffNotes?: string[];
+}) {
+  return {
+    id: input.id,
+    userId: 'user-1',
+    mode: 'ai',
+    status: 'completed',
+    model: 'gpt-5.4',
+    tokenInput: 10,
+    tokenOutput: 20,
+    summary: buildSessionSummary(input),
+    createdAt: input.createdAt,
+    completedAt: input.createdAt,
+  };
+}
+
+function buildMultipleChoiceExercise(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'exercise-coverage-1',
+    type: 'multiple_choice',
+    title: 'Request politely',
+    japanese: 'ください',
+    romaji: 'kudasai',
+    englishContext: 'Please give me...',
+    tags: ['food'],
+    difficulty: 1,
+    question: 'What does ください (kudasai) mean?',
+    choices: ['Please', 'Goodbye'],
+    correctAnswer: 'Please',
+    ...overrides,
+  };
+}
+
 function buildMockUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'user-1',
@@ -141,6 +227,8 @@ async function generateSession(body: unknown, selectedUserId: string | null = 'u
 function expectNoGenerationDbOrTokenWrites() {
   expect(mockGenerateSessionPlan).not.toHaveBeenCalled();
   expect(mockDeleteStaleGhostSessions).not.toHaveBeenCalled();
+  expect(mockGetCompletedAiExerciseResultsForUser).not.toHaveBeenCalled();
+  expect(mockGetCompletedAiSessionsForUser).not.toHaveBeenCalled();
   expect(mockGetExerciseResultsForUser).not.toHaveBeenCalled();
   expect(mockGetSessionsForUser).not.toHaveBeenCalled();
   expect(mockCreateSessionRecord).not.toHaveBeenCalled();
@@ -159,6 +247,8 @@ describe('POST /api/session/generate', () => {
     vi.unstubAllEnvs();
     mockGenerateSessionPlan.mockReset();
     mockDeleteStaleGhostSessions.mockReset();
+    mockGetCompletedAiExerciseResultsForUser.mockReset();
+    mockGetCompletedAiSessionsForUser.mockReset();
     mockGetExerciseResultsForUser.mockReset();
     mockGetSessionsForUser.mockReset();
     mockCreateSessionRecord.mockReset();
@@ -169,6 +259,8 @@ describe('POST /api/session/generate', () => {
 
     mockCheckBudget.mockResolvedValue({ allowed: true });
     mockGetUser.mockResolvedValue(buildMockUser());
+    mockGetCompletedAiExerciseResultsForUser.mockResolvedValue([]);
+    mockGetCompletedAiSessionsForUser.mockResolvedValue([]);
     mockGetSessionsForUser.mockResolvedValue([]);
     mockGetExerciseResultsForUser.mockResolvedValue([]);
     mockGenerateSessionPlan.mockResolvedValue(generatedPlan);
@@ -192,6 +284,8 @@ describe('POST /api/session/generate', () => {
     expect(mockCheckBudget).toHaveBeenCalledWith('user-1');
     expect(mockGetUser).toHaveBeenCalledWith('user-1');
     expect(mockGetSessionsForUser).toHaveBeenCalledWith('user-1', 10);
+    expect(mockGetCompletedAiSessionsForUser).toHaveBeenCalledWith('user-1');
+    expect(mockGetCompletedAiExerciseResultsForUser).toHaveBeenCalledWith('user-1');
     expect(mockGetExerciseResultsForUser).toHaveBeenCalledWith('user-1');
     expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -251,6 +345,90 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         userId: 'user-1',
         japaneseWritingEnabled: true,
+      }),
+    );
+  });
+
+  it('builds Coverage Evidence from full completed AI history and joined exercise results for generation', async () => {
+    mockGetUser.mockResolvedValueOnce(
+      buildMockUser({
+        progressJournal: 'Learner still hesitates on ください (kudasai) requests.',
+      }),
+    );
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+      buildCompletedAiSession({
+        id: 'session-2',
+        createdAt: '2026-05-03T08:00:00.000Z',
+        category: 'food_dining',
+        topic: 'Restaurant requests',
+        accuracy: 45,
+        weaknesses: ['Needs more practice with ください (kudasai).'],
+        handoffNotes: ['Review ください (kudasai) before moving on.'],
+        keyPhraseDetails: [
+          {
+            japanese: 'ください',
+            romaji: 'kudasai',
+            english: 'please give me',
+            usage: 'Use when requesting an item.',
+          },
+        ],
+      }),
+      buildCompletedAiSession({
+        id: 'session-1',
+        createdAt: '2026-05-02T08:00:00.000Z',
+        category: 'food_dining',
+        topic: 'Ordering food',
+        keyPhraseDetails: [
+          {
+            japanese: 'すみません',
+            romaji: 'sumimasen',
+            english: 'excuse me',
+            usage: 'Use to get attention politely.',
+          },
+        ],
+      }),
+    ]);
+    mockGetCompletedAiExerciseResultsForUser.mockResolvedValueOnce([
+      {
+        sessionId: 'session-2',
+        exerciseId: 'exercise-coverage-1',
+        isCorrect: false,
+        answerText: 'I said kudasai too late',
+        createdAt: '2026-05-03T08:10:00.000Z',
+        exercise: buildMultipleChoiceExercise(),
+      },
+    ]);
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learningJournal: 'Learner still hesitates on ください (kudasai) requests.',
+        totalSessionCount: 2,
+        coverageEvidence: expect.objectContaining({
+          source: {
+            totalCompletedAiSessions: 2,
+            parseableCompletedAiSessions: 2,
+            ignoredCompletedAiSessions: 0,
+          },
+          categoryRotation: expect.objectContaining({
+            currentCategory: 'food_dining',
+            currentCategoryStreak: 2,
+            selectedCategory: 'food_dining',
+            selectionReason: 'continued_current_category_for_review_candidate',
+          }),
+          avoidKeyPhrases: expect.arrayContaining([
+            expect.objectContaining({ display: 'ください (kudasai)' }),
+            expect.objectContaining({ display: 'すみません (sumimasen)' }),
+          ]),
+          reviewCandidates: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'key_phrase',
+              display: 'ください (kudasai)',
+            }),
+          ]),
+        }),
       }),
     );
   });
