@@ -44,6 +44,28 @@ Minimal full-stack Japanese learning app with:
    npm run dev
    ```
 
+## Optional CodeGraph navigation
+
+Agents may use the repo-local CodeGraph workflow to map Svelte components, SvelteKit routes, server utilities, callers, callees, and likely impact surfaces. It is optional and local-only: no global install, Hermes/MCP config, app dependency, CI, or production integration.
+
+```bash
+npm run codegraph:preflight
+npm run codegraph:init
+npm run codegraph:status
+npm run codegraph:sync
+```
+
+Example exact queries:
+
+```bash
+npm run codegraph:cli -- query SpeakingExercise --path .
+npm run codegraph:cli -- callers checkSpeakingAnswer --path .
+npm run codegraph:cli -- impact ExerciseAnswerPayload --path .
+npm run codegraph:cli -- query api/missions --path .
+```
+
+Treat CodeGraph output as navigation guidance only. Read the source and run the required validation before claiming behavior is correct. See `documents/decisions/005-codegraph-repo-local-navigation.md` for guardrails.
+
 ## Environment variables
 
 See `.env.example` for full list and comments.

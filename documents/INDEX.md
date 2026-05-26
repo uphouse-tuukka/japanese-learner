@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-05-20
+**Last updated:** 2026-05-26
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -53,23 +53,23 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `README.md`
 
 - Status: active
-- Description: Current project overview, setup, route/API summary, and database notes.
-- Source files affected: `.env.example`, `package.json`, `src/routes/**`, `src/lib/server/**`
-- Last verified: 2026-05-06
+- Description: Current project overview, setup, route/API summary, optional repo-local CodeGraph navigation, and database notes.
+- Source files affected: `.env.example`, `package.json`, `src/routes/**`, `src/lib/server/**`, CodeGraph workflow docs
+- Last verified: 2026-05-26
 
 ### `AGENTS.md`
 
 - Status: active
-- Description: Root bootstrap document for AI agents: mission, mandatory reading, boot sequence, validation, and subagent workflow.
+- Description: Root bootstrap document for AI agents: mission, mandatory reading, boot sequence, optional CodeGraph navigation, validation, and subagent workflow.
 - Source files affected: repository workflow and validation docs
-- Last verified: 2026-05-06
+- Last verified: 2026-05-26
 
 ### `documents/CONTRIBUTING.md`
 
 - Status: active
-- Description: Project contribution guide for code quality, docs rules, agent workflow, review gates, and architecture notes.
+- Description: Project contribution guide for code quality, docs rules, repo-local CodeGraph navigation, agent workflow, review gates, and architecture notes.
 - Source files affected: repository workflow and validation docs
-- Last verified: 2026-05-06
+- Last verified: 2026-05-26
 
 ### `documents/INDEX.md`
 
@@ -165,6 +165,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Description: Decision record for leaving mission table FK/index conventions unchanged until a future orphan audit and SQLite/libsql table-rebuild migration plan justify DB-level enforcement.
 - Source files affected: `src/lib/server/db-schema.ts`, `src/lib/server/db-migrations.ts`, mission-related DB access in `src/lib/server/missions-db.ts`
 - Last verified: 2026-05-08
+
+### `documents/decisions/005-codegraph-repo-local-navigation.md`
+
+- Status: decision
+- Description: Decision record for optional repo-local CodeGraph navigation via pinned npm-exec scripts, ignored `.codegraph/`, and a symlink/source-boundary preflight.
+- Source files affected: `.gitignore`, `package.json`, `scripts/codegraph-preflight.mjs`, `AGENTS.md`, `documents/CONTRIBUTING.md`, `README.md`
+- Last verified: 2026-05-26
 
 ## Analyses
 

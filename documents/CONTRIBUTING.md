@@ -40,6 +40,44 @@ Use these templates for future structured docs:
 - Decisions: `documents/templates/decision-template.md`
 - Reviews: `documents/templates/review-template.md`
 
+## Repo-local CodeGraph Navigation
+
+CodeGraph is available only as an optional repository-local navigation aid. It is for building a first map of the codebase, not for proving behavior.
+
+Run the guarded setup commands from the repo root:
+
+```bash
+npm run codegraph:preflight
+npm run codegraph:init
+npm run codegraph:status
+npm run codegraph:sync
+```
+
+Use exact symbol, route, caller, callee, or impact queries first:
+
+```bash
+npm run codegraph:cli -- query SpeakingExercise --path .
+npm run codegraph:cli -- callers checkSpeakingAnswer --path .
+npm run codegraph:cli -- query ExerciseAnswerPayload --path .
+npm run codegraph:cli -- impact ExerciseAnswerPayload --path .
+npm run codegraph:cli -- query checkBudget --path .
+npm run codegraph:cli -- callers checkBudget --path .
+npm run codegraph:cli -- query api/missions --path .
+```
+
+Broad `context` prompts are allowed for discovery, but they can mis-rank generic terms. Verify every useful hit by reading source.
+
+Guardrails:
+
+- Do not add CodeGraph to app dependencies.
+- Do not commit `.codegraph/` or generated database files.
+- Do not run `codegraph install --target=hermes`.
+- Do not mutate Hermes/MCP/global config for this repo.
+- Do not wire CodeGraph into CI, production, cron, or messaging automation.
+- Keep using `npm run validate:ci` as the code-change gate.
+
+Decision record: `documents/decisions/005-codegraph-repo-local-navigation.md`.
+
 Required subagent handoff format:
 
 ```text

@@ -21,6 +21,18 @@ Before editing, read:
 4. Identify the validation commands you will run before editing.
 5. Avoid feature drift: keep the change inside the requested scope.
 
+## Optional CodeGraph navigation
+
+This repo has an optional, repo-local CodeGraph workflow for first-pass code navigation. Use it when mapping unfamiliar Svelte components, SvelteKit routes, server utilities, callers, callees, or impact surfaces.
+
+- Keep it repo-local: do not install CodeGraph globally, run `codegraph install --target=hermes`, mutate Hermes/MCP config, or add it to CI/production automation.
+- Run `npm run codegraph:preflight` before indexing. The preflight verifies `.codegraph/` is ignored and rejects symlinks that escape the repository.
+- Initialize or refresh with `npm run codegraph:init`, `npm run codegraph:sync`, and inspect with `npm run codegraph:status`.
+- Prefer exact commands such as `npm run codegraph:cli -- query SpeakingExercise --path .`, `npm run codegraph:cli -- callers checkSpeakingAnswer --path .`, and `npm run codegraph:cli -- impact ExerciseAnswerPayload --path .` before broad natural-language `context` prompts.
+- Treat CodeGraph output as a navigation map, not proof. Read the source files it points to and run the required validation.
+
+See `documents/decisions/005-codegraph-repo-local-navigation.md` for rationale, guardrails, and examples.
+
 ## Coding constraints
 
 - Use SvelteKit 2 and Svelte 5 runes syntax.

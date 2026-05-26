@@ -6,6 +6,9 @@ build
 .output
 .vercel
 
+# Local CodeGraph index
+.codegraph/
+
 # Environment files
 .env
 .env.*
