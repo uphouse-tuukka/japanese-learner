@@ -1,4 +1,11 @@
+import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/server/topic-categories';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
+
+export {
+  TOPIC_CATEGORIES,
+  TOPIC_CATEGORY_KEYS,
+  type TopicCategoryKey,
+} from '$lib/server/topic-categories';
 
 export const LEVEL_RULES: Record<
   UserLevel,
@@ -98,61 +105,6 @@ export const LEVEL_RULES: Record<
     translationDirections: ['ja_to_en', 'en_to_ja'],
   },
 };
-
-export const TOPIC_CATEGORIES = [
-  {
-    key: 'greetings_basics',
-    label: 'Greetings & Basics',
-    examples: 'Self-introductions, thank you, excuse me, counting, basic polite phrases',
-  },
-  {
-    key: 'food_dining',
-    label: 'Food & Dining',
-    examples: 'Restaurants, ordering food, menu items, dietary needs, paying the bill',
-  },
-  {
-    key: 'transport',
-    label: 'Transport',
-    examples: 'Trains, buses, taxis, buying tickets, asking for platforms, IC cards',
-  },
-  {
-    key: 'shopping',
-    label: 'Shopping',
-    examples: 'Convenience stores, souvenirs, prices, sizes, trying on clothes',
-  },
-  {
-    key: 'directions',
-    label: 'Directions & Navigation',
-    examples: 'Asking the way, landmarks, reading signs, using maps',
-  },
-  {
-    key: 'hotel_accommodation',
-    label: 'Hotel & Accommodation',
-    examples: 'Check-in/out, room requests, problems, amenities',
-  },
-  {
-    key: 'emergencies_health',
-    label: 'Emergencies & Health',
-    examples: 'Pharmacy, doctor visits, lost items, police, feeling unwell',
-  },
-  {
-    key: 'social_conversation',
-    label: 'Social & Conversation',
-    examples: 'Small talk, weather, compliments, hobbies, meeting people',
-  },
-  {
-    key: 'sightseeing_culture',
-    label: 'Sightseeing & Culture',
-    examples: 'Temples, museums, etiquette, customs, photo requests',
-  },
-  {
-    key: 'bars_nightlife',
-    label: 'Bars & Nightlife',
-    examples: 'Izakaya ordering, drinks, karaoke, bar etiquette, nomikai culture',
-  },
-] as const;
-
-export type TopicCategoryKey = (typeof TOPIC_CATEGORIES)[number]['key'];
 
 const TRANSLATION_FIELD_REQUIREMENT_SUFFIX =
   'prompt (the text to translate), expectedAnswer (the correct translation), acceptedAnswers (string array of alternative correct answers).';
@@ -384,9 +336,9 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
       input.userLevel === 'ready_for_japan');
   const targetExerciseCount = Math.min(12, Math.max(4, Math.round(input.exerciseCount ?? 6)));
   const sessionHistory = (input.sessionHistory ?? []).slice(0, 10);
-  const categoryList = TOPIC_CATEGORIES.map((c) => `${c.key}: ${c.label} (${c.examples})`).join(
-    '; ',
-  );
+  const categoryList = TOPIC_CATEGORY_DEFINITIONS.map(
+    (c) => `${c.key}: ${c.label} (${c.examples})`,
+  ).join('; ');
   const categoryRotation = input.categoryRotation;
   const categoryContext = categoryRotation
     ? [
