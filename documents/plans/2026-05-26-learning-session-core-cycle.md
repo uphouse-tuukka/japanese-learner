@@ -195,5 +195,10 @@ Updated: 2026-05-26
   - Session generation prompts now label Coverage Evidence as authoritative app-side rails, include selected target category/allowed/preferred/blocked category state, include covered topic/key-phrase avoid lists and Review Candidates, and label the Learning Journal as advisory tutor memory rather than exact coverage proof.
   - Added route and prompt tests for Coverage Evidence wiring, full-history source counts, selected-category rails, Learning Journal handoff, and joined exercise-result review evidence.
   - Validation: `npm test -- src/routes/api/session/generate.server.test.ts src/lib/server/ai-session-prompts.test.ts src/lib/server/session-coverage-evidence.test.ts`; `npm run validate:ci`.
-- [ ] Task 4 — Add post-generation curriculum validation/retry and record rejected attempt usage with `sessionId: null`.
+- [x] Task 4 — Add post-generation curriculum validation/retry and record rejected attempt usage with `sessionId: null`.
+  - Added a pure `session-curriculum-validation` guard that rejects category mismatches, blocked categories, exact covered Lesson Topic repeats without Review Candidate evidence, and more than one repeated non-review Lesson Key Phrase.
+  - `/api/session/generate` now validates each generated plan before creating a session, records rejected model-call token usage with `sessionId: null`, retries once with compact curriculum feedback, logs sanitized failure details, and fails closed without creating/storing a bad session if both attempts violate rails.
+  - Session-generation prompts now carry compact retry feedback into the next model attempt and expose it in the structured user payload for testable prompt wiring.
+  - Added validator, prompt, and route tests for category rails, topic/phrase repetition tolerance, rejected-attempt usage accounting, successful retry, and closed failure after repeated validation rejection.
+  - Validation: `npm test -- src/lib/server/ai-session-prompts.test.ts src/lib/server/session-curriculum-validation.test.ts src/routes/api/session/generate.server.test.ts`; `npm run validate:ci`.
 - [ ] Task 5 — Run full validation, update plan progress/handoff, and commit final docs/status.

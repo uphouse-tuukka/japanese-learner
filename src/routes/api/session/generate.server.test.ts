@@ -53,11 +53,19 @@ vi.mock('$lib/server/users', () => ({
 import { POST } from './generate/+server';
 
 const lesson = {
+  topic: 'Basic greetings',
+  category: 'greetings_basics',
+  explanation: 'Learn a few polite greeting phrases.',
+  culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
+  keyPhrases: [],
+};
+
+const alternateCategoryLesson = {
+  ...lesson,
   topic: 'Ordering food',
   category: 'food_dining',
   explanation: 'Learn a few polite ordering phrases.',
   culturalNote: 'Be polite with staff.',
-  keyPhrases: [],
 };
 
 const exercises = [
@@ -99,6 +107,22 @@ const generatedPlan = {
   },
   metadata: {},
 };
+
+function buildGeneratedPlan(
+  overrides: {
+    lesson?: Partial<typeof lesson>;
+    tokenUsage?: { input: number; output: number };
+    model?: string;
+  } = {},
+) {
+  return {
+    model: overrides.model ?? generatedPlan.model,
+    lesson: { ...lesson, ...overrides.lesson },
+    exercises,
+    tokenUsage: overrides.tokenUsage ?? generatedPlan.tokenUsage,
+    metadata: {},
+  };
+}
 
 function buildSessionSummary(input: {
   category: string;
@@ -398,6 +422,11 @@ describe('POST /api/session/generate', () => {
         exercise: buildMultipleChoiceExercise(),
       },
     ]);
+    mockGenerateSessionPlan.mockResolvedValueOnce(
+      buildGeneratedPlan({
+        lesson: { topic: 'Restaurant payment', category: 'food_dining' },
+      }),
+    );
 
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
 
@@ -505,6 +534,91 @@ describe('POST /api/session/generate', () => {
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
       error: expect.stringMatching(/timed out/i),
+    });
+  });
+
+  it('records rejected generation usage with a null session id and retries after curriculum validation rejects the first plan', async () => {
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: alternateCategoryLesson,
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'First greetings', category: 'greetings_basics' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockCreateSessionRecord).toHaveBeenCalledWith({
+      userId: 'user-1',
+      mode: 'ai',
+      status: 'planned',
+      model: 'gpt-5.4',
+      tokenInput: 13,
+      tokenOutput: 21,
+    });
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
+      userId: 'user-1',
+      sessionId: null,
+      model: 'gpt-5.4',
+      tokensIn: 11,
+      tokensOut: 22,
+    });
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(2, {
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 13,
+      tokensOut: 21,
+    });
+  });
+
+  it('fails closed without creating a session when both generation attempts violate curriculum rails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: alternateCategoryLesson,
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: alternateCategoryLesson,
+          tokenUsage: { input: 12, output: 23 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to generate AI teaching session.',
+    });
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockCreateSessionRecord).not.toHaveBeenCalled();
+    expect(mockAttachExercisesToSession).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
+      userId: 'user-1',
+      sessionId: null,
+      model: 'gpt-5.4',
+      tokensIn: 11,
+      tokensOut: 22,
+    });
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(2, {
+      userId: 'user-1',
+      sessionId: null,
+      model: 'gpt-5.4',
+      tokensIn: 12,
+      tokensOut: 23,
     });
   });
 

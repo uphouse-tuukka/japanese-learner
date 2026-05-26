@@ -11,6 +11,7 @@ import {
   getExerciseResultsForUser,
   getSessionsForUser,
 } from '$lib/server/db';
+import { validateGeneratedSessionPlan } from '$lib/server/session-curriculum-validation';
 import {
   buildCoverageEvidence,
   parseCoverageSourceSessions,
@@ -64,6 +65,23 @@ function legacySummaryToHistory(summary: string): SessionHistoryItem {
     nextSteps: [],
     keyPhrases: summary.trim() ? [summary.trim().slice(0, 120)] : [],
   };
+}
+
+function validationFeedbackForRetry(
+  validation: ReturnType<typeof validateGeneratedSessionPlan>,
+): string[] {
+  if (validation.valid) return [];
+  const feedback = [
+    `Previous generation violated curriculum rails: ${validation.reasonCodes.join(', ')}.`,
+    `Lesson category must be exactly "${validation.details.selectedCategory}".`,
+  ];
+  if (validation.reasonCodes.includes('repeated_lesson_topic')) {
+    feedback.push('Choose a fresh exact lesson topic unless it is an explicit Review Candidate.');
+  }
+  if (validation.reasonCodes.includes('repeated_key_phrases')) {
+    feedback.push('Use at most one already-covered non-review Lesson Key Phrase.');
+  }
+  return feedback;
 }
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
@@ -277,9 +295,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     try {
       let lastError: Error | null = null;
+      let curriculumValidationFeedback: string[] = [];
       for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
         try {
-          plan = await withAbort(
+          const generatedPlan = await withAbort(
             generateSessionPlan({
               userId: user.id,
               userName: user.name,
@@ -293,6 +312,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               categoryRotation,
               coverageEvidence: coverageEvidence.promptSnapshot,
               learningJournal: user.progressJournal,
+              curriculumValidationFeedback,
               performanceInsights: {
                 overallAccuracy,
                 weakExerciseIds,
@@ -302,6 +322,36 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             }),
             controller.signal,
           );
+
+          const validation = validateGeneratedSessionPlan({
+            plan: generatedPlan,
+            coverageEvidence,
+          });
+          if (!validation.valid) {
+            await recordUsageEvent({
+              userId,
+              sessionId: null,
+              model: generatedPlan.model,
+              tokensIn: generatedPlan.tokenUsage.input,
+              tokensOut: generatedPlan.tokenUsage.output,
+            });
+            lastError = new Error('Generated session failed curriculum validation.');
+            curriculumValidationFeedback = validationFeedbackForRetry(validation);
+            console.warn('[api/session/generate] curriculum validation failed', {
+              attempt,
+              maxAttempts: MAX_GENERATION_ATTEMPTS,
+              userId,
+              reasonCodes: validation.reasonCodes,
+              selectedCategory: validation.details.selectedCategory,
+              generatedCategory: validation.details.generatedCategory,
+              blockedCategories: validation.details.blockedCategories,
+              preferredCategories: validation.details.preferredCategories,
+              repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
+            });
+            continue;
+          }
+
+          plan = generatedPlan;
           break;
         } catch (error) {
           if (controller.signal.aborted) {

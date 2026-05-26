@@ -173,6 +173,7 @@ export type SessionPlanPromptInput = {
   };
   coverageEvidence?: CompactCoverageEvidence;
   learningJournal?: string | null;
+  curriculumValidationFeedback?: string[];
 };
 
 export type SessionPlanPrompt = {
@@ -268,6 +269,19 @@ function formatLearningJournalContext(learningJournal: string | null): string {
     learningJournal,
     'Use this for learner tendencies, persistent weak spots, semantic continuity, and Review Candidate interpretation.',
     'It is not exact proof of covered categories, lesson topics, or phrases; Coverage Evidence remains authoritative for exact coverage and validation.',
+  ].join('\n');
+}
+
+function formatCurriculumValidationFeedback(feedback: string[] | undefined): string {
+  const compactFeedback = (feedback ?? [])
+    .map((item) => compactSingleLine(item, 220))
+    .filter(Boolean)
+    .slice(0, 5);
+  if (compactFeedback.length === 0) return '';
+  return [
+    'CURRICULUM VALIDATION FEEDBACK FROM PREVIOUS ATTEMPT:',
+    ...compactFeedback.map((item) => `- ${item}`),
+    'Revise the next attempt to satisfy these app-side rails exactly.',
   ].join('\n');
 }
 
@@ -417,6 +431,9 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
   const coverageEvidenceContext = formatCoverageEvidenceContext(input.coverageEvidence);
   const learningJournal = boundedOptionalBlock(input.learningJournal);
   const learningJournalContext = formatLearningJournalContext(learningJournal);
+  const curriculumValidationFeedback = formatCurriculumValidationFeedback(
+    input.curriculumValidationFeedback,
+  );
   const categoryRotation = input.categoryRotation;
   const categoryContext = coverageEvidenceContext
     ? [
@@ -495,6 +512,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '',
           learningJournalContext,
           '',
+          curriculumValidationFeedback,
+          '',
           priorNotesBlock,
           '',
           recentCulturalNotesBlock,
@@ -559,6 +578,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
             },
             coverageEvidence: input.coverageEvidence ?? null,
             learningJournal,
+            curriculumValidationFeedback: input.curriculumValidationFeedback ?? [],
           },
           targetExerciseCount,
           requiredOutputExample: {

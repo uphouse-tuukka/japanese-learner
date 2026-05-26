@@ -253,6 +253,10 @@ describe('ai session prompt builders', () => {
       },
       learningJournal:
         'The learner understands greetings, but still hesitates when using ください (kudasai) in requests.',
+      curriculumValidationFeedback: [
+        'Previous generation violated curriculum rails: category_mismatch.',
+        'Lesson category must be exactly "transport".',
+      ],
     });
 
     const promptText = systemPrompt(prompt);
@@ -264,6 +268,7 @@ describe('ai session prompt builders', () => {
           reviewCandidates: Array<{ display: string }>;
         };
         learningJournal: string;
+        curriculumValidationFeedback: string[];
       };
     }>(prompt);
 
@@ -280,6 +285,13 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'not exact proof of covered categories, lesson topics, or phrases',
     );
+    expect(promptText).toContain('CURRICULUM VALIDATION FEEDBACK FROM PREVIOUS ATTEMPT:');
+    expect(promptText).toContain(
+      'Previous generation violated curriculum rails: category_mismatch.',
+    );
+    expect(promptText).toContain(
+      'Revise the next attempt to satisfy these app-side rails exactly.',
+    );
     expect(payload.user.coverageEvidence.categoryRotation.selectedCategory).toBe('transport');
     expect(payload.user.coverageEvidence.categoryRotation.blockedCategories).toEqual([
       'food_dining',
@@ -289,6 +301,10 @@ describe('ai session prompt builders', () => {
     expect(payload.user.learningJournal).toBe(
       'The learner understands greetings, but still hesitates when using ください (kudasai) in requests.',
     );
+    expect(payload.user.curriculumValidationFeedback).toEqual([
+      'Previous generation violated curriculum rails: category_mismatch.',
+      'Lesson category must be exactly "transport".',
+    ]);
   });
 
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {
