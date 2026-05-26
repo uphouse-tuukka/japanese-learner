@@ -201,4 +201,7 @@ Updated: 2026-05-26
   - Session-generation prompts now carry compact retry feedback into the next model attempt and expose it in the structured user payload for testable prompt wiring.
   - Added validator, prompt, and route tests for category rails, topic/phrase repetition tolerance, rejected-attempt usage accounting, successful retry, and closed failure after repeated validation rejection.
   - Validation: `npm test -- src/lib/server/ai-session-prompts.test.ts src/lib/server/session-curriculum-validation.test.ts src/routes/api/session/generate.server.test.ts`; `npm run validate:ci`.
-- [ ] Task 5 — Run full validation, update plan progress/handoff, and commit final docs/status.
+- [x] Task 5 — Run full validation, update plan progress/handoff, and commit final docs/status.
+  - Ran full CI validation after Task 4 implementation: `npm run validate:ci`.
+  - Updated this plan with Task 4 implementation and validation status.
+  - Code/docs commits: `43c71a8 feat: wire coverage evidence into session generation`; `8522c53 Validate generated session curriculum rails`.
