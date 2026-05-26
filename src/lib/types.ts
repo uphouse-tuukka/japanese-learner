@@ -173,6 +173,13 @@ export interface KeyPhrase {
   usage: string;
 }
 
+export interface SessionKeyPhraseDetail {
+  japanese?: string;
+  romaji?: string;
+  english?: string;
+  usage?: string;
+}
+
 export interface Lesson {
   topic: string;
   category?: string;
@@ -233,6 +240,7 @@ export interface SessionMeta {
   handoffNotes?: string[];
   exerciseTypes: string[];
   keyPhrases: string[];
+  keyPhraseDetails?: SessionKeyPhraseDetail[];
   culturalNote?: string;
   miniLesson?: SessionMiniLesson | null;
   hadLevelUpRecommendation?: boolean;

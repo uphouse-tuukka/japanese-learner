@@ -1,5 +1,55 @@
-import type { SessionMeta, SessionMiniLesson } from '$lib/types';
+import type { SessionKeyPhraseDetail, SessionMeta, SessionMiniLesson } from '$lib/types';
 import { asStringArray, parseJsonObject } from './common';
+
+const MAX_KEY_PHRASE_DETAILS = 10;
+const MAX_KEY_PHRASE_DETAIL_INPUT_ITEMS = 50;
+const MAX_KEY_PHRASE_DETAIL_FIELD_LENGTH = 160;
+
+function trimOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim().slice(0, MAX_KEY_PHRASE_DETAIL_FIELD_LENGTH).trimEnd();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function sanitizeKeyPhraseDetails(value: unknown): SessionKeyPhraseDetail[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const details: SessionKeyPhraseDetail[] = [];
+
+  for (const item of value.slice(0, MAX_KEY_PHRASE_DETAIL_INPUT_ITEMS)) {
+    if (details.length >= MAX_KEY_PHRASE_DETAILS) {
+      break;
+    }
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+
+    const raw = item as Record<string, unknown>;
+    const japanese = trimOptionalString(raw.japanese);
+    const romaji = trimOptionalString(raw.romaji);
+    const english = trimOptionalString(raw.english);
+    const usage = trimOptionalString(raw.usage);
+
+    if (!japanese && !romaji && !english) {
+      continue;
+    }
+
+    const detail: SessionKeyPhraseDetail = {};
+    if (japanese) detail.japanese = japanese;
+    if (romaji) detail.romaji = romaji;
+    if (english) detail.english = english;
+    if (usage) detail.usage = usage;
+
+    details.push(detail);
+  }
+
+  return details;
+}
 
 function parseMiniLesson(value: unknown): SessionMiniLesson | null | undefined {
   if (value === undefined) {
@@ -60,6 +110,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
   const nextSteps = asStringArray(parsed.nextSteps);
   const handoffNotes = asStringArray(parsed.handoffNotes);
   const miniLesson = parseMiniLesson(parsed.miniLesson);
+  const keyPhraseDetails = sanitizeKeyPhraseDetails(parsed.keyPhraseDetails);
 
   return {
     summaryText: parsed.summaryText,
@@ -72,6 +123,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
     handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
     exerciseTypes: asStringArray(parsed.exerciseTypes),
     keyPhrases: asStringArray(parsed.keyPhrases),
+    keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,
     culturalNote: typeof parsed.culturalNote === 'string' ? parsed.culturalNote : undefined,
     miniLesson,
     hadLevelUpRecommendation:

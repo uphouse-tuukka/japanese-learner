@@ -17,6 +17,7 @@ import { runBackgroundTask } from '$lib/server/background-task';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { processSessionCompletion } from '$lib/server/gamification';
 import { calculateMaxCombo } from '$lib/utils/results';
+import { sanitizeKeyPhraseDetails } from '$lib/validators/session-meta';
 
 type ResultPayload = {
   exerciseId: string;
@@ -30,7 +31,8 @@ type CompleteRequest = {
   results?: unknown;
   lessonTopic?: string;
   category?: string;
-  keyPhrases?: string[];
+  keyPhrases?: unknown;
+  keyPhraseDetails?: unknown;
   culturalNote?: string;
   localDate?: string;
 };
@@ -119,6 +121,14 @@ function deriveKeyPhrasesFromExercises(exercises: Exercise[]): string[] {
   return Array.from(seen);
 }
 
+function deriveLegacyKeyPhrasesFromDetails(
+  keyPhraseDetails: NonNullable<SessionMeta['keyPhraseDetails']>,
+): string[] {
+  return keyPhraseDetails
+    .map((phrase) => phrase.japanese ?? phrase.romaji ?? phrase.english)
+    .filter((phrase): phrase is string => !!phrase);
+}
+
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
     const bodyResult = await readJsonBody(request);
@@ -165,11 +175,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const lessonTopic = requestedLessonTopic || inferLessonTopic(exercises);
     const category = String(body.category ?? '').trim() || undefined;
     const culturalNote = String(body.culturalNote ?? '').trim() || undefined;
+    const keyPhraseDetails = sanitizeKeyPhraseDetails(body.keyPhraseDetails);
     const requestKeyPhrases = toStringList(body.keyPhrases);
     const keyPhrases =
-      requestKeyPhrases.length > 0
-        ? requestKeyPhrases.slice(0, 10)
-        : deriveKeyPhrasesFromExercises(exercises);
+      keyPhraseDetails.length > 0
+        ? deriveLegacyKeyPhrasesFromDetails(keyPhraseDetails)
+        : requestKeyPhrases.length > 0
+          ? requestKeyPhrases.slice(0, 10)
+          : deriveKeyPhrasesFromExercises(exercises);
     const exerciseTypes = Array.from(new Set(exercises.map((exercise) => exercise.type)));
 
     let summary: SessionSummary;
@@ -269,6 +282,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
         exerciseTypes,
         keyPhrases,
+        keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,
         culturalNote,
         miniLesson: summary.miniLesson ?? null,
         hadLevelUpRecommendation: !!summary.levelUpRecommendation,

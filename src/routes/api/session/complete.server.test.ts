@@ -436,6 +436,165 @@ describe('POST /api/session/complete', () => {
     );
   });
 
+  it('sanitizes structured key phrase details and derives legacy key phrases from them first', async () => {
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+      keyPhrases: ['legacy request phrase'],
+      keyPhraseDetails: [
+        {
+          japanese: '  すみません  ',
+          romaji: ' sumimasen ',
+          english: ' Excuse me ',
+          usage: ' Getting attention. ',
+        },
+        {
+          japanese: ' ',
+          romaji: ' kore wa ',
+          english: ' This is ',
+          usage: ' ',
+        },
+        {
+          english: ' Thank you. ',
+          usage: ' Gratitude. ',
+        },
+        {
+          japanese: ' ',
+          romaji: ' ',
+          english: ' ',
+          usage: 'Usage alone is not a phrase.',
+        },
+        'not an object',
+        { japanese: 42, romaji: null, english: undefined, usage: 'Malformed text fields.' },
+      ],
+    });
+
+    expect(response.status).toBe(200);
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+      string,
+      { summary: string; tokenInput: number; tokenOutput: number },
+    ];
+    const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
+
+    expect(storedMeta.keyPhraseDetails).toEqual([
+      {
+        japanese: 'すみません',
+        romaji: 'sumimasen',
+        english: 'Excuse me',
+        usage: 'Getting attention.',
+      },
+      {
+        romaji: 'kore wa',
+        english: 'This is',
+      },
+      {
+        english: 'Thank you.',
+        usage: 'Gratitude.',
+      },
+    ]);
+    expect(storedMeta.keyPhrases).toEqual(['すみません', 'kore wa', 'Thank you.']);
+  });
+
+  it('caps structured key phrase details before storing completion metadata', async () => {
+    const keyPhraseDetails = Array.from({ length: 12 }, (_, index) => ({
+      japanese: `表現${index + 1}`,
+      romaji: `hyougen ${index + 1}`,
+      english: `Phrase ${index + 1}`,
+      usage: `Usage ${index + 1}`,
+    }));
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+      keyPhraseDetails,
+    });
+
+    expect(response.status).toBe(200);
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+      string,
+      { summary: string; tokenInput: number; tokenOutput: number },
+    ];
+    const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
+
+    expect(storedMeta.keyPhraseDetails).toHaveLength(10);
+    expect(storedMeta.keyPhrases).toEqual([
+      '表現1',
+      '表現2',
+      '表現3',
+      '表現4',
+      '表現5',
+      '表現6',
+      '表現7',
+      '表現8',
+      '表現9',
+      '表現10',
+    ]);
+  });
+
+  it('bounds structured key phrase detail field lengths before storing completion metadata', async () => {
+    const longJapanese = `すみません${'あ'.repeat(200)}`;
+    const longRomaji = `sumimasen ${'x'.repeat(200)}`;
+    const longEnglish = `Excuse me ${'y'.repeat(200)}`;
+    const longUsage = `Getting attention ${'z'.repeat(200)}`;
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+      keyPhraseDetails: [
+        {
+          japanese: longJapanese,
+          romaji: longRomaji,
+          english: longEnglish,
+          usage: longUsage,
+        },
+      ],
+    });
+
+    expect(response.status).toBe(200);
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+      string,
+      { summary: string; tokenInput: number; tokenOutput: number },
+    ];
+    const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
+
+    expect(storedMeta.keyPhraseDetails).toEqual([
+      {
+        japanese: longJapanese.slice(0, 160),
+        romaji: longRomaji.slice(0, 160),
+        english: longEnglish.slice(0, 160),
+        usage: longUsage.slice(0, 160),
+      },
+    ]);
+    expect(storedMeta.keyPhrases).toEqual([longJapanese.slice(0, 160)]);
+  });
+
+  it('falls back to legacy request key phrases when structured details are absent or invalid', async () => {
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+      keyPhrases: ['  legacy phrase  '],
+      keyPhraseDetails: [{ usage: 'Usage without phrase text is invalid.' }, null],
+    });
+
+    expect(response.status).toBe(200);
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+      string,
+      { summary: string; tokenInput: number; tokenOutput: number },
+    ];
+    const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
+
+    expect(storedMeta.keyPhrases).toEqual(['legacy phrase']);
+    expect(storedMeta.keyPhraseDetails).toBeUndefined();
+  });
+
   it('schedules AI journal updates through the shared background helper', async () => {
     mockCheckBudget.mockResolvedValueOnce({ allowed: true });
 

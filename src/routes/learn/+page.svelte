@@ -35,7 +35,14 @@
     restoreGamificationFromStorage,
     clearGamificationStorage,
   } from '$lib/stores/gamification.svelte';
-  import type { Exercise, ExerciseAnswerPayload, ExerciseType, Lesson, Session } from '$lib/types';
+  import type {
+    Exercise,
+    ExerciseAnswerPayload,
+    ExerciseType,
+    KeyPhrase,
+    Lesson,
+    Session,
+  } from '$lib/types';
   import type { PageData } from './$types';
   import {
     clearLearnPageStorage,
@@ -240,6 +247,10 @@
     }).format(new Date());
   }
 
+  function getLegacyKeyPhraseText(phrase: KeyPhrase): string {
+    return phrase.japanese.trim() || phrase.romaji.trim() || phrase.english.trim();
+  }
+
   async function startLearning(): Promise<void> {
     uiState = 'loading';
     errorMessage = '';
@@ -359,7 +370,8 @@
           lessonTopic: lesson?.topic ?? '',
           category: lesson?.category ?? '',
           culturalNote: lesson?.culturalNote ?? '',
-          keyPhrases: lesson?.keyPhrases?.map((phrase) => phrase.romaji).filter(Boolean) ?? [],
+          keyPhrases: lesson?.keyPhrases?.map(getLegacyKeyPhraseText).filter(Boolean) ?? [],
+          keyPhraseDetails: lesson?.keyPhrases ?? [],
           maxCombo: $maxCombo,
           localDate: getHelsinkiLocalDate(),
         }),

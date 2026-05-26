@@ -53,6 +53,98 @@ describe('parseSessionMeta', () => {
     });
   });
 
+  it('parses and sanitizes structured key phrase details when present', () => {
+    const parsed = parseSessionMeta(
+      validSessionMeta({
+        keyPhraseDetails: [
+          {
+            japanese: '  おすすめは何ですか  ',
+            romaji: ' osusume wa nan desu ka ',
+            english: ' What do you recommend? ',
+            usage: ' Asking for a recommendation. ',
+          },
+          {
+            japanese: '   ',
+            romaji: ' kudasai ',
+            english: '',
+            usage: ' Request marker. ',
+          },
+          {
+            english: ' Please wait. ',
+          },
+          {
+            japanese: ' ',
+            romaji: ' ',
+            english: ' ',
+            usage: 'Usage alone is not enough.',
+          },
+          null,
+          'not an object',
+          { japanese: 42, romaji: null, english: undefined, usage: 'Malformed text fields.' },
+        ],
+      }),
+    );
+
+    expect(parsed?.keyPhraseDetails).toEqual([
+      {
+        japanese: 'おすすめは何ですか',
+        romaji: 'osusume wa nan desu ka',
+        english: 'What do you recommend?',
+        usage: 'Asking for a recommendation.',
+      },
+      {
+        romaji: 'kudasai',
+        usage: 'Request marker.',
+      },
+      {
+        english: 'Please wait.',
+      },
+    ]);
+  });
+
+  it('omits structured key phrase details when absent or empty after sanitizing', () => {
+    expect(parseSessionMeta(validSessionMeta())?.keyPhraseDetails).toBeUndefined();
+    expect(
+      parseSessionMeta(
+        validSessionMeta({
+          keyPhraseDetails: [
+            { japanese: ' ', romaji: ' ', english: ' ', usage: 'Only usage.' },
+            ['not an object'],
+          ],
+        }),
+      )?.keyPhraseDetails,
+    ).toBeUndefined();
+  });
+
+  it('bounds structured key phrase detail field lengths when sanitizing', () => {
+    const longJapanese = `すみません${'あ'.repeat(200)}`;
+    const longRomaji = `sumimasen ${'x'.repeat(200)}`;
+    const longEnglish = `Excuse me ${'y'.repeat(200)}`;
+    const longUsage = `Getting attention ${'z'.repeat(200)}`;
+
+    const parsed = parseSessionMeta(
+      validSessionMeta({
+        keyPhraseDetails: [
+          {
+            japanese: longJapanese,
+            romaji: longRomaji,
+            english: longEnglish,
+            usage: longUsage,
+          },
+        ],
+      }),
+    );
+
+    expect(parsed?.keyPhraseDetails).toEqual([
+      {
+        japanese: longJapanese.slice(0, 160),
+        romaji: longRomaji.slice(0, 160),
+        english: longEnglish.slice(0, 160),
+        usage: longUsage.slice(0, 160),
+      },
+    ]);
+  });
+
   it('returns null when required fields are missing', () => {
     expect(parseSessionMeta(validSessionMeta({ topic: undefined }))).toBeNull();
     expect(parseSessionMeta(validSessionMeta({ exerciseTypes: undefined }))).toBeNull();
