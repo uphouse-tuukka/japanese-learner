@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatFillBlankContextText,
   formatFillBlankPromptText,
   formatMultipleChoiceQuestionText,
   getMultipleChoiceOptionDisplay,
@@ -34,6 +35,31 @@ describe('exercise display helpers', () => {
         blank: '____',
       }),
     ).toBe('水を____');
+  });
+
+  it('keeps fill-blank English context complete when Japanese and romaji have blanks', () => {
+    expect(
+      formatFillBlankContextText({
+        text: 'Every morning, I drink ___.',
+        fallbackText: 'Every morning, I drink coffee.',
+      }),
+    ).toBe('Every morning, I drink coffee.');
+
+    expect(
+      formatFillBlankContextText({
+        text: 'I go to Shinjuku.',
+        fallbackText: 'You are saying where you are going.',
+      }),
+    ).toBe('I go to Shinjuku.');
+  });
+
+  it('falls back to explicit fill-blank instruction instead of showing an English blank', () => {
+    expect(
+      formatFillBlankContextText({
+        text: 'Every morning, I drink ___.',
+        fallbackText: 'You describe your daily morning habit ___.',
+      }),
+    ).toBe('Fill the missing Japanese word or romaji.');
   });
 
   it('hides counterpart language from multiple-choice option labels', () => {

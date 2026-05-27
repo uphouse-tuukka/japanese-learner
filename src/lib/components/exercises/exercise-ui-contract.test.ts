@@ -120,6 +120,14 @@ describe('exercise UI contract', () => {
     expect(listening).not.toContain('Preparing audio…');
   });
 
+  it('keeps FillBlankExercise English context separate from Japanese and romaji blanks', () => {
+    const fillBlank = readExerciseComponent(join(exerciseDir, 'FillBlankExercise.svelte'));
+
+    expect(fillBlank).toContain('formatFillBlankContextText');
+    expect(fillBlank).toContain('promptSentenceEnglish');
+    expect(fillBlank).not.toContain('<p>{exercise.sentenceEnglish}</p>');
+  });
+
   it('only shows speaking Working copy while answer checking is processing', () => {
     const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
 

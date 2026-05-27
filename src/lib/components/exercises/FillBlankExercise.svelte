@@ -1,7 +1,10 @@
 <script lang="ts">
   import type { FillBlankExercise, OnAnswer } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
-  import { formatFillBlankPromptText } from '$lib/utils/exercise-display';
+  import {
+    formatFillBlankContextText,
+    formatFillBlankPromptText,
+  } from '$lib/utils/exercise-display';
   import { normalizeForComparison } from '$lib/utils/text';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
@@ -26,6 +29,12 @@
       text: exercise.sentenceRomaji,
       answer: exercise.answerRomaji,
       blank: exercise.blank,
+    }),
+  );
+  let promptSentenceEnglish = $derived(
+    formatFillBlankContextText({
+      text: exercise.sentenceEnglish,
+      fallbackText: exercise.englishContext,
     }),
   );
 
@@ -106,7 +115,7 @@
   {#if promptSentenceRomaji}
     <p class="romaji">{promptSentenceRomaji}</p>
   {/if}
-  <p>{exercise.sentenceEnglish}</p>
+  <p>{promptSentenceEnglish}</p>
 
   <div class="exercise-control-stack">
     <input bind:value={answer} placeholder="Fill the blank" disabled={answered || checking} />

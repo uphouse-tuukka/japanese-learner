@@ -26,8 +26,9 @@
 
 ### Fill-in-the-blank exercises
 
-- `sentence` and `sentenceRomaji` must show a visible `____` placeholder where the missing answer belongs.
-- Do not include the answer in the learner-visible sentence fields; keep it only in `answer` and `answerRomaji`.
+- `sentence` and `sentenceRomaji` must show a visible `____` placeholder where the missing Japanese/romaji answer belongs.
+- `sentenceEnglish` must be the complete English meaning/context with no blank placeholder, so the learner knows what Japanese/romaji word to supply.
+- Do not include the answer in the learner-visible Japanese/romaji sentence fields; keep it only in `answer` and `answerRomaji`.
 - Set `blank` to `____` for generated exercises.
 
 ### Multiple-choice exercises

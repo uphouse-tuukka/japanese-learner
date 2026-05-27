@@ -68,6 +68,16 @@ export function formatFillBlankPromptText(input: {
   return `${text} ${FILL_BLANK_PLACEHOLDER}`;
 }
 
+export function formatFillBlankContextText(input: { text: string; fallbackText?: string }): string {
+  const text = input.text.trim();
+  const fallbackText = input.fallbackText?.trim() ?? '';
+
+  if (text && !hasVisibleFillBlankPlaceholder(text)) return text;
+  if (fallbackText && !hasVisibleFillBlankPlaceholder(fallbackText)) return fallbackText;
+
+  return 'Fill the missing Japanese word or romaji.';
+}
+
 function splitCounterpartChoice(choice: string): { japanese: string; english: string } | null {
   const match = choice.trim().match(COUNTERPART_SEPARATOR_PATTERN);
   if (!match?.groups) return null;

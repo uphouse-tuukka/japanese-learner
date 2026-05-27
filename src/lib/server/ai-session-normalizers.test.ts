@@ -246,6 +246,33 @@ describe('ai session normalizers', () => {
       expect(exercise.blank).toBe('____');
     });
 
+    it('normalizes fill-blank English context so only Japanese and romaji have blanks', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'fill-english-context',
+          type: 'fill_blank',
+          japanese: '毎朝、コーヒーを飲みます。',
+          romaji: 'Maiasa, koohii o nomimasu.',
+          englishContext: 'Every morning, I drink coffee.',
+          difficulty: 1,
+          sentence: '毎朝、____を飲みます。',
+          sentenceRomaji: 'Maiasa, ____ o nomimasu.',
+          sentenceEnglish: 'Every morning, I drink ___.',
+          blank: '____',
+          answer: 'コーヒー',
+          answerRomaji: 'koohii',
+        },
+        6,
+        'elementary',
+      );
+
+      expect(exercise.type).toBe('fill_blank');
+      if (exercise.type !== 'fill_blank') return;
+      expect(exercise.sentence).toBe('毎朝、____を飲みます。');
+      expect(exercise.sentenceRomaji).toBe('Maiasa, ____ o nomimasu.');
+      expect(exercise.sentenceEnglish).toBe('Every morning, I drink coffee.');
+    });
+
     it('normalizes meaning-style multiple-choice choices to English-only options', () => {
       const exercise = normalizeExercise(
         {

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { LEVEL_RULES } from '$lib/server/ai-session-prompts';
 import { logWarn } from '$lib/server/logger';
 import {
+  formatFillBlankContextText,
   formatFillBlankPromptText,
   formatMultipleChoiceQuestionText,
   normalizeMultipleChoiceOptions,
@@ -469,14 +470,17 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
         answer: answerRomaji,
         blank,
       }),
-      sentenceEnglish: requireString(
-        row,
-        'sentenceEnglish',
-        'sentenceEnglish',
-        'sentence_english',
-        'english',
-        'translation',
-      ),
+      sentenceEnglish: formatFillBlankContextText({
+        text: requireString(
+          row,
+          'sentenceEnglish',
+          'sentenceEnglish',
+          'sentence_english',
+          'english',
+          'translation',
+        ),
+        fallbackText: base.englishContext,
+      }),
       blank: VISIBLE_FILL_BLANK_PLACEHOLDER,
       answer,
       answerRomaji,

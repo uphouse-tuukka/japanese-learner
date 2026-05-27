@@ -323,6 +323,9 @@ describe('ai session prompt builders', () => {
       'sentence and sentenceRomaji must contain the visible placeholder "____"',
     );
     expect(promptText).toContain(
+      'sentenceEnglish must be a complete English meaning or context with no blank placeholder',
+    );
+    expect(promptText).toContain(
       'Never include both Japanese/romaji and English in the same choice string',
     );
     expect(promptText).toContain(
