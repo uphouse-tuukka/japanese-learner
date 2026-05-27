@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { LEVEL_RULES } from '$lib/server/ai-session-prompts';
 import { logWarn } from '$lib/server/logger';
+import {
+  formatFillBlankPromptText,
+  normalizeMultipleChoiceOptions,
+  VISIBLE_FILL_BLANK_PLACEHOLDER,
+} from '$lib/utils/exercise-display';
 import type {
   Exercise,
   ExerciseType,
@@ -371,10 +376,10 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
   };
 
   if (typeRaw === 'multiple_choice') {
-    const choices = shuffleArray(
+    const rawChoices = shuffleArray(
       toStringArray(row.choices ?? row.options ?? row.answers, 'choices'),
     );
-    const normalizedCorrectAnswer = requireString(
+    const rawCorrectAnswer = requireString(
       row,
       'correctAnswer',
       'correctAnswer',
@@ -382,10 +387,17 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
       'answer',
       'correct',
     );
-    const correctAnswer = choices.includes(normalizedCorrectAnswer)
-      ? normalizedCorrectAnswer
+    const question = requireString(row, 'question', 'question', 'prompt', 'title', 'text');
+    const normalizedOptions = normalizeMultipleChoiceOptions({
+      question,
+      choices: rawChoices,
+      correctAnswer: rawCorrectAnswer,
+    });
+    const choices = normalizedOptions.choices;
+    const correctAnswer = choices.includes(normalizedOptions.correctAnswer)
+      ? normalizedOptions.correctAnswer
       : choices[0];
-    if (correctAnswer !== normalizedCorrectAnswer) {
+    if (correctAnswer !== normalizedOptions.correctAnswer) {
       logWarn('ai', 'multiple_choice correctAnswer not in choices; using first choice', {
         exerciseIndex: index,
         type: typeRaw,
@@ -395,7 +407,7 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
     return {
       ...base,
       type: 'multiple_choice',
-      question: requireString(row, 'question', 'question', 'prompt', 'title', 'text'),
+      question,
       choices,
       correctAnswer,
       explanation: typeof row.explanation === 'string' ? row.explanation : undefined,
@@ -429,17 +441,27 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
   }
 
   if (typeRaw === 'fill_blank') {
+    const sentence = requireString(row, 'sentence', 'sentence', 'text', 'prompt');
+    const sentenceRomaji = requireString(
+      row,
+      'sentenceRomaji',
+      'sentenceRomaji',
+      'sentence_romaji',
+      'romaji',
+    );
+    const blank = requireString(row, 'blank', 'blank', 'gap', 'missing');
+    const answer = requireString(row, 'answer', 'answer', 'correctAnswer', 'correct_answer');
+    const answerRomaji = requireString(row, 'answerRomaji', 'answerRomaji', 'answer_romaji');
+
     return {
       ...base,
       type: 'fill_blank',
-      sentence: requireString(row, 'sentence', 'sentence', 'text', 'prompt'),
-      sentenceRomaji: requireString(
-        row,
-        'sentenceRomaji',
-        'sentenceRomaji',
-        'sentence_romaji',
-        'romaji',
-      ),
+      sentence: formatFillBlankPromptText({ text: sentence, answer, blank }),
+      sentenceRomaji: formatFillBlankPromptText({
+        text: sentenceRomaji,
+        answer: answerRomaji,
+        blank,
+      }),
       sentenceEnglish: requireString(
         row,
         'sentenceEnglish',
@@ -448,9 +470,9 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
         'english',
         'translation',
       ),
-      blank: requireString(row, 'blank', 'blank', 'gap', 'missing'),
-      answer: requireString(row, 'answer', 'answer', 'correctAnswer', 'correct_answer'),
-      answerRomaji: requireString(row, 'answerRomaji', 'answerRomaji', 'answer_romaji'),
+      blank: VISIBLE_FILL_BLANK_PLACEHOLDER,
+      answer,
+      answerRomaji,
     };
   }
 

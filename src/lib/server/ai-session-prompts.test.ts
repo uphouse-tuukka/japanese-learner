@@ -319,6 +319,12 @@ describe('ai session prompt builders', () => {
       'Allowed exercise types: multiple_choice, translation, listening, fill_blank, speaking.',
     );
     expect(promptText).toContain('- speaking:');
+    expect(promptText).toContain(
+      'sentence and sentenceRomaji must contain the visible placeholder "____"',
+    );
+    expect(promptText).toContain(
+      'Never include both Japanese/romaji and English in the same choice string',
+    );
     expect(promptText).toContain('responseKind');
     expect(promptText).toContain('expectedRomaji');
     expect(promptText).toContain(

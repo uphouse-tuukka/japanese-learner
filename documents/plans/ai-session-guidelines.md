@@ -24,6 +24,19 @@
 - This applies to exercise prompts, lesson key phrases, and any user-facing Japanese
 - Structured exercise fields may split script and romanization when the schema has paired fields. For speaking exercises, `expectedAnswer` is Japanese script only and `expectedRomaji` is the matching romanization.
 
+### Fill-in-the-blank exercises
+
+- `sentence` and `sentenceRomaji` must show a visible `____` placeholder where the missing answer belongs.
+- Do not include the answer in the learner-visible sentence fields; keep it only in `answer` and `answerRomaji`.
+- Set `blank` to `____` for generated exercises.
+
+### Multiple-choice exercises
+
+- The displayed `question` and `choices` must be self-contained without relying on hidden metadata fields.
+- For “What does [Japanese phrase] mean?” questions, choices must be English-only meanings.
+- For scenario / “Which phrase means [English]?” questions, choices must be Japanese with romaji only.
+- Never combine both sides in one option such as `これは何ですか (kore wa nan desu ka) = What is this?` because it gives away the answer.
+
 ### Speaking Exercises
 
 - Speaking exercises are private learn/practice exercises only. Public portfolio challenge output must not include `speaking` or require microphone access.

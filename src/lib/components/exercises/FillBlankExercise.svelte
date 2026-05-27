@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FillBlankExercise, OnAnswer } from '$lib/types';
   import InlineAudio from '$lib/components/InlineAudio.svelte';
+  import { formatFillBlankPromptText } from '$lib/utils/exercise-display';
   import { normalizeForComparison } from '$lib/utils/text';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
@@ -13,6 +14,20 @@
   let submittedAnswer = $state('');
   let checking = $state(false);
   let aiVerified = $state(false);
+  let promptSentence = $derived(
+    formatFillBlankPromptText({
+      text: exercise.sentence,
+      answer: exercise.answer,
+      blank: exercise.blank,
+    }),
+  );
+  let promptSentenceRomaji = $derived(
+    formatFillBlankPromptText({
+      text: exercise.sentenceRomaji,
+      answer: exercise.answerRomaji,
+      blank: exercise.blank,
+    }),
+  );
 
   async function checkWithAI(trimmed: string): Promise<boolean> {
     try {
@@ -85,11 +100,11 @@
 
 <ExerciseFrame title={exercise.title}>
   <p class="text-japanese">
-    {exercise.sentence}
-    <InlineAudio japanese={exercise.sentence} size="md" />
+    {promptSentence}
+    <InlineAudio japanese={promptSentence} size="md" />
   </p>
-  {#if exercise.sentenceRomaji}
-    <p class="romaji">{exercise.sentenceRomaji}</p>
+  {#if promptSentenceRomaji}
+    <p class="romaji">{promptSentenceRomaji}</p>
   {/if}
   <p>{exercise.sentenceEnglish}</p>
 

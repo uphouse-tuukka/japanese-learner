@@ -219,6 +219,74 @@ describe('ai session normalizers', () => {
       ]);
     });
 
+    it('normalizes fill-blank prompts that still contain the answer into visible blanks', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'fill-visible-blank',
+          type: 'fill_blank',
+          japanese: 'これは何ですか',
+          romaji: 'kore wa nan desu ka',
+          englishContext: 'Asking what something is',
+          difficulty: 2,
+          sentence: 'これは何ですか',
+          sentenceRomaji: 'kore wa nan desu ka',
+          sentenceEnglish: 'What is this?',
+          blank: '何',
+          answer: '何',
+          answerRomaji: 'nan',
+        },
+        5,
+        'elementary',
+      );
+
+      expect(exercise.type).toBe('fill_blank');
+      if (exercise.type !== 'fill_blank') return;
+      expect(exercise.sentence).toBe('これは____ですか');
+      expect(exercise.sentenceRomaji).toBe('kore wa ____ desu ka');
+      expect(exercise.blank).toBe('____');
+    });
+
+    it('normalizes meaning-style multiple-choice choices to English-only options', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'mc-meaning-pairs',
+          type: 'multiple_choice',
+          japanese: 'それは何ですか',
+          romaji: 'sore wa nan desu ka',
+          englishContext: 'Asking what something is',
+          difficulty: 2,
+          question: 'What does それは何ですか (sore wa nan desu ka) mean?',
+          choices: [
+            'これは何ですか (kore wa nan desu ka) = What is this?',
+            'それは何ですか (sore wa nan desu ka) = What is that?',
+            'トイレはどこですか (toire wa doko desu ka) = Where is the restroom?',
+            'いくらですか (ikura desu ka) = How much is it?',
+          ],
+          correctAnswer: 'それは何ですか (sore wa nan desu ka) = What is that?',
+        },
+        6,
+        'elementary',
+      );
+
+      expect(exercise.type).toBe('multiple_choice');
+      if (exercise.type !== 'multiple_choice') return;
+      expect(exercise.choices).toEqual(
+        expect.arrayContaining([
+          'What is this?',
+          'What is that?',
+          'Where is the restroom?',
+          'How much is it?',
+        ]),
+      );
+      expect(
+        exercise.choices.every(
+          (choice) => !/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]/u.test(choice),
+        ),
+      ).toBe(true);
+      expect(exercise.choices.every((choice) => !choice.includes('='))).toBe(true);
+      expect(exercise.correctAnswer).toBe('What is that?');
+    });
+
     it('rejects disallowed exercise types and translation directions for a level', () => {
       const fillBlank = normalizeExercise(
         {

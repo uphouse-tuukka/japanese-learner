@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MultipleChoiceExercise, OnAnswer } from '$lib/types';
+  import { getMultipleChoiceOptionDisplay } from '$lib/utils/exercise-display';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
 
@@ -28,6 +29,10 @@
       isCorrect,
     });
   }
+
+  function choiceDisplay(choice: string): string {
+    return getMultipleChoiceOptionDisplay({ question: exercise.question, choice });
+  }
 </script>
 
 <ExerciseFrame title={exercise.title}>
@@ -44,7 +49,7 @@
         onclick={() => (selected = choice)}
         disabled={answered}
       >
-        {choice}
+        {choiceDisplay(choice)}
       </button>
     {/each}
   </div>
@@ -55,7 +60,7 @@
       title={isCorrect ? 'Correct!' : 'Not quite'}
     >
       {#if !isCorrect}
-        <p>The correct answer: {exercise.correctAnswer}</p>
+        <p>The correct answer: {choiceDisplay(exercise.correctAnswer)}</p>
       {/if}
       {#if exercise.explanation}
         <p class="explanation">{exercise.explanation}</p>
