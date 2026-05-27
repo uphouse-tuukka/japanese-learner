@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatFillBlankPromptText,
+  formatMultipleChoiceQuestionText,
   getMultipleChoiceOptionDisplay,
+  getMultipleChoiceSourcePrompt,
 } from '$lib/utils/exercise-display';
 
 describe('exercise display helpers', () => {
@@ -50,5 +52,43 @@ describe('exercise display helpers', () => {
         choice: pairedChoice,
       }),
     ).toBe('これは何ですか (kore wa nan desu ka)');
+  });
+
+  it('keeps Japanese options for questions that ask for a Japanese phrase', () => {
+    const pairedChoice = 'トイレはどこですか (toire wa doko desu ka) = Where is the restroom?';
+
+    expect(
+      getMultipleChoiceOptionDisplay({
+        question: 'Translate "Where is the restroom?" into Japanese (日本語).',
+        choice: pairedChoice,
+      }),
+    ).toBe('トイレはどこですか (toire wa doko desu ka)');
+  });
+
+  it('surfaces the source Japanese phrase when English choices depend on hidden metadata', () => {
+    expect(
+      getMultipleChoiceSourcePrompt({
+        question: 'What does this sentence politely ask for?',
+        japanese: 'コーヒーを一つお願いします。',
+        romaji: 'Koohii o hitotsu onegaishimasu.',
+        choices: ['A table for one', 'One coffee', 'The bill', 'A glass of water'],
+      }),
+    ).toEqual({
+      japanese: 'コーヒーを一つお願いします。',
+      romaji: 'Koohii o hitotsu onegaishimasu.',
+    });
+  });
+
+  it('normalizes metadata-dependent English-choice questions into self-contained prompts', () => {
+    expect(
+      formatMultipleChoiceQuestionText({
+        question: 'What does this sentence politely ask for?',
+        japanese: 'コーヒーを一つお願いします。',
+        romaji: 'Koohii o hitotsu onegaishimasu.',
+        choices: ['A table for one', 'One coffee', 'The bill', 'A glass of water'],
+      }),
+    ).toBe(
+      'Phrase: コーヒーを一つお願いします。 (Koohii o hitotsu onegaishimasu.). What does this sentence politely ask for?',
+    );
   });
 });

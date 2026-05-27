@@ -287,6 +287,34 @@ describe('ai session normalizers', () => {
       expect(exercise.correctAnswer).toBe('What is that?');
     });
 
+    it('normalizes English-choice multiple-choice questions to include the hidden Japanese phrase', () => {
+      const exercise = normalizeExercise(
+        {
+          id: 'mc-hidden-source',
+          type: 'multiple_choice',
+          japanese: 'コーヒーを一つお願いします。',
+          romaji: 'Koohii o hitotsu onegaishimasu.',
+          englishContext: 'You are ordering one coffee at a cafe.',
+          difficulty: 1,
+          question: 'What does this sentence politely ask for?',
+          choices: ['A table for one', 'One coffee', 'The bill', 'A glass of water'],
+          correctAnswer: 'One coffee',
+        },
+        7,
+        'elementary',
+      );
+
+      expect(exercise.type).toBe('multiple_choice');
+      if (exercise.type !== 'multiple_choice') return;
+      expect(exercise.question).toBe(
+        'Phrase: コーヒーを一つお願いします。 (Koohii o hitotsu onegaishimasu.). What does this sentence politely ask for?',
+      );
+      expect(exercise.choices).toEqual(
+        expect.arrayContaining(['A table for one', 'One coffee', 'The bill', 'A glass of water']),
+      );
+      expect(exercise.correctAnswer).toBe('One coffee');
+    });
+
     it('rejects disallowed exercise types and translation directions for a level', () => {
       const fillBlank = normalizeExercise(
         {

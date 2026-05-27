@@ -33,8 +33,9 @@
 ### Multiple-choice exercises
 
 - The displayed `question` and `choices` must be self-contained without relying on hidden metadata fields.
+- If choices are English-only meanings, the question itself must include the Japanese phrase with romaji; do not ask “What does this sentence mean?” unless the sentence is visible in the question.
 - For “What does [Japanese phrase] mean?” questions, choices must be English-only meanings.
-- For scenario / “Which phrase means [English]?” questions, choices must be Japanese with romaji only.
+- For scenario, “Which phrase means [English]?”, “What is [English] in Japanese?”, or “Translate [English] into Japanese” questions, choices must be Japanese with romaji only.
 - Never combine both sides in one option such as `これは何ですか (kore wa nan desu ka) = What is this?` because it gives away the answer.
 
 ### Speaking Exercises

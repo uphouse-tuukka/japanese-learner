@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { MultipleChoiceExercise, OnAnswer } from '$lib/types';
-  import { getMultipleChoiceOptionDisplay } from '$lib/utils/exercise-display';
+  import {
+    getMultipleChoiceOptionDisplay,
+    getMultipleChoiceSourcePrompt,
+  } from '$lib/utils/exercise-display';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
 
@@ -8,6 +11,14 @@
   let selected = $state('');
   let answered = $state(false);
   let isCorrect = $state(false);
+  let sourcePrompt = $derived(
+    getMultipleChoiceSourcePrompt({
+      question: exercise.question,
+      japanese: exercise.japanese,
+      romaji: exercise.romaji,
+      choices: exercise.choices,
+    }),
+  );
 
   $effect(() => {
     exercise.id;
@@ -36,6 +47,14 @@
 </script>
 
 <ExerciseFrame title={exercise.title}>
+  {#if sourcePrompt}
+    <div>
+      <p class="text-japanese">{sourcePrompt.japanese}</p>
+      {#if sourcePrompt.romaji}
+        <p class="romaji">{sourcePrompt.romaji}</p>
+      {/if}
+    </div>
+  {/if}
   <p>{exercise.question}</p>
 
   <div class="exercise-choice-grid">

@@ -6,6 +6,13 @@ const FILL_BLANK_PLACEHOLDER_REPLACE_PATTERN =
   /(?:_{2,}|＿{2,}|\[\s*blank\s*\]|\{\{\s*blank\s*\}\}|\(\s*blank\s*\))/giu;
 const COUNTERPART_SEPARATOR_PATTERN = /^(?<left>.+?)\s*(?:=|＝|→|->|–|—|:|：)\s*(?<right>.+)$/u;
 
+type MultipleChoiceSourcePromptInput = {
+  question: string;
+  japanese: string;
+  romaji?: string;
+  choices: string[];
+};
+
 export function containsJapaneseScript(value: string): boolean {
   return JAPANESE_SCRIPT_PATTERN.test(value);
 }
@@ -81,11 +88,32 @@ function splitCounterpartChoice(choice: string): { japanese: string; english: st
   return null;
 }
 
-function isMeaningStyleQuestion(question: string): boolean {
+function isQuestionAskingForJapanese(question: string): boolean {
+  const trimmedQuestion = question.trim();
   return (
-    containsJapaneseScript(question) &&
-    /\b(?:what\s+does|mean|meaning|translate|translation)\b/iu.test(question)
+    /\b(?:in|into)\s+japanese\b/iu.test(trimmedQuestion) ||
+    /\bjapanese\s+(?:for|phrase|translation|version)\b/iu.test(trimmedQuestion) ||
+    /\bwhich\s+(?:japanese\s+)?phrase\s+means\b/iu.test(trimmedQuestion) ||
+    /\bwhat\s+(?:would|do|should)\s+you\s+say\b/iu.test(trimmedQuestion)
   );
+}
+
+function isMeaningStyleQuestion(question: string): boolean {
+  const trimmedQuestion = question.trim();
+  if (isQuestionAskingForJapanese(trimmedQuestion)) return false;
+  return (
+    containsJapaneseScript(trimmedQuestion) &&
+    /\b(?:what\s+does|mean|meaning|translate|translation)\b/iu.test(trimmedQuestion)
+  );
+}
+
+function formatJapaneseWithRomaji(japanese: string, romaji: string | undefined): string {
+  const japaneseText = japanese.trim();
+  const romajiText = romaji?.trim() ?? '';
+  if (!japaneseText || !romajiText) return japaneseText;
+
+  const inlineRomajiPattern = new RegExp(`\\(${escapeRegExp(romajiText)}\\)`, 'iu');
+  return inlineRomajiPattern.test(japaneseText) ? japaneseText : `${japaneseText} (${romajiText})`;
 }
 
 export function getMultipleChoiceOptionDisplay(input: {
@@ -97,6 +125,34 @@ export function getMultipleChoiceOptionDisplay(input: {
   if (!counterpart) return choice;
 
   return isMeaningStyleQuestion(input.question) ? counterpart.english : counterpart.japanese;
+}
+
+export function getMultipleChoiceSourcePrompt(
+  input: MultipleChoiceSourcePromptInput,
+): { japanese: string; romaji: string } | null {
+  const question = input.question.trim();
+  if (!question || containsJapaneseScript(question) || isQuestionAskingForJapanese(question)) {
+    return null;
+  }
+
+  const japanese = input.japanese.trim();
+  if (!containsJapaneseScript(japanese)) return null;
+
+  const displayedChoices = input.choices
+    .map((choice) => getMultipleChoiceOptionDisplay({ question, choice }))
+    .filter(Boolean);
+  if (displayedChoices.length === 0) return null;
+  if (displayedChoices.some((choice) => containsJapaneseScript(choice))) return null;
+
+  return { japanese, romaji: input.romaji?.trim() ?? '' };
+}
+
+export function formatMultipleChoiceQuestionText(input: MultipleChoiceSourcePromptInput): string {
+  const question = input.question.trim();
+  const sourcePrompt = getMultipleChoiceSourcePrompt(input);
+  if (!sourcePrompt) return question;
+
+  return `Phrase: ${formatJapaneseWithRomaji(sourcePrompt.japanese, sourcePrompt.romaji)}. ${question}`;
 }
 
 export function normalizeMultipleChoiceOptions(input: {

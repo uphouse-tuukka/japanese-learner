@@ -4,6 +4,7 @@ import { LEVEL_RULES } from '$lib/server/ai-session-prompts';
 import { logWarn } from '$lib/server/logger';
 import {
   formatFillBlankPromptText,
+  formatMultipleChoiceQuestionText,
   normalizeMultipleChoiceOptions,
   VISIBLE_FILL_BLANK_PLACEHOLDER,
 } from '$lib/utils/exercise-display';
@@ -387,7 +388,13 @@ export function normalizeExercise(raw: unknown, index: number, level: UserLevel)
       'answer',
       'correct',
     );
-    const question = requireString(row, 'question', 'question', 'prompt', 'title', 'text');
+    const rawQuestion = requireString(row, 'question', 'question', 'prompt', 'title', 'text');
+    const question = formatMultipleChoiceQuestionText({
+      question: rawQuestion,
+      japanese: base.japanese,
+      romaji: base.romaji,
+      choices: rawChoices,
+    });
     const normalizedOptions = normalizeMultipleChoiceOptions({
       question,
       choices: rawChoices,

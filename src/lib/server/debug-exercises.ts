@@ -14,7 +14,8 @@ const DEBUG_EXERCISE_TEMPLATES: Record<ExerciseType, ExerciseTemplate[]> = {
       englishContext: 'You are ordering one coffee at a cafe.',
       tags: ['daily_life', 'cafe', 'polite'],
       difficulty: 1,
-      question: 'What does this sentence politely ask for?',
+      question:
+        'What does コーヒーを一つお願いします。 (Koohii o hitotsu onegaishimasu.) politely ask for?',
       choices: ['A table for one', 'One coffee', 'The bill', 'A glass of water'],
       correctAnswer: 'One coffee',
       explanation: '一つ means one item, and お願いします is a polite request.',
@@ -27,7 +28,7 @@ const DEBUG_EXERCISE_TEMPLATES: Record<ExerciseType, ExerciseTemplate[]> = {
       englishContext: 'You are asking for directions in town.',
       tags: ['travel', 'directions', 'question'],
       difficulty: 1,
-      question: 'What is the speaker asking?',
+      question: 'What is 駅はどこですか。 (Eki wa doko desu ka.) asking?',
       choices: [
         'Where is the station?',
         'When does the train leave?',

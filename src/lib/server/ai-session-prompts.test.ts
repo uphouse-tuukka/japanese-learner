@@ -325,6 +325,12 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'Never include both Japanese/romaji and English in the same choice string',
     );
+    expect(promptText).toContain(
+      'If choices are English-only meanings, the question itself must include the Japanese phrase with romaji',
+    );
+    expect(promptText).toContain(
+      'For "What is [English] in Japanese?" or "Translate [English] into Japanese" questions, choices must be Japanese with romaji only',
+    );
     expect(promptText).toContain('responseKind');
     expect(promptText).toContain('expectedRomaji');
     expect(promptText).toContain(
