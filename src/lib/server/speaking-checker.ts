@@ -111,6 +111,32 @@ function validateAudio(audio: File): void {
   }
 }
 
+function compactPromptValue(value: string, maxLength = 160): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function buildTranscriptionPrompt(input: SpeakingCheckInput): string {
+  const acceptedAnswers = input.acceptedAnswers
+    .map((answer) => compactPromptValue(answer, 80))
+    .filter(Boolean)
+    .slice(0, 5)
+    .join('; ');
+
+  return [
+    'Japanese learner speaking practice.',
+    `Exercise prompt: ${compactPromptValue(input.prompt)}`,
+    `Expected answer: ${compactPromptValue(input.expectedAnswer)}`,
+    input.expectedRomaji ? `Expected romaji: ${compactPromptValue(input.expectedRomaji)}` : '',
+    acceptedAnswers ? `Accepted alternatives: ${acceptedAnswers}` : '',
+    'Use this context only to resolve close or ambiguous Japanese speech from a non-native learner.',
+    'Transcribe the actual speech in Japanese. Do not invent or correct the answer if the audio is clearly different.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function toTokenCount(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return Math.max(0, Math.floor(value));
@@ -180,8 +206,12 @@ function buildGradingPrompt(input: SpeakingCheckInput, transcript: string): stri
     `Rubric: ${input.rubric}`,
     `Transcript: ${transcript}`,
     '',
+    'This is an automatic speech recognition transcript from a non-native learner; it may contain small recognition errors when the spoken answer was close.',
     'Is the transcript semantically correct for the speaking exercise?',
     'Grade semantic correctness and communicative intent. Do not grade pronunciation, accent, or exact wording.',
+    'Accept minor particle, kana/kanji, spacing, formality, and clipped-politeness differences when the same communicative intent remains.',
+    'If the transcript is close to the expected or accepted answers and has no contradictory meaning, mark it correct with medium or low confidence rather than failing exact wording.',
+    'Do not accept a transcript whose core meaning changes: wrong objects, wrong actions, negation errors, or unrelated phrases.',
     'Reply JSON only: {"correct":true/false,"confidence":"high"/"medium"/"low","feedback":"short learner-facing feedback in English"}',
   ]
     .filter(Boolean)
@@ -204,6 +234,7 @@ async function transcribeAudio(client: OpenAI, input: SpeakingCheckInput): Promi
     model: TRANSCRIPTION_MODEL,
     language: 'ja',
     response_format: 'json',
+    prompt: buildTranscriptionPrompt(input),
   });
 
   await recordTokenUsageIfPresent({
@@ -235,7 +266,7 @@ async function gradeTranscript(
       {
         role: 'system',
         content:
-          'You evaluate Japanese speaking exercise transcripts. Be fair and concise. The learner-facing feedback field must be in English. Reply ONLY with JSON.',
+          'You evaluate Japanese speaking exercise transcripts. Be fair and concise. Be encouraging without accepting clearly wrong answers. The learner-facing feedback field must be in English. Reply ONLY with JSON.',
       },
       {
         role: 'user',

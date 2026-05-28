@@ -137,6 +137,15 @@ describe('exercise UI contract', () => {
     );
   });
 
+  it('keeps speaking incorrect results focused on transcript checking rather than blame', () => {
+    const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
+
+    expect(speaking).toContain('Not quite — check the transcript');
+    expect(speaking).toContain('If I misheard you, try again before continuing.');
+    expect(speaking).toContain('function retryAnswer()');
+    expect(speaking).toContain('onclick={retryAnswer}');
+  });
+
   it('keeps speaking controls stable before recording status copy', () => {
     const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
 

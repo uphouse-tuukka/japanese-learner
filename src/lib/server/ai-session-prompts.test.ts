@@ -337,6 +337,15 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain('responseKind');
     expect(promptText).toContain('expectedRomaji');
     expect(promptText).toContain(
+      'acceptedAnswers must include common particle/formality variants when they preserve the same intent',
+    );
+    expect(promptText).toContain(
+      'rubric must tell the checker to accept semantically equivalent learner speech, not exact wording',
+    );
+    expect(promptText).toContain(
+      'rubric must still reject wrong objects, wrong actions, negation errors, or unrelated phrases',
+    );
+    expect(promptText).toContain(
       'Elementary speaking exercises must use responseKind="situational_response" only.',
     );
     expect(promptText).toContain('Translation direction must be ja_to_en only.');

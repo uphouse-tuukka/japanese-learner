@@ -120,7 +120,7 @@ const EXERCISE_FIELD_REQUIREMENTS: Record<NonTranslationExerciseType, string> = 
   listening:
     '- listening: prompt, audioText, choices (string array), correctAnswer (must match one choice). For listening exercises, prompt must be short English-only instruction, e.g. "Listen and choose the correct meaning". Do NOT include Japanese text or romaji in prompt.',
   speaking:
-    '- speaking: prompt, responseKind ("situational_response" or "translation_en_to_ja"), expectedAnswer (Japanese script only), expectedRomaji (romanization only), acceptedAnswers (string array of natural Japanese-script alternatives; romaji alternatives allowed only for future typed fallback), rubric (semantic correctness criteria), maxRecordingSeconds (optional, 5-20). The prompt must tell the learner to speak Japanese. Grade semantic correctness, not exact wording.',
+    '- speaking: prompt, responseKind ("situational_response" or "translation_en_to_ja"), expectedAnswer (Japanese script only), expectedRomaji (romanization only), acceptedAnswers (string array of natural Japanese-script alternatives; romaji alternatives allowed only for future typed fallback), rubric (semantic correctness criteria), maxRecordingSeconds (optional, 5-20). The prompt must tell the learner to speak Japanese. Grade semantic correctness, not exact wording. For speaking exercises, acceptedAnswers must include common particle/formality variants when they preserve the same intent. The rubric must tell the checker to accept semantically equivalent learner speech, not exact wording; the rubric must still reject wrong objects, wrong actions, negation errors, or unrelated phrases.',
 };
 
 const PUBLIC_CHALLENGE_ALLOWED_TYPES: ExerciseType[] = [

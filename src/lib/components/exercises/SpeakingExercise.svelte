@@ -247,6 +247,10 @@
     });
   }
 
+  function retryAnswer(): void {
+    resetForExercise();
+  }
+
   $effect(() => {
     exercise.id;
     resetForExercise();
@@ -267,7 +271,7 @@
   {#if recordingState === 'answered'}
     <ExerciseResultPanel
       state={isCorrect ? 'correct' : 'incorrect'}
-      title={isCorrect ? 'Correct!' : 'Not quite'}
+      title={isCorrect ? 'Correct!' : 'Not quite — check the transcript'}
     >
       <div class="result-grid">
         <div class="answer-card">
@@ -285,6 +289,9 @@
       {#if feedback}
         <p class="feedback">{feedback}</p>
       {/if}
+      {#if !isCorrect}
+        <p class="small">If I misheard you, try again before continuing.</p>
+      {/if}
     </ExerciseResultPanel>
   {/if}
 
@@ -297,7 +304,14 @@
     {:else if recordingState === 'processing'}
       <button class="btn btn-primary" type="button" disabled>Working…</button>
     {:else if recordingState === 'answered'}
-      <button class="btn btn-primary" type="button" onclick={continueToNext}>Continue</button>
+      {#if isCorrect}
+        <button class="btn btn-primary" type="button" onclick={continueToNext}>Continue</button>
+      {:else}
+        <button class="btn btn-primary" type="button" onclick={retryAnswer}>Try again</button>
+        <button class="btn btn-ghost" type="button" onclick={continueToNext}
+          >Continue without credit</button
+        >
+      {/if}
     {:else if recordingState === 'unsupported'}
       <button class="btn btn-ghost" type="button" onclick={continueToNext}
         >Continue without credit</button

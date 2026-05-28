@@ -83,12 +83,15 @@ describe('checkSpeakingAnswer', () => {
       confidence: 'high',
       feedback: 'Good natural request.',
     });
-    expect(mockClient.audio.transcriptions.create).toHaveBeenCalledWith({
-      file: expect.any(File),
-      model: 'gpt-4o-mini-transcribe',
-      language: 'ja',
-      response_format: 'json',
-    });
+    expect(mockClient.audio.transcriptions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: expect.any(File),
+        model: 'gpt-4o-mini-transcribe',
+        language: 'ja',
+        response_format: 'json',
+        prompt: expect.stringContaining('Japanese learner speaking practice'),
+      }),
+    );
     expect(mockClient.responses.create).toHaveBeenCalledTimes(1);
   });
 
@@ -158,13 +161,33 @@ describe('checkSpeakingAnswer', () => {
 
     const request = mockClient.responses.create.mock.calls[0]?.[0];
     const prompt = request.input[1].content as string;
+    const systemInstruction = mockClient.responses.create.mock.calls[0]?.[0].input[0]
+      .content as string;
     expect(prompt).toContain('Rubric:');
     expect(prompt).toContain('Response kind: situational_response');
     expect(prompt).toContain('semantically correct');
     expect(prompt).toContain('Do not grade pronunciation');
     expect(prompt).toContain('feedback in English');
-    expect(mockClient.responses.create.mock.calls[0]?.[0].input[0].content).toContain(
-      'feedback field must be in English',
+    expect(prompt).toContain('automatic speech recognition transcript from a non-native learner');
+    expect(prompt).toContain(
+      'Accept minor particle, kana/kanji, spacing, formality, and clipped-politeness differences',
+    );
+    expect(prompt).toContain('Do not accept a transcript whose core meaning changes');
+    expect(systemInstruction).toContain('feedback field must be in English');
+    expect(systemInstruction).toContain('Be encouraging without accepting clearly wrong answers');
+  });
+
+  it('limits transcription hints to resolving close learner speech without inventing the answer', async () => {
+    await checkSpeakingAnswer(validInput());
+
+    const transcriptionRequest = mockClient.audio.transcriptions.create.mock.calls[0]?.[0];
+    const prompt = transcriptionRequest.prompt as string;
+    expect(prompt).toContain('Japanese learner speaking practice');
+    expect(prompt).toContain('Expected answer: 水をください');
+    expect(prompt).toContain('Accepted alternatives: お水をください');
+    expect(prompt).toContain('Use this context only to resolve close or ambiguous Japanese speech');
+    expect(prompt).toContain(
+      'Do not invent or correct the answer if the audio is clearly different',
     );
   });
 });

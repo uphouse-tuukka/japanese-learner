@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-05-25
+**Last updated:** 2026-05-28
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -44,6 +44,9 @@
 - Speaking exercises are private learn/practice exercises only. Public portfolio challenge output must not include `speaking` or require microphone access.
 - Raw audio is transient: validate it, send it for transcription/evaluation, then discard it. The transcript is stored as the learner's `answerText`; raw audio, confidence, and feedback are not persisted in the MVP.
 - Grade transcript semantic correctness, not pronunciation scoring. Show the transcript and expected Japanese + romaji after processing.
+- Transcription may receive the prompt, expected answer, romaji, and accepted alternatives as hints, but only to resolve close or ambiguous Japanese speech; it must not invent the expected answer when audio is clearly different.
+- Speaking grading should be learner-friendly for non-native ASR transcripts: accept minor particle, kana/kanji, spacing, formality, clipped-politeness, and close-transcription differences when communicative intent remains intact. Still reject changed core meaning such as wrong objects, wrong actions, negation errors, or unrelated phrases.
+- If a spoken answer is marked incorrect, the UI should make the transcript reviewable and allow retry before continuing without credit.
 - Supported response kinds:
   - `situational_response`: learner speaks an appropriate Japanese response for the situation.
   - `translation_en_to_ja`: learner speaks a Japanese translation of an English prompt.
