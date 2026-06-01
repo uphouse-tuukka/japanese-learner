@@ -21,6 +21,14 @@ Before editing, read:
 4. Identify the validation commands you will run before editing.
 5. Avoid feature drift: keep the change inside the requested scope.
 
+Implementation discipline:
+
+- State material assumptions before editing when they affect scope or safety.
+- Prefer the smallest change that satisfies the request.
+- Do not refactor adjacent code, formatting, comments, docs, or APIs unless required.
+- Every changed line should trace to the task, validation, or cleanup caused by the task.
+- Define verification before calling work complete.
+
 ## Optional CodeGraph navigation
 
 This repo has an optional, repo-local CodeGraph workflow for first-pass code navigation. Use it when mapping unfamiliar Svelte components, SvelteKit routes, server utilities, callers, callees, or impact surfaces.
