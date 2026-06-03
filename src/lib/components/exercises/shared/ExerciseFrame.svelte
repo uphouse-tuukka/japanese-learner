@@ -44,7 +44,7 @@
 <style>
   .exercise-frame {
     display: grid;
-    gap: var(--exercise-frame-gap, var(--space-4));
+    gap: var(--exercise-frame-gap);
   }
 
   .exercise-frame__header {
@@ -83,13 +83,13 @@
 
   .exercise-frame__body {
     display: grid;
-    gap: var(--exercise-control-gap, var(--space-3));
+    gap: var(--exercise-control-gap);
   }
 
   .exercise-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--exercise-action-gap, var(--space-4));
+    gap: var(--exercise-action-gap);
   }
 
   @media (max-width: 37.5rem) {

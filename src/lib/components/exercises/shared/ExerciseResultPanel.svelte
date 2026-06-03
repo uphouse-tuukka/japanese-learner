@@ -48,7 +48,7 @@
     gap: var(--space-3);
     border: 1px solid transparent;
     border-radius: var(--radius-lg);
-    padding: var(--exercise-result-padding, var(--space-4));
+    padding: var(--exercise-result-padding);
     background: var(--bg-washi);
     animation: exercise-result-reveal 300ms var(--ease-out);
   }

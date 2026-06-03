@@ -17,6 +17,13 @@ function firstPartyExerciseComponents(): string[] {
     .sort();
 }
 
+function sharedExercisePrimitives(): string[] {
+  return readdirSync(join(exerciseDir, 'shared'))
+    .filter((entry) => entry.endsWith('.svelte'))
+    .map((entry) => join(exerciseDir, 'shared', entry))
+    .sort();
+}
+
 function styleBlocks(content: string): string {
   return Array.from(content.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/g))
     .map((match) => match[1])
@@ -48,6 +55,18 @@ describe('exercise UI contract', () => {
 
   it('does not use fallback syntax for app-owned design tokens', () => {
     const fallbackTokenUsages = firstPartyExerciseComponents().flatMap((path) => {
+      const styles = styleBlocks(readExerciseComponent(path));
+      const matches = Array.from(styles.matchAll(/var\(\s*(--[a-z0-9-]+)\s*,/gi)).map(
+        (match) => match[1],
+      );
+      return matches.map((match) => `${basename(path)}: ${match}`);
+    });
+
+    expect(fallbackTokenUsages).toEqual([]);
+  });
+
+  it('does not use fallback syntax in shared exercise primitive styles', () => {
+    const fallbackTokenUsages = sharedExercisePrimitives().flatMap((path) => {
       const styles = styleBlocks(readExerciseComponent(path));
       const matches = Array.from(styles.matchAll(/var\(\s*(--[a-z0-9-]+)\s*,/gi)).map(
         (match) => match[1],
