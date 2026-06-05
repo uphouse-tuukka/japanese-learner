@@ -110,8 +110,8 @@ Use this index before following older plans or decisions. Status labels are cons
 
 ### `documents/plans/2026-06-05-progress-level-ink-separation.md`
 
-- Status: active
-- Description: Implementation plan to separate learning/profile level from ink/XP progress on the `/progress` analytics branch, including Level Journey copy/model cleanup and roadmap corrections.
+- Status: implemented
+- Description: Implemented cleanup separating learning/profile level from ink/XP progress on the `/progress` analytics branch, including Level Journey copy/model cleanup and roadmap corrections.
 - Source files affected: `src/routes/progress/+page.svelte`, `src/routes/progress/progress-view-model.ts`, `src/routes/progress/progress-view-model.test.ts`, `documents/plans/progress-page-roadmap.md`
 - Last verified: 2026-06-05
 

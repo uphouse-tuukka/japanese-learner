@@ -22,25 +22,25 @@ The `/progress` page should become the long-horizon companion view: a place user
 
 Proposed section order (top to bottom):
 
-1. Header summary (current level, total 墨/XP, current streak, next milestone)
-2. **XP History**
-3. **Level Journey**
+1. Header summary (learning level, total 墨/ink, current streak, next ink milestone)
+2. **Ink History**
+3. **Learning Level Journey**
 4. **Milestone Gallery**
 5. **Streak Calendar**
 6. **Session History Enhanced**
 7. **Skill Breakdown**
 
-Rationale: start with macro trajectory (XP + levels), then achievements/consistency, then detailed performance diagnostics.
+Rationale: start with macro trajectory by showing ink momentum and profile learning level separately, then achievements/consistency, then detailed performance diagnostics.
 
 ---
 
 ## 3. Feature Scope by Section
 
-## 3.1 XP History
+## 3.1 Ink History
 
 ### What it contains
 
-- Time-series visualization of XP earned with toggles:
+- Time-series visualization of ink earned with toggles:
   - **Daily** (last 30-90 days)
   - **Weekly** (last 12-26 weeks)
   - **Monthly** (last 12 months)
@@ -56,7 +56,7 @@ Rationale: start with macro trajectory (XP + levels), then achievements/consiste
 
 ### Technical considerations
 
-- Aggregate from immutable XP events (avoid recomputing from mutable session objects only).
+- Aggregate from immutable ink/XP events (avoid recomputing from mutable session objects only).
 - Precompute daily rollups for fast chart rendering.
 - Time-zone aware bucket boundaries (user-local date).
 - Handle sparse data (show zero-activity periods explicitly).
@@ -65,7 +65,7 @@ Rationale: start with macro trajectory (XP + levels), then achievements/consiste
 
 ```text
 +---------------------------------------------------------------+
-| XP History                                          [D][W][M] |
+| Ink History                                         [D][W][M] |
 |                                                               |
 |   墨                                                         * |
 | 120 |                                                  *  *   |
@@ -88,7 +88,7 @@ Rationale: start with macro trajectory (XP + levels), then achievements/consiste
   - upcoming milestones (with progress-to-target)
 - Group by category:
   - consistency
-  - XP/level
+  - ink/XP milestones
   - exercise mastery
   - mission/category completion (future-compatible)
 
@@ -110,7 +110,7 @@ Milestone Gallery
 
 [✓] First Ink       Achieved: 2026-04-03
 [✓] 7-Day Flow      Achieved: 2026-04-10
-[✓] Level 3 Reached Achieved: 2026-04-18
+[✓] Listening Focus Achieved: 2026-04-18
 [ ] 30-Day Flow     Progress: 18 / 30 days
 [ ] 10,000 墨        Progress: 7,450 / 10,000
 ```
@@ -135,7 +135,7 @@ Milestone Gallery
 - Daily activity table should include:
   - active flag
   - sessions completed
-  - XP earned that day
+  - ink earned that day
 - Use user-local day boundaries.
 - Gracefully handle missed data and partial backfills.
 
@@ -161,7 +161,7 @@ Legend: . none  ░ light  ▓ medium  █ deep
 
 An expanded timeline beyond current `/history`:
 
-- XP earned per session
+- ink earned per session
 - accuracy per session
 - rolling accuracy trend
 - session duration + exercise mix
@@ -174,7 +174,7 @@ An expanded timeline beyond current `/history`:
 
 ### Technical considerations
 
-- Extend session summary model to persist XP and accuracy snapshots at completion.
+- Extend session summary model to persist ink/XP and accuracy snapshots at completion.
 - Ensure trend lines use consistent denominator logic (avoid skew from tiny sessions).
 - Keep pagination/server filtering efficient (cursor + indexed timestamps).
 
@@ -228,36 +228,37 @@ Recommendation: prioritize Sentence Build + Grammar Ordering this week.
 
 ---
 
-## 3.6 Level Journey
+## 3.6 Learning Level Journey
 
 ### What it contains
 
-- Visual progression across all **8 user levels**
-- Current XP, XP needed for next level, and historical level-up points
-- Context on pace (“at current 14-day average, ~X days to next level”)
+- Visual progression across all **8 user learning levels**
+- Current profile/tutor level from `users.level`
+- Next learning level label, without ink/XP requirements
+- Clear copy that learning level changes through tutor recommendations/profile updates, not ink totals
 
 ### Why it matters
 
-- Provides long-term orientation and pacing.
-- Connects session effort (short term) to identity/progression (long term).
+- Provides long-term orientation for the learner's current tutor/profile level.
+- Keeps learning level separate from short-term activity rewards.
 
 ### Technical considerations
 
-- Keep level thresholds declarative and versioned.
-- Persist level-up event history so retrospective timeline is stable.
-- If thresholds change later, define migration/display policy clearly.
+- Treat `users.level` and ink/XP totals as separate systems.
+- Do not derive learning level from `user_xp` totals.
+- If persisted level-up event history is added later, model it as tutor/profile level history, not XP threshold history.
 
 ### UI sketch
 
 ```text
-Level Journey
+Learning Level Journey
 
 L1 ── L2 ── L3 ── L4 ── L5 ── L6 ── L7 ── L8
 ✓     ✓     ✓    [YOU]  ·     ·     ·     ·
 
-Current: Level 4 (7,450 墨)
-Next: Level 5 at 8,200 墨  (750 墨 to go)
-Recent pace: ~210 墨/week
+Current: Pre-Intermediate
+Next learning level: Intermediate
+Level changes through tutor recommendations, not ink totals.
 ```
 
 ---
@@ -266,12 +267,12 @@ Recent pace: ~210 墨/week
 
 Before building `/progress`, ensure these foundations are stable:
 
-- event-level XP ledger (`xp_events`)
+- event-level ink/XP ledger (`xp_events`)
 - daily activity rollups (`user_daily_activity`)
 - milestone definitions + unlock events (`milestones`, `user_milestones`)
 - session analytics snapshot fields (xp, accuracy, duration, type mix)
 - exercise-performance aggregates (by type, date bucket)
-- level threshold config + level-up event log
+- profile/tutor learning level history, if future level-change history is needed
 
 Design preference: deterministic server-side aggregates with lightweight client rendering.
 
@@ -284,7 +285,7 @@ Recommended phased release for `/progress`:
 ### Phase A (MVP progress surface)
 
 - Header summary
-- XP History (daily + weekly)
+- Ink History (daily + weekly)
 - Streak Calendar
 
 ### Phase B (Achievement + diagnostics)
@@ -295,7 +296,7 @@ Recommended phased release for `/progress`:
 ### Phase C (Coaching depth)
 
 - Skill Breakdown recommendations
-- Level Journey pace forecasting
+- Learning Level Journey profile/tutor level context
 
 This sequencing provides quick user value while reducing analytics complexity risk.
 
@@ -306,7 +307,7 @@ This sequencing provides quick user value while reducing analytics complexity ri
 - **Risk:** Inconsistent metrics between pages.  
   **Mitigation:** Use shared aggregation utilities and single metric definitions.
 
-- **Risk:** Time-zone boundary bugs in streak/XP charts.  
+- **Risk:** Time-zone boundary bugs in streak/ink charts.
   **Mitigation:** Centralize local-date derivation and test around day transitions.
 
 - **Risk:** Misleading skill labels due to low sample sizes.  

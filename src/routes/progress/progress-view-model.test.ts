@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCalendarData,
   buildHistoryList,
-  buildLevelJourney,
+  buildLearningLevelJourney,
   buildMilestoneGallery,
   buildSkillBreakdown,
   buildXpHistory,
@@ -91,16 +91,8 @@ describe('progress view model helpers', () => {
     });
   });
 
-  it('builds a level journey with current level, thresholds, pace, and XP to next level', () => {
-    const journey = buildLevelJourney({
-      currentLevel: 'elementary',
-      totalXp: 450,
-      todayValue: new Date(2024, 0, 14, 12),
-      dailyXpHistory: [
-        { date: '2024-01-13', totalXp: 20 },
-        { date: '2024-01-14', totalXp: 22 },
-      ],
-    });
+  it('builds a learning level journey from the stored profile level only', () => {
+    const journey = buildLearningLevelJourney({ currentLevel: 'elementary' });
 
     expect(journey.currentLevel).toBe(3);
     expect(journey.currentLevelLabel).toBe('Elementary');
@@ -108,43 +100,38 @@ describe('progress view model helpers', () => {
     expect(journey.steps[2]).toMatchObject({
       level: 3,
       label: 'Elementary',
-      thresholdXp: 300,
       isCurrent: true,
       isReached: true,
+      isNext: false,
     });
-    expect(journey.nextLevel).toMatchObject({ level: 4, thresholdXp: 700 });
-    expect(journey.xpToNext).toBe(250);
-    expect(journey.progressToNextPct).toBe(38);
-    expect(journey.recentAverageDailyXp).toBe(3);
-    expect(journey.recentWeeklyPaceXp).toBe(21);
-    expect(journey.estimatedDaysToNext).toBe(84);
-    expect(journey.hasPaceData).toBe(true);
+    expect(journey.nextLevel).toMatchObject({
+      level: 4,
+      label: 'Pre-Intermediate',
+      isNext: true,
+    });
     expect(journey.isMaxLevel).toBe(false);
+    expect(journey).not.toHaveProperty('xpToNext');
+    expect(journey).not.toHaveProperty('progressToNextPct');
+    expect(journey).not.toHaveProperty('estimatedDaysToNext');
   });
 
-  it('uses named user levels instead of deriving current level from XP', () => {
-    const journey = buildLevelJourney({
-      currentLevel: 'beginner',
-      totalXp: 12_000,
-      dailyXpHistory: [],
-    });
+  it('does not expose ink or XP requirements for learning level progression', () => {
+    const journey = buildLearningLevelJourney({ currentLevel: 'beginner' });
 
     expect(journey.currentLevel).toBe(2);
     expect(journey.currentLevelLabel).toBe('Beginner');
-    expect(journey.steps[1]).toMatchObject({ label: 'Beginner', isCurrent: true });
     expect(journey.nextLevel).toMatchObject({ level: 3, label: 'Elementary' });
-    expect(journey.isMaxLevel).toBe(false);
+    for (const step of journey.steps) {
+      expect(step).not.toHaveProperty('thresholdXp');
+    }
   });
 
-  it('builds max-level and no-pace level states explicitly', () => {
-    const journey = buildLevelJourney({ currentLevel: 8, totalXp: 12_000, dailyXpHistory: [] });
+  it('builds max learning level state explicitly', () => {
+    const journey = buildLearningLevelJourney({ currentLevel: 'ready_for_japan' });
 
     expect(journey.currentLevel).toBe(8);
+    expect(journey.currentLevelLabel).toBe('Ready for Japan 🇯🇵');
     expect(journey.nextLevel).toBeNull();
-    expect(journey.xpToNext).toBeNull();
-    expect(journey.progressToNextPct).toBeNull();
-    expect(journey.estimatedDaysToNext).toBeNull();
-    expect(journey.hasPaceData).toBe(false);
     expect(journey.isMaxLevel).toBe(true);
   });
 

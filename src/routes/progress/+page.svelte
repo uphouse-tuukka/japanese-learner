@@ -4,7 +4,7 @@
   import {
     buildCalendarData,
     buildHistoryList,
-    buildLevelJourney,
+    buildLearningLevelJourney,
     buildMilestoneGallery,
     buildSkillBreakdown,
     buildXpHistory,
@@ -41,7 +41,7 @@
 
       <section class="card section-xp-history">
         <div class="section-header">
-          <h2>XP History</h2>
+          <h2>Ink History</h2>
           <span class="shimmer-block" style="width: 10rem; height: 1rem;"></span>
         </div>
         <div class="xp-chart skeleton-chart">
@@ -53,7 +53,7 @@
 
       <section class="card section-levels">
         <div class="section-header">
-          <h2>Level Journey</h2>
+          <h2>Learning Level Journey</h2>
           <span class="shimmer-block" style="width: 12rem; height: 1rem;"></span>
         </div>
         <div class="level-track">
@@ -169,11 +169,7 @@
       }}
       {@const userLevel = resolved.user?.level ?? 'absolute_beginner'}
       {@const xpHistory = buildXpHistory(resolved.dailyXpHistory)}
-      {@const levelJourney = buildLevelJourney({
-        totalXp: gamification.totalXp,
-        currentLevel: userLevel,
-        dailyXpHistory: resolved.dailyXpHistory,
-      })}
+      {@const levelJourney = buildLearningLevelJourney({ currentLevel: userLevel })}
       {@const calendar = buildCalendarData(
         resolved.activityDates,
         new Date(),
@@ -210,7 +206,7 @@
         </div>
         <div class="summary-grid">
           <div class="summary-stat">
-            <span class="stat-label">Current level</span>
+            <span class="stat-label">Learning level</span>
             <strong>{levelJourney.currentLevelLabel}</strong>
           </div>
           <div class="summary-stat">
@@ -222,7 +218,7 @@
             <strong>{gamification.currentStreak} days</strong>
           </div>
           <div class="summary-stat">
-            <span class="stat-label">Next milestone</span>
+            <span class="stat-label">Next ink milestone</span>
             {#if nextMilestoneName}
               <strong>{nextMilestoneName}</strong>
               <span>{gamification.xpToNextMilestone} 墨 to go</span>
@@ -237,8 +233,8 @@
       <section class="card section-xp-history" aria-labelledby="xp-history-heading">
         <div class="section-header">
           <div>
-            <h2 id="xp-history-heading">XP History</h2>
-            <p class="section-copy">Daily totals from current XP rollups, not an event ledger.</p>
+            <h2 id="xp-history-heading">Ink History</h2>
+            <p class="section-copy">Daily ink totals from current reward rollups.</p>
           </div>
           {#if xpHistory.summary.hasData}
             <div class="streak-stats">
@@ -249,7 +245,7 @@
           {/if}
         </div>
         {#if xpHistory.summary.hasData}
-          <div class="xp-chart" aria-label="Daily XP totals for the last 30 days">
+          <div class="xp-chart" aria-label="Daily ink totals for the last 30 days">
             {#each xpHistory.daily as day}
               <div class="xp-bar-wrap">
                 <span
@@ -285,7 +281,7 @@
           </div>
         {:else}
           <p class="empty-state">
-            No daily XP totals yet. Complete a session to start building history.
+            No daily ink totals yet. Complete a session to start building history.
           </p>
         {/if}
       </section>
@@ -293,56 +289,40 @@
       <section class="card section-levels" aria-labelledby="level-heading">
         <div class="section-header">
           <div>
-            <h2 id="level-heading">Level Journey</h2>
+            <h2 id="level-heading">Learning Level Journey</h2>
             <p class="section-copy">
-              Conservative local thresholds; this is not persisted level-up history.
+              Separate from ink. This reflects your current tutor/profile level.
             </p>
           </div>
           <div class="streak-stats">
             <span>Current: <strong>{levelJourney.currentLevelLabel}</strong></span>
-            <span class="separator">·</span>
-            <span>{levelJourney.totalXp} 墨</span>
+            {#if levelJourney.nextLevel}
+              <span class="separator">·</span>
+              <span>Next: <strong>{levelJourney.nextLevel.label}</strong></span>
+            {/if}
           </div>
         </div>
-        <div class="level-track" aria-label="Eight-level progress journey">
+        <div class="level-track" aria-label="Eight-level learning journey">
           {#each levelJourney.steps as step}
             <div
               class="level-step"
               class:reached={step.isReached}
               class:current={step.isCurrent}
-              title={`${step.label}: ${step.thresholdXp} 墨 threshold`}
+              class:next={step.isNext}
+              title={step.label}
             >
               <span>{step.level}</span>
-              <small>{step.thresholdXp}</small>
+              <small>{step.isCurrent ? 'Current' : step.isNext ? 'Next' : ' '}</small>
             </div>
           {/each}
         </div>
         <div class="level-details">
           {#if levelJourney.isMaxLevel}
-            <strong>Max visible level reached.</strong>
-            <span>Keep practicing to deepen mastery.</span>
+            <strong>Highest learning level selected.</strong>
+            <span>Keep practicing to deepen readiness.</span>
           {:else if levelJourney.nextLevel}
-            <strong
-              >Next: {levelJourney.nextLevel.label} at {levelJourney.nextLevel.thresholdXp} 墨</strong
-            >
-            <span>{levelJourney.xpToNext} 墨 to go</span>
-            {#if levelJourney.progressToNextPct !== null}
-              <div
-                class="progress-meter"
-                aria-label={`Progress to next level: ${levelJourney.progressToNextPct}%`}
-              >
-                <span style:width={`${levelJourney.progressToNextPct}%`}></span>
-              </div>
-            {/if}
-            {#if levelJourney.hasPaceData}
-              <span>
-                Recent pace: ~{levelJourney.recentWeeklyPaceXp} 墨/week{levelJourney.estimatedDaysToNext
-                  ? `, about ${levelJourney.estimatedDaysToNext} days to next level`
-                  : ''}
-              </span>
-            {:else}
-              <span>Recent pace appears after daily XP totals are available.</span>
-            {/if}
+            <strong>Next learning level: {levelJourney.nextLevel.label}</strong>
+            <span>Learning level changes through tutor recommendations, not ink totals.</span>
           {/if}
         </div>
       </section>
@@ -352,7 +332,7 @@
           <div>
             <h2 id="milestones-heading">Milestone Gallery</h2>
             <p class="section-copy">
-              Unlocked milestones plus XP progress toward upcoming milestone targets.
+              Unlocked milestones plus ink progress toward upcoming milestone targets.
             </p>
           </div>
         </div>
@@ -369,7 +349,7 @@
                   {#if m.isUnlocked}
                     <p class="achieved-date">Achieved {m.achievedAt}</p>
                   {:else if m.progress.isComplete}
-                    <p class="locked-text">XP target complete; unlock record not present yet.</p>
+                    <p class="locked-text">Ink target complete; unlock record not present yet.</p>
                   {:else}
                     <p class="locked-text">
                       Progress: {m.progress.currentXp} / {m.progress.targetXp} 墨
@@ -392,7 +372,8 @@
           <div>
             <h2 id="calendar-heading">Streak Calendar</h2>
             <p class="section-copy">
-              Active days come from activity dates; ink intensity uses daily XP totals when present.
+              Active days come from activity dates; ink intensity uses daily ink totals when
+              present.
             </p>
           </div>
           <div class="streak-stats">
@@ -434,7 +415,7 @@
           <div>
             <h2 id="history-heading">Session History Enhanced</h2>
             <p class="section-copy">
-              Shows session XP and duration only when those fields already exist.
+              Shows session ink and duration only when those fields already exist.
             </p>
           </div>
         </div>
@@ -445,7 +426,7 @@
                 <tr>
                   <th>Date</th>
                   <th>Mode</th>
-                  <th>XP</th>
+                  <th>Ink</th>
                   <th>Accuracy</th>
                   <th>Duration</th>
                   <th>Exercises</th>

@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-05
 
-**Status:** active
+**Status:** implemented
 
 **Owner/Agent:** Alfred / Hermes
 

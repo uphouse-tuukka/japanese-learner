@@ -174,37 +174,25 @@ export function buildXpHistory(
   };
 }
 
-export interface LevelJourneyInput {
-  totalXp: number;
+export interface LearningLevelJourneyInput {
   currentLevel: string | number;
-  dailyXpHistory?: DailyXpHistoryEntry[];
-  todayValue?: Date;
 }
 
-export interface LevelJourneyStep {
+export interface LearningLevelJourneyStep {
   level: number;
   label: string;
-  thresholdXp: number;
   isCurrent: boolean;
   isReached: boolean;
+  isNext: boolean;
 }
 
-export interface LevelJourneyViewModel {
+export interface LearningLevelJourneyViewModel {
   currentLevel: number | null;
   currentLevelLabel: string;
-  totalXp: number;
-  steps: LevelJourneyStep[];
-  nextLevel: LevelJourneyStep | null;
-  xpToNext: number | null;
-  progressToNextPct: number | null;
-  recentAverageDailyXp: number;
-  recentWeeklyPaceXp: number;
-  estimatedDaysToNext: number | null;
+  steps: LearningLevelJourneyStep[];
+  nextLevel: LearningLevelJourneyStep | null;
   isMaxLevel: boolean;
-  hasPaceData: boolean;
 }
-
-const LEVEL_THRESHOLDS = [0, 100, 300, 700, 1500, 3000, 6000, 10000] as const;
 
 const LEVEL_NAMES = LEVEL_ORDER.map((levelKey, index) => ({
   level: index + 1,
@@ -224,56 +212,29 @@ function getLevelLabel(level: number): string {
   return LEVEL_NAMES[level - 1]?.label ?? `Level ${level}`;
 }
 
-export function buildLevelJourney(input: LevelJourneyInput): LevelJourneyViewModel {
-  const totalXp = safeNonNegative(input.totalXp);
+export function buildLearningLevelJourney(
+  input: LearningLevelJourneyInput,
+): LearningLevelJourneyViewModel {
   const levelFromUser = parseLevel(input.currentLevel);
-  const levelFromXp = LEVEL_THRESHOLDS.reduce(
-    (level, threshold, index) => (totalXp >= threshold ? index + 1 : level),
-    1,
-  );
-  const currentLevel = levelFromUser ?? levelFromXp;
-  const clampedCurrentLevel = Math.max(1, Math.min(LEVEL_THRESHOLDS.length, currentLevel));
-  const steps = LEVEL_THRESHOLDS.map((thresholdXp, index) => {
-    const level = index + 1;
-    return {
-      level,
-      label: getLevelLabel(level),
-      thresholdXp,
-      isCurrent: level === clampedCurrentLevel,
-      isReached: totalXp >= thresholdXp || level <= clampedCurrentLevel,
-    };
-  });
-  const nextLevel = steps.find((step) => step.level > clampedCurrentLevel) ?? null;
-  const currentThreshold = LEVEL_THRESHOLDS[clampedCurrentLevel - 1] ?? 0;
-  const xpToNext = nextLevel ? Math.max(0, nextLevel.thresholdXp - totalXp) : null;
-  const progressToNextPct = nextLevel
-    ? clampPercentage(
-        ((totalXp - currentThreshold) / (nextLevel.thresholdXp - currentThreshold)) * 100,
-      )
-    : null;
-  const recentHistory = buildXpHistory(
-    input.dailyXpHistory ?? [],
-    input.todayValue ?? new Date(),
-    14,
-  );
-  const recentAverageDailyXp = recentHistory.summary.averageDailyXp;
+  const clampedCurrentLevel = Math.max(1, Math.min(LEVEL_NAMES.length, levelFromUser ?? 1));
+  const nextLevelNumber = clampedCurrentLevel < LEVEL_NAMES.length ? clampedCurrentLevel + 1 : null;
+
+  const steps = LEVEL_NAMES.map(({ level, label }) => ({
+    level,
+    label,
+    isCurrent: level === clampedCurrentLevel,
+    isReached: level <= clampedCurrentLevel,
+    isNext: level === nextLevelNumber,
+  }));
+
+  const nextLevel = nextLevelNumber ? (steps[nextLevelNumber - 1] ?? null) : null;
 
   return {
     currentLevel: clampedCurrentLevel,
     currentLevelLabel: getLevelLabel(clampedCurrentLevel),
-    totalXp,
     steps,
     nextLevel,
-    xpToNext,
-    progressToNextPct,
-    recentAverageDailyXp,
-    recentWeeklyPaceXp: recentAverageDailyXp * 7,
-    estimatedDaysToNext:
-      xpToNext !== null && recentAverageDailyXp > 0
-        ? Math.ceil(xpToNext / recentAverageDailyXp)
-        : null,
     isMaxLevel: nextLevel === null,
-    hasPaceData: recentHistory.summary.hasData,
   };
 }
 
