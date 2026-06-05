@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-05-26
+**Last updated:** 2026-06-05
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -107,6 +107,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Last verified: 2026-05-20
 
 ## Plans
+
+### `documents/plans/2026-06-05-progress-level-ink-separation.md`
+
+- Status: active
+- Description: Implementation plan to separate learning/profile level from ink/XP progress on the `/progress` analytics branch, including Level Journey copy/model cleanup and roadmap corrections.
+- Source files affected: `src/routes/progress/+page.svelte`, `src/routes/progress/progress-view-model.ts`, `src/routes/progress/progress-view-model.test.ts`, `documents/plans/progress-page-roadmap.md`
+- Last verified: 2026-06-05
 
 ### `documents/plans/2026-05-06-technical-debt-agentic-workflow-improvements.md`
 
