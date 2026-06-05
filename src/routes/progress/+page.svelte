@@ -322,7 +322,6 @@
             <span>Keep practicing to deepen readiness.</span>
           {:else if levelJourney.nextLevel}
             <strong>Next learning level: {levelJourney.nextLevel.label}</strong>
-            <span>Learning level changes through tutor recommendations, not ink totals.</span>
           {/if}
         </div>
       </section>
