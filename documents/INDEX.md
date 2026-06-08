@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-06-05
+**Last updated:** 2026-06-08
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -107,6 +107,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Last verified: 2026-05-20
 
 ## Plans
+
+### `documents/plans/2026-06-08-session-summary-experiment-brief.md`
+
+- Status: active
+- Description: Experiment Lab decision brief for the session summary redesign; locks B4 as the prototype direction and records the no-duplicate-feedback, carry-forward summary principles.
+- Source files affected: `src/lib/components/SessionSummary.svelte`, `src/lib/components/session-summary-view-model.ts`, `src/routes/prototype/session-summary/+page.svelte`, session summary AI/view-model wiring
+- Last verified: 2026-06-08
 
 ### `documents/plans/2026-06-05-progress-level-ink-separation.md`
 
