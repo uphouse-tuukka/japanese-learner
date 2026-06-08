@@ -3,6 +3,7 @@ import {
   LEVEL_ORDER,
   type LevelUpRecommendation,
   type Milestone,
+  type SessionMiniLesson,
   type SessionXpBreakdown,
 } from '$lib/types';
 
@@ -44,6 +45,37 @@ export interface LevelTransition {
   nextLevelLabel: string;
   isReadyForJapan: boolean;
 }
+
+export interface UsefulUnlock {
+  eyebrow: 'Today’s unlock';
+  heading: string;
+  deck: string;
+  phrase: {
+    japanese: string;
+    romaji: string;
+    english: string;
+  };
+  phraseLine: string;
+}
+
+export interface SessionSummaryFrameLabels {
+  leftHeading: 'Session complete';
+  unlockEyebrow: 'Today’s unlock';
+  homeCta: 'Return Home';
+  practiceCta: 'Try Practice Mode';
+}
+
+const FALLBACK_USEFUL_UNLOCK: UsefulUnlock = {
+  eyebrow: 'Today’s unlock',
+  heading: 'Keep one reusable travel move',
+  deck: 'When you need help, open politely first, then name the thing you need.',
+  phrase: {
+    japanese: 'すみません',
+    romaji: 'sumimasen',
+    english: 'Excuse me / sorry to bother you',
+  },
+  phraseLine: 'すみません (sumimasen)',
+};
 
 export function shouldCelebrateScore(score: number): boolean {
   return score >= 80;
@@ -93,5 +125,30 @@ export function buildLevelTransition(
     currentLevelLabel: currentLevelKey ? LEVEL_LABELS[currentLevelKey] : '',
     nextLevelLabel: LEVEL_LABELS[recommendation.recommendedLevel],
     isReadyForJapan: recommendation.recommendedLevel === 'ready_for_japan',
+  };
+}
+
+export function buildUsefulUnlock(miniLesson: SessionMiniLesson | null | undefined): UsefulUnlock {
+  if (!miniLesson) return FALLBACK_USEFUL_UNLOCK;
+
+  return {
+    eyebrow: 'Today’s unlock',
+    heading: 'Carry this pattern forward',
+    deck: miniLesson.note,
+    phrase: {
+      japanese: miniLesson.japanese,
+      romaji: miniLesson.romaji,
+      english: miniLesson.english,
+    },
+    phraseLine: `${miniLesson.japanese} (${miniLesson.romaji})`,
+  };
+}
+
+export function getSessionSummaryFrameLabels(): SessionSummaryFrameLabels {
+  return {
+    leftHeading: 'Session complete',
+    unlockEyebrow: 'Today’s unlock',
+    homeCta: 'Return Home',
+    practiceCta: 'Try Practice Mode',
   };
 }

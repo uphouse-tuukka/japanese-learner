@@ -2,11 +2,11 @@
   import { invalidateAll } from '$app/navigation';
   import { page } from '$app/stores';
   import { type SessionSummary as SessionSummaryType, type SessionXpBreakdown } from '$lib/types';
-  import LessonKeyPhraseCard from '$lib/components/LessonKeyPhraseCard.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
   import {
     buildLevelTransition,
     buildMilestoneDisplay,
+    buildUsefulUnlock,
     buildXpRows,
     shouldCelebrateScore,
   } from './session-summary-view-model';
@@ -23,6 +23,7 @@
   const celebrate = $derived(shouldCelebrateScore(score));
   const recommendation = $derived(summary.levelUpRecommendation);
   const miniLesson = $derived(summary.miniLesson ?? null);
+  const usefulUnlock = $derived(buildUsefulUnlock(miniLesson));
   const xpRows = $derived(buildXpRows(xpBreakdown));
   const milestoneDisplay = $derived(buildMilestoneDisplay(xpBreakdown?.newMilestones));
   const displayedMilestones = $derived(milestoneDisplay.displayedMilestones);
@@ -107,68 +108,76 @@
 </script>
 
 <section class="card summary" aria-live="polite">
-  <header class="summary-header">
-    <h2>Session complete</h2>
+  <div class="summary-frame">
+    <aside class="completion-rail" aria-label="Session result and ink earned">
+      <header class="summary-header">
+        <h2>Session complete</h2>
 
-    <div class="score-container" class:celebrate>
-      {#if celebrate}
-        <div class="ink-bloom"></div>
-        <div class="hanko-stamp">合格</div>
-      {:else}
-        <div class="practice-stamp">練習</div>
-      {/if}
-      <p class="score">{displayScore}%</p>
-    </div>
+        <div class="score-container" class:celebrate>
+          {#if celebrate}
+            <div class="ink-bloom"></div>
+            <div class="hanko-stamp">合格</div>
+          {:else}
+            <div class="practice-stamp">練習</div>
+          {/if}
+          <p class="score">{displayScore}%</p>
+        </div>
 
-    {#if celebrate}
-      <p class="celebrate-text">Excellent work. Great consistency.</p>
-    {/if}
-  </header>
+        <p class="summary-text">{summary.summary}</p>
+      </header>
 
-  <p class="summary-text">{summary.summary}</p>
-
-  {#if xpBreakdown}
-    <section class="ink-earned-card stagger-1 stagger-item">
-      <h4>墨 Ink Earned</h4>
-      <div class="xp-total-container">
-        <span class="xp-total">{displayXp}</span>
-      </div>
-      <div class="xp-breakdown">
-        {#each xpRows as row}
-          <div class="xp-row" class:highlight={row.highlight}>
-            <span>{row.label}</span>
-            <span>{row.value}</span>
+      {#if xpBreakdown}
+        <section class="ink-earned-card stagger-1 stagger-item">
+          <h3>墨 Ink Earned</h3>
+          <p class="xp-total"><span>{displayXp}</span>墨</p>
+          <div class="xp-breakdown">
+            {#each xpRows as row}
+              <div class="xp-row" class:highlight={row.highlight}>
+                <span>{row.label}</span>
+                <span>{row.value}</span>
+              </div>
+            {/each}
           </div>
-        {/each}
-      </div>
-    </section>
-  {/if}
+        </section>
+      {/if}
+    </aside>
 
-  <div class="summary-insights-grid">
-    <section class="stagger-2 stagger-item">
-      <h3>What you're mastering</h3>
-      <ul>
-        {#each summary.strengths as item}
-          <li>{item}</li>
-        {/each}
-      </ul>
-    </section>
-    <section class="stagger-3 stagger-item">
-      <h3>What to work on</h3>
-      <ul>
-        {#each summary.weaknesses as item}
-          <li>{item}</li>
-        {/each}
-      </ul>
-    </section>
+    <div class="coach-panel">
+      <section class="unlock-card stagger-2 stagger-item" aria-label="Today’s unlock">
+        <p class="unlock-eyebrow">{usefulUnlock.eyebrow}</p>
+        <h3>{usefulUnlock.heading}</h3>
+        <p class="unlock-deck"><RichJapaneseText text={usefulUnlock.deck} /></p>
+
+        <blockquote class="phrase-example">
+          <p class="jp">{usefulUnlock.phraseLine}</p>
+          <p class="english">“{usefulUnlock.phrase.english}”</p>
+        </blockquote>
+      </section>
+
+      <section class="actions-card stagger-3 stagger-item" aria-label="Session actions">
+        <div>
+          <h3>Ready to close the session?</h3>
+          <p>The takeaway is saved. No extra drill hiding here.</p>
+        </div>
+        <div class="actions">
+          <a class="btn btn-secondary" href="/">Return Home</a>
+          {#if isOnPracticePage}
+            <button
+              class="btn btn-primary"
+              onclick={async () => {
+                await invalidateAll();
+                window.location.reload();
+              }}
+            >
+              Practice Again
+            </button>
+          {:else}
+            <a class="btn btn-primary" href="/practice">Try Practice Mode</a>
+          {/if}
+        </div>
+      </section>
+    </div>
   </div>
-
-  {#if miniLesson}
-    <section class="stagger-4 stagger-item mini-lesson-block">
-      <h3>One more useful phrase</h3>
-      <LessonKeyPhraseCard phrase={miniLesson} />
-    </section>
-  {/if}
 
   {#if displayedMilestones.length}
     {#each displayedMilestones as milestone}
@@ -255,23 +264,6 @@
       </div>
     </section>
   {/if}
-
-  <div class="actions">
-    <a class="btn btn-secondary" href="/">Return Home</a>
-    {#if isOnPracticePage}
-      <button
-        class="btn btn-primary"
-        onclick={async () => {
-          await invalidateAll();
-          window.location.reload();
-        }}
-      >
-        Practice Again
-      </button>
-    {:else}
-      <a class="btn btn-primary" href="/practice">Try Practice Mode</a>
-    {/if}
-  </div>
 </section>
 
 <style>
@@ -280,31 +272,54 @@
     gap: var(--space-4);
   }
 
-  .summary-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: var(--space-4) 0 var(--space-2);
+  .summary-frame {
+    display: grid;
+    grid-template-columns: minmax(17rem, 0.85fr) minmax(18rem, 1.15fr);
+    gap: var(--space-5);
+    align-items: stretch;
   }
 
-  header h2 {
+  .completion-rail,
+  .coach-panel {
+    min-width: 0;
+  }
+
+  .completion-rail {
+    display: grid;
+    gap: var(--space-4);
+    align-content: start;
+  }
+
+  .summary-header {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    text-align: center;
+    padding: var(--space-5) var(--space-4);
+    background: linear-gradient(to bottom, var(--bg-shoji), var(--bg-white));
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+  }
+
+  .summary-header h2,
+  h3,
+  p {
     margin: 0;
+  }
+
+  .summary-header h2 {
     color: var(--text-sumi);
   }
 
   .summary-text {
-    text-align: center;
     color: var(--text-bokashi);
-    margin-top: 0;
+    max-width: 28rem;
     overflow-wrap: break-word;
     word-break: break-word;
   }
 
   .score-container {
     position: relative;
-    margin-top: var(--space-6);
-    margin-bottom: var(--space-4);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -322,76 +337,23 @@
     margin: 0;
   }
 
-  .celebrate-text {
-    margin-top: var(--space-2);
-    color: var(--state-success);
-    margin-bottom: 0;
-  }
-
-  .summary-insights-grid {
-    display: grid;
-    gap: var(--space-6);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: var(--space-2);
-  }
-
-  .summary-insights-grid > * {
-    min-width: 0;
-  }
-
-  ul {
-    padding-left: 1.25rem;
-    margin: 0;
-    display: grid;
-    gap: var(--space-2);
-    color: var(--text-bokashi);
-  }
-
-  li {
-    overflow-wrap: break-word;
-    word-break: break-word;
-  }
-
-  h3 {
-    margin-bottom: var(--space-3);
-    color: var(--text-sumi);
-    font-size: var(--text-md);
-  }
-
-  .mini-lesson-block {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  @media (max-width: 42rem) {
-    .summary-insights-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-top: var(--space-4);
-  }
-
-  /* Ink Earned Card */
-  .ink-earned-card {
-    background-color: var(--bg-kinu);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
+  .ink-earned-card,
+  .unlock-card,
+  .actions-card {
     border: 1px solid var(--border-light);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    margin-bottom: var(--space-2);
+    border-radius: var(--radius-lg);
+    background: var(--bg-kinu);
+    padding: var(--space-4);
   }
 
-  .ink-earned-card h4 {
-    margin: 0;
+  .ink-earned-card {
+    display: grid;
+    gap: var(--space-3);
+    text-align: center;
+  }
+
+  .ink-earned-card h3,
+  .unlock-eyebrow {
     color: var(--text-bokashi);
     font-size: var(--text-sm);
     text-transform: uppercase;
@@ -399,23 +361,21 @@
     font-weight: var(--weight-medium);
   }
 
-  .xp-total-container {
-    margin: var(--space-2) 0 var(--space-4);
-  }
-
   .xp-total {
     font-family: 'Noto Sans JP', sans-serif;
+    font-size: var(--text-base);
+    color: var(--text-sumi);
+  }
+
+  .xp-total span {
     font-size: var(--text-2xl);
     font-weight: var(--weight-bold);
-    color: var(--text-sumi);
     line-height: 1;
   }
 
   .xp-breakdown {
     width: 100%;
-    max-width: 300px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
     gap: var(--space-2);
     font-size: var(--text-sm);
   }
@@ -423,8 +383,8 @@
   .xp-row {
     display: flex;
     justify-content: space-between;
+    gap: var(--space-3);
     color: var(--text-bokashi);
-    padding: 2px 0;
   }
 
   .xp-row.highlight {
@@ -434,6 +394,81 @@
 
   .xp-row span:last-child {
     font-variant-numeric: tabular-nums;
+  }
+
+  .coach-panel {
+    display: grid;
+    gap: var(--space-4);
+    align-content: stretch;
+  }
+
+  .unlock-card {
+    display: grid;
+    gap: var(--space-4);
+    background: var(--bg-white);
+    box-shadow: var(--shadow-card);
+  }
+
+  .unlock-card h3 {
+    color: var(--text-sumi);
+    font-size: var(--text-xl);
+  }
+
+  .unlock-deck,
+  .actions-card p,
+  .english {
+    color: var(--text-bokashi);
+  }
+
+  .phrase-example {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-4);
+    border-left: 4px solid var(--accent-shu);
+    border-radius: var(--radius-md);
+    background: var(--bg-washi);
+  }
+
+  .jp {
+    color: var(--text-sumi);
+    font-family: 'Noto Sans JP', serif;
+    font-size: var(--text-xl);
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .actions-card {
+    display: grid;
+    gap: var(--space-4);
+    background: var(--bg-shoji);
+  }
+
+  .actions-card h3 {
+    color: var(--text-sumi);
+    font-size: var(--text-md);
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .actions :global(.btn),
+  .actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  @media (max-width: 42rem) {
+    .summary-frame {
+      grid-template-columns: 1fr;
+    }
+
+    .actions {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Milestone Card */
@@ -766,9 +801,6 @@
     }
     .stagger-3 {
       animation-delay: 600ms;
-    }
-    .stagger-4 {
-      animation-delay: 800ms;
     }
     .stagger-5 {
       animation-delay: 1000ms;
