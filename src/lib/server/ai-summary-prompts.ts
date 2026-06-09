@@ -176,6 +176,7 @@ export function buildSessionSummaryPrompt(input: SessionSummaryPromptInput): Ses
           '',
           'RULES:',
           '1) Only reference exercises that appear in the provided session data. Never fabricate.',
+          'summary: This is the short top recap shown under the score. Write 1-3 concise sentences, 35-60 words maximum. Do NOT make summary exercise-by-exercise feedback, an essay, or a duplicate of patterns_strong, patterns_weak, or mini_lesson.',
           '2) patterns_strong: Identify PATTERNS and skills the learner demonstrates consistently — compare with prior sessions/journal when evidence exists. Do NOT list individual correct answers. Focus on what skills are ready to build upon.',
           '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
           '4) mini_lesson: exactly one object with keys kind, japanese, romaji, english, note. kind must be one of: related_phrase, likely_reply, nuance_upgrade, follow_up. Keep it closely related to this completed lesson, concrete, and immediately usable. Do NOT copy a taught key phrase verbatim. Do NOT phrase it as a future promise ("next time we will...").',

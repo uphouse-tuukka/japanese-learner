@@ -34,7 +34,11 @@ vi.mock('$lib/config', () => ({
   },
 }));
 
-import { generateSessionPlan, generateSessionSummary } from '$lib/server/ai';
+import {
+  generateSessionPlan,
+  generateSessionSummary,
+  normalizeSessionSummaryText,
+} from '$lib/server/ai';
 import type { Exercise } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -338,6 +342,42 @@ describe('generateSessionSummary', () => {
     });
 
     expect(summary.accuracy).toBe(0);
+  });
+
+  it('normalizes overlong model summaries before exposing learner-facing text', async () => {
+    const overlongSummary = [
+      'You completed each prompt with steady focus and showed confidence with polite restaurant phrases throughout the session.',
+      'You correctly recognized greetings, request language, menu wording, and several small variations that appeared across the exercises.',
+      'One area to keep practicing is choosing the exact particle when the sentence shifts from asking for help to naming a destination.',
+      'Overall this was a strong session with useful travel language that can be reused in restaurants, stations, and shops.',
+    ].join(' ');
+    mockModelOutput(validSummaryModelPayload({ summary: overlongSummary }));
+
+    const { summary } = await generateSessionSummary(baseSessionInput());
+
+    expect(summary.summary).toBe(
+      'You completed each prompt with steady focus and showed confidence with polite restaurant phrases throughout the session. You correctly recognized greetings, request language, menu wording, and several small variations that appeared across the exercises. One area to keep practicing is choosing the exact particle when the sentence shifts from asking for help to naming a destination.',
+    );
+    expect(summary.summary).not.toContain('Overall this was a strong session');
+    expect(summary.summary.split(/\s+/u).length).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('normalizeSessionSummaryText', () => {
+  it('preserves already-short summaries aside from whitespace normalization', () => {
+    expect(
+      normalizeSessionSummaryText(
+        '  You handled polite food-ordering phrases well.\nKeep listening for particle cues.  ',
+      ),
+    ).toBe('You handled polite food-ordering phrases well. Keep listening for particle cues.');
+  });
+
+  it('caps very long summaries to sixty words even within the sentence limit', () => {
+    const words = Array.from({ length: 75 }, (_, index) => `word${index + 1}`);
+    const normalized = normalizeSessionSummaryText(`${words.join(' ')}.`);
+
+    expect(normalized.split(/\s+/u)).toHaveLength(60);
+    expect(normalized).toMatch(/word60…$/u);
   });
 });
 

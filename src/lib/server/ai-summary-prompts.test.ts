@@ -227,6 +227,18 @@ describe('buildSessionSummaryPrompt', () => {
       'Recommend promotion only with consistent mastery',
     );
   });
+
+  it('instructs the model that summary is a concise top recap with a concrete cap', () => {
+    const prompt = buildSessionSummaryPrompt(baseSessionSummaryPromptInput());
+    const systemPrompt = messageContent(prompt.messages, 'system');
+
+    expect(systemPrompt).toContain(
+      'summary: This is the short top recap shown under the score. Write 1-3 concise sentences, 35-60 words maximum.',
+    );
+    expect(systemPrompt).toContain(
+      'Do NOT make summary exercise-by-exercise feedback, an essay, or a duplicate of patterns_strong, patterns_weak, or mini_lesson.',
+    );
+  });
 });
 
 function completedSessionSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {

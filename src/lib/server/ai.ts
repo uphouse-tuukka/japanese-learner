@@ -29,6 +29,31 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const SESSION_SUMMARY_MAX_SENTENCES = 3;
+const SESSION_SUMMARY_MAX_WORDS = 60;
+
+function splitSentences(text: string): string[] {
+  const matches = text.match(/[^.!?。！？]+[.!?。！？]+[”’"')\]]*|[^.!?。！？]+$/gu);
+  return matches?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
+}
+
+export function normalizeSessionSummaryText(rawSummary: string): string {
+  const normalized = rawSummary.replace(/\s+/gu, ' ').trim();
+  if (!normalized) return normalized;
+
+  const sentenceLimited = splitSentences(normalized)
+    .slice(0, SESSION_SUMMARY_MAX_SENTENCES)
+    .join(' ');
+  const candidate = sentenceLimited || normalized;
+  const words = candidate.split(/\s+/u);
+  if (words.length <= SESSION_SUMMARY_MAX_WORDS) return candidate;
+
+  const truncatedWords = words.slice(0, SESSION_SUMMARY_MAX_WORDS);
+  const finalWord = truncatedWords[truncatedWords.length - 1] ?? '';
+  truncatedWords[truncatedWords.length - 1] = finalWord.replace(/[.,;:!?。！？]*$/u, '') + '…';
+  return truncatedWords.join(' ');
+}
+
 function getOpenAiClient(): OpenAI {
   return getCachedOpenAiClient({
     scope: 'ai',
@@ -210,9 +235,9 @@ export async function generateSessionSummary(input: {
     return undefined;
   };
 
-  const summaryText = String(
-    pickFirst(['summary', 'sessionSummary', 'session_summary', 'overview']) ?? '',
-  ).trim();
+  const summaryText = normalizeSessionSummaryText(
+    String(pickFirst(['summary', 'sessionSummary', 'session_summary', 'overview']) ?? ''),
+  );
 
   const currentLevelIndex = LEVEL_ORDER.indexOf(input.userLevel);
   const nextLevel =

@@ -160,10 +160,10 @@
           <p>The takeaway is saved. No extra drill hiding here.</p>
         </div>
         <div class="actions">
-          <a class="btn btn-secondary" href="/">Return Home</a>
+          <a class="btn btn-secondary action-btn" href="/">Return Home</a>
           {#if isOnPracticePage}
             <button
-              class="btn btn-primary"
+              class="btn btn-primary action-btn"
               onclick={async () => {
                 await invalidateAll();
                 window.location.reload();
@@ -172,7 +172,7 @@
               Practice Again
             </button>
           {:else}
-            <a class="btn btn-primary" href="/practice">Try Practice Mode</a>
+            <a class="btn btn-primary action-btn" href="/practice">Try Practice Mode</a>
           {/if}
         </div>
       </section>
@@ -453,12 +453,21 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
+    align-items: stretch;
   }
 
-  .actions :global(.btn),
-  .actions .btn {
+  .actions .action-btn {
+    display: inline-flex;
+    min-width: 0;
     width: 100%;
+    min-height: 3rem;
+    align-items: center;
     justify-content: center;
+    padding: var(--space-3) var(--space-4);
+    text-align: center;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   @media (max-width: 42rem) {
