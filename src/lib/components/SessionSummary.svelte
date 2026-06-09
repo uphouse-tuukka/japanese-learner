@@ -451,22 +451,23 @@
 
   .actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(10.75rem, 11.75rem));
     gap: var(--space-3);
-    align-items: stretch;
+    align-items: center;
+    justify-content: start;
   }
 
   .actions .action-btn {
     display: inline-flex;
     min-width: 0;
     width: 100%;
-    min-height: 3rem;
+    min-height: 2.5rem;
     align-items: center;
     justify-content: center;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-5);
     text-align: center;
-    line-height: 1.25;
-    white-space: normal;
+    line-height: 1;
+    white-space: nowrap;
     overflow-wrap: anywhere;
   }
 
@@ -477,6 +478,13 @@
 
     .actions {
       grid-template-columns: 1fr;
+      justify-content: stretch;
+    }
+
+    .actions .action-btn {
+      min-height: 3rem;
+      line-height: 1.25;
+      white-space: normal;
     }
   }
 
