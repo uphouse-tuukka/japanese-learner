@@ -21,13 +21,16 @@ Before editing, read:
 4. Identify the validation commands you will run before editing.
 5. Avoid feature drift: keep the change inside the requested scope.
 
-Implementation discipline:
+## Implementation discipline:
 
 - State material assumptions before editing when they affect scope or safety.
-- Prefer the smallest change that satisfies the request.
-- Do not refactor adjacent code, formatting, comments, docs, or APIs unless required.
-- Every changed line should trace to the task, validation, or cleanup caused by the task.
-- Define verification before calling work complete.
+- Prefer the smallest coherent change that satisfies the request.
+- When fixing a bug, changing code, or adding a feature, inspect the related and surrounding code to understand the full impact.
+- Clean up code that the task makes redundant, duplicated, unreachable, obsolete, or unused. This cleanup is part of the task, not optional refactoring.
+- Do not perform unrelated refactors, formatting changes, comment rewrites, documentation edits, or API changes unless they are required by the task or its direct cleanup.
+- Update relevant tests to match the intended behaviour. Remove tests only when the behaviour they covered is genuinely obsolete or no longer applicable.
+- Every changed line should trace to the task, validation, or cleanup directly caused by the task.
+- Define and run appropriate verification before calling the work complete.
 
 ## Optional CodeGraph navigation
 
