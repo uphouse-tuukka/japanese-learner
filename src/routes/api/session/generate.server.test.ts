@@ -28,7 +28,19 @@ const {
 
 vi.mock('$lib/server/ai', () => ({
   generateSessionPlan: mockGenerateSessionPlan,
-  TOPIC_CATEGORIES: [{ key: 'greetings_basics' }, { key: 'food_dining' }],
+  TOPIC_CATEGORIES: [
+    { key: 'greetings_basics' },
+    { key: 'travel_essentials' },
+    { key: 'food_dining' },
+    { key: 'transport' },
+    { key: 'shopping' },
+    { key: 'directions' },
+    { key: 'hotel_accommodation' },
+    { key: 'emergencies_health' },
+    { key: 'social_conversation' },
+    { key: 'sightseeing_culture' },
+    { key: 'bars_nightlife' },
+  ],
 }));
 
 vi.mock('$lib/server/db', () => ({
@@ -316,6 +328,13 @@ describe('POST /api/session/generate', () => {
         userId: 'user-1',
         exerciseCount: 12,
         japaneseWritingEnabled: false,
+        categoryRotation: expect.objectContaining({
+          neverVisited: expect.arrayContaining([
+            'greetings_basics',
+            'travel_essentials',
+            'food_dining',
+          ]),
+        }),
       }),
     );
     expect(mockCreateSessionRecord).toHaveBeenCalledWith({

@@ -2,7 +2,13 @@ export const TOPIC_CATEGORIES = [
   {
     key: 'greetings_basics',
     label: 'Greetings & Basics',
-    examples: 'Self-introductions, thank you, excuse me, counting, basic polite phrases',
+    examples: 'Self-introductions, thank you, excuse me, basic polite phrases',
+  },
+  {
+    key: 'travel_essentials',
+    label: 'Travel Essentials',
+    examples:
+      'Portable travel literacy: numbers, quantities, counters, time, dates, money, forms, contact details, Wi-Fi details, common signs, clarification phrases',
   },
   {
     key: 'food_dining',

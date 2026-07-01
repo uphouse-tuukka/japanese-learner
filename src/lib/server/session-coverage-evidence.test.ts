@@ -201,6 +201,23 @@ describe('deterministic category selection', () => {
     expect(streakThree.categoryRotation.selectedCategory).not.toBe('food_dining');
   });
 
+  it('selects Travel Essentials after greetings depth before scenario categories', () => {
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        sourceSession('2', 'greetings_basics', 'Polite openers', '2026-05-04T08:00:00.000Z'),
+        sourceSession('1', 'greetings_basics', 'Basic greetings', '2026-05-03T08:00:00.000Z'),
+      ],
+    });
+
+    expect(evidence.categoryRotation.selectionReason).toBe('rotated_after_two_session_streak');
+    expect(evidence.categoryRotation.selectedCategory).toBe('travel_essentials');
+    expect(evidence.categoryRotation.preferredCategories.slice(0, 3)).toEqual([
+      'travel_essentials',
+      'food_dining',
+      'transport',
+    ]);
+  });
+
   it('treats a newest missing category as a streak break instead of skipping it', () => {
     const evidence = buildCoverageEvidence({
       sessions: [

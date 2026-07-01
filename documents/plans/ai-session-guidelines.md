@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-05-28
+**Last updated:** 2026-07-01
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -68,6 +68,14 @@
 - Include practical, travel-relevant language
 - Cultural notes should be authentic and specific
 - Key phrases: 3-5 per lesson with japanese, romaji, english, usage
+
+### Topic Categories
+
+- The Learn-cycle source order starts with `greetings_basics`, then `travel_essentials`, then scenario categories such as `food_dining`, `transport`, and `shopping`.
+- `travel_essentials` means portable travel literacy, not a general bucket.
+- It covers numbers, quantities, counters, time, dates, money, forms, contact details, Wi-Fi details, common signs, clarification phrases, and similar cross-scenario essentials.
+- Teach recognition and comprehension first, then spoken survival phrases.
+- Numbers and core portable basics should lead before dates, forms, contact details, Wi-Fi, and similar later essentials.
 
 ### Level Constraints
 

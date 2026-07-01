@@ -129,6 +129,10 @@ const PUBLIC_CHALLENGE_ALLOWED_TYPES: ExerciseType[] = [
   'listening',
 ];
 const MAX_LEARNING_JOURNAL_CONTEXT_CHARS = 4000;
+const EARLY_CATEGORY_FLOW_GUIDANCE =
+  'For early sessions, prefer starting with greetings_basics, then travel_essentials, then food_dining, transport, and shopping as a natural learning flow when that does not conflict with category rotation rails.';
+const TRAVEL_ESSENTIALS_GUIDANCE =
+  'For travel_essentials, teach portable travel literacy rather than scenario leftovers: emphasize recognition/comprehension first, then spoken survival, with numbers, quantities, counters, time, money, and common signs before later dates, forms, contact details, and Wi-Fi details.';
 
 export type AiPromptMessage = {
   role: 'system' | 'user';
@@ -439,7 +443,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
     ? [
         `Available categories: ${categoryList}.`,
         coverageEvidenceContext,
-        'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow only when it does not conflict with the selected target category.',
+        EARLY_CATEGORY_FLOW_GUIDANCE,
+        TRAVEL_ESSENTIALS_GUIDANCE,
       ].join('\n')
     : categoryRotation
       ? [
@@ -457,7 +462,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           categoryRotation.neverVisited.length > 0
             ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
             : '',
-          'For early sessions, prefer starting with greetings_basics, then food_dining, transport, shopping as a natural learning flow.',
+          EARLY_CATEGORY_FLOW_GUIDANCE,
+          TRAVEL_ESSENTIALS_GUIDANCE,
         ]
           .filter(Boolean)
           .join(' ')
