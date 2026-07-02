@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-06-08
+**Last updated:** 2026-07-02
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -30,9 +30,9 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/plans/ai-session-guidelines.md`
 
 - Status: active
-- Description: Prompt/content quality guidance for AI-generated learning sessions. Check current model constants in code before relying on the model note.
-- Source files affected: `src/lib/server/ai.ts`, `src/routes/api/session/**`, `src/lib/server/ai.session-summary.test.ts`
-- Last verified: 2026-05-06
+- Description: Prompt/content quality guidance for AI-generated learning sessions, including Learn-cycle topic category order and Travel Essentials rails.
+- Source files affected: `src/lib/server/ai-session-prompts.ts`, `src/lib/server/topic-categories.ts`, `src/lib/server/session-coverage-evidence.ts`, `src/lib/server/ai.ts`, `src/routes/api/session/**`
+- Last verified: 2026-07-02
 
 ### `documents/plans/inline-audio-tts.md`
 
@@ -122,6 +122,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Source files affected: `src/routes/progress/+page.svelte`, `src/routes/progress/progress-view-model.ts`, `src/routes/progress/progress-view-model.test.ts`, `documents/plans/progress-page-roadmap.md`
 - Last verified: 2026-06-05
 
+### `documents/plans/2026-05-26-learning-session-core-cycle.md`
+
+- Status: implemented
+- Description: Implemented Learning Session Coverage Evidence/core-cycle plan for deterministic category rails, review candidates, learning journal prompt context, and curriculum validation.
+- Source files affected: `src/routes/api/session/generate/+server.ts`, `src/routes/api/session/complete/+server.ts`, `src/lib/server/session-coverage-evidence.ts`, `src/lib/server/session-curriculum-validation.ts`, `src/lib/server/ai-session-prompts.ts`, `src/lib/server/topic-categories.ts`, session route tests
+- Last verified: 2026-07-02
+
 ### `documents/plans/2026-05-06-technical-debt-agentic-workflow-improvements.md`
 
 - Status: implemented
@@ -134,14 +141,14 @@ Use this index before following older plans or decisions. Status labels are cons
 - Status: implemented
 - Description: Historical Travel Missions design spec for mission catalog, mission chat, badges, limits, and mission APIs.
 - Source files affected: `src/routes/missions/**`, `src/routes/api/missions/**`, `src/lib/server/missions-*.ts`, mission tables in DB setup
-- Last verified: 2026-05-06
+- Last verified: 2026-07-02
 
 ### `documents/plans/2026-03-27-ai-tutor-improvements-design.md`
 
 - Status: implemented
-- Description: Historical AI tutor improvement plan for category rotation, summary bridge fields, and topic tracking.
+- Description: Historical AI tutor improvement plan for category rotation, summary bridge fields, and topic tracking, currentized with the Travel Essentials category order.
 - Source files affected: `src/lib/server/ai.ts`, `src/routes/api/session/generate/+server.ts`, `src/routes/api/session/complete/+server.ts`, `src/routes/learn/+page.svelte`, `src/lib/types.ts`, `src/lib/components/SessionSummary.svelte`
-- Last verified: 2026-05-06
+- Last verified: 2026-07-02
 
 ### `documents/plans/feature-roadmap.md`
 

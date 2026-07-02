@@ -59,6 +59,7 @@ A dedicated page showing all available missions organized by category with linea
 
 - Missions 1 and 2 are always available (starter missions)
 - Other missions require N completed Learn sessions in the matching `TOPIC_CATEGORIES` category (the category field stored in `SessionMeta`)
+- `travel_essentials` is a Learn-cycle category only in this MVP; mission seed data and mission UI behavior stay unchanged.
 - A dev override (environment variable or setting) force-unlocks all missions for debugging
 
 **Replay:** Users can replay any completed mission at any time. Re-completing in Immersion Mode does not re-grant the badge but still awards XP.
@@ -223,7 +224,7 @@ The AI should receive:
 
 ### Model
 
-Use the same model as Learn sessions (`gpt-5.2`) for consistency.
+Use the same model as Learn sessions (`gpt-5.4`) for consistency.
 Token usage should be tracked in the existing `token_usage` table, following the same pattern as Learn session AI calls.
 
 ---
@@ -321,7 +322,7 @@ All designs use the app's existing warm paper palette (shoji, washi, vermillion,
 - Leaderboards or social features
 - Mission creation tools
 - Voice input for responses
-- Missions for categories without defined scenarios (directions, sightseeing, social)
+- Mission tracks beyond the current seed set, including `travel_essentials`, `directions`, `sightseeing_culture`, and `social_conversation`
 - Difficulty adaptation within a mission (fixed per mission definition)
 - Mission-specific items or inventory system
 

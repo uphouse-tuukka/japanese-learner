@@ -34,6 +34,7 @@ describe('ai session prompt builders', () => {
     expect(compatibleKey).toBe('food_dining');
     expect(TOPIC_CATEGORIES.map((category) => category.key)).toEqual([
       'greetings_basics',
+      'travel_essentials',
       'food_dining',
       'transport',
       'shopping',
@@ -44,6 +45,16 @@ describe('ai session prompt builders', () => {
       'sightseeing_culture',
       'bars_nightlife',
     ]);
+    expect(TOPIC_CATEGORIES[1]).toMatchObject({
+      key: 'travel_essentials',
+      label: 'Travel Essentials',
+    });
+    expect(
+      TOPIC_CATEGORIES.find((category) => category.key === 'greetings_basics')?.examples,
+    ).not.toMatch(/\bcounting\b/i);
+    expect(
+      TOPIC_CATEGORIES.find((category) => category.key === 'travel_essentials')?.examples,
+    ).toContain('Portable travel literacy');
   });
 
   it('buildSessionPlanPrompt clamps targetExerciseCount to 4..12 and slices sessionHistory to 10', () => {
@@ -160,6 +171,12 @@ describe('ai session prompt builders', () => {
     const promptText = systemPrompt(prompt);
 
     expect(promptText).toContain('TOPIC CATEGORY ROTATION:');
+    expect(promptText).toContain(
+      'For early sessions, prefer starting with greetings_basics, then travel_essentials, then food_dining, transport, and shopping',
+    );
+    expect(promptText).toContain(
+      'For travel_essentials, teach portable travel literacy rather than scenario leftovers',
+    );
     expect(promptText).toContain('Current category streak: "food_dining" × 3 session(s)');
     expect(promptText).toContain('MUST switch to a different category — 3 sessions reached.');
     expect(promptText).toContain(
@@ -273,6 +290,10 @@ describe('ai session prompt builders', () => {
     }>(prompt);
 
     expect(promptText).toContain('COVERAGE EVIDENCE — AUTHORITATIVE APP-SIDE RAILS:');
+    expect(promptText).toContain('travel_essentials: Travel Essentials');
+    expect(promptText).toContain(
+      'For early sessions, prefer starting with greetings_basics, then travel_essentials, then food_dining, transport, and shopping',
+    );
     expect(promptText).toContain('Target Topic Category: "transport"');
     expect(promptText).toContain('Lesson category MUST be exactly "transport".');
     expect(promptText).toContain('Blocked Topic Categories: food_dining.');
