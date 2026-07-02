@@ -54,7 +54,10 @@ Do not build either future direction now; keep this change inside the Learning S
 13. Resolved: model calls rejected by curriculum validation still count against token usage. Record usage for every model call that returns usage data; rejected attempts should use `sessionId: null`, while the successful final generation should be recorded against the created session. Do not create ghost or planned sessions just to attach rejected usage. If a call fails before returning usage, there is no reliable usage to record.
 14. Resolved: structured Lesson Key Phrase details should come from the generated lesson, not from reconstructed exercises. Keep legacy `keyPhrases: string[]`, add optional sanitized `keyPhraseDetails` metadata for new completions, and have Coverage Evidence prefer those details. Fall back to legacy strings, then only as a last resort derive phrases from exercises.
 15. Resolved: the current Learning Journal should be passed to session generation as advisory tutor context. Generation should receive the whole bounded journal rather than a separate model-generated excerpt, clearly labelled as semantic context and explicitly not authoritative Coverage Evidence. The Learning Journal update prompt and server-side storage should keep the journal compact enough that the whole stored journal can be passed safely.
-16. Resolved: the app should choose a single target Topic Category deterministically before generation. The model should not decide whether to continue or rotate categories. Category selection should prefer normal Category Depth at streak 1, prefer rotation at streak 2 unless there is an explicit reason for a 3rd session, block the current Topic Category at streak 3+, and choose among candidate categories by never-visited, least-covered, oldest-seen, then fixed beginner-friendly order as the tie-breaker.
+16. Resolved: the app should choose a single target Topic Category deterministically before generation.
+    The model should not decide whether to continue or rotate categories.
+    Category selection should prefer normal Category Depth at streak 1, prefer rotation at streak 2 unless there is an explicit reason for a 3rd session, block the current Topic Category at streak 3+, and choose among candidate categories by never-visited, least-covered, oldest-seen, then the fixed beginner-friendly order as the tie-breaker.
+    The current fixed order is `greetings_basics`, `travel_essentials`, `food_dining`, `transport`, `shopping`, `directions`, `hotel_accommodation`, `emergencies_health`, `social_conversation`, `sightseeing_culture`, and `bars_nightlife`.
 17. Resolved: do not implement a broad Topic Category saturation heuristic in this fix. At streak 1, continue the current Topic Category by default. Rotate early only for a concrete reason: the current category is blocked by validation constraints, no viable fresh Lesson Topic remains after retry, or stronger item-level Review Candidate / handoff / Learning Journal evidence clearly requires another category. Treat saturation as a future concept unless a real topic taxonomy is introduced.
 
 ## Generation-time design
@@ -105,7 +108,7 @@ The target Topic Category selection algorithm should be deterministic:
 - if the current Topic Category streak is 1, continue the current Topic Category by default for Category Depth unless the current category is blocked by validation constraints, no viable fresh Lesson Topic remains after retry, or stronger item-level Review Candidate / handoff / Learning Journal evidence clearly requires another category
 - if the current Topic Category streak is 2, prefer rotation to a different Topic Category, allowing a 3rd session only for an explicit reason such as strong weakness, an unfinished sub-area, or Learning Journal / handoff guidance
 - if the current Topic Category streak is 3 or more, block the current Topic Category and rotate to a different category
-- when choosing among candidate categories, prefer never-visited categories, then least-covered categories, then oldest-seen categories, using a fixed beginner-friendly category order only as a tie-breaker
+- when choosing among candidate categories, prefer never-visited categories, then least-covered categories, then oldest-seen categories, using the fixed beginner-friendly order only as a tie-breaker
 - do not use randomness for category selection in this fix
 - pass `selectedCategory`, `selectionReason`, `blockedCategories`, and `preferredCategories` into the generation prompt
 
@@ -173,7 +176,7 @@ A completed implementation should be validated with `npm run validate:ci` and wi
 
 ## Implementation progress
 
-Updated: 2026-05-26
+Updated: 2026-07-02
 
 - [x] Task 1 — Store structured Lesson Key Phrase details on session completion and parse them from `SessionMeta`.
   - Added optional `SessionMeta.keyPhraseDetails` metadata with sanitized `japanese`, `romaji`, `english`, and `usage` fields.

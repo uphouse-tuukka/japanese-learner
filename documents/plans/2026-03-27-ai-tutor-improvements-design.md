@@ -10,27 +10,28 @@ Three interconnected issues degrade learning quality:
 
 ## Approach: Category Rotation + Summary Bridge
 
-### 1. Topic Categories (10 categories)
+### 1. Topic Categories (11 categories)
 
-| #   | Category Key        | Label                   | Example Topics                                   |
-| --- | ------------------- | ----------------------- | ------------------------------------------------ |
-| 1   | greetings_basics    | Greetings & Basics      | Self-intro, thank you, excuse me, counting       |
-| 2   | food_dining         | Food & Dining           | Restaurants, ordering, menu items, dietary needs |
-| 3   | transport           | Transport               | Trains, buses, taxis, buying tickets             |
-| 4   | shopping            | Shopping                | Convenience stores, souvenirs, prices, sizes     |
-| 5   | directions          | Directions & Navigation | Asking the way, landmarks, reading signs         |
-| 6   | hotel_accommodation | Hotel & Accommodation   | Check-in/out, room requests, problems            |
-| 7   | emergencies_health  | Emergencies & Health    | Pharmacy, doctor, lost items, police             |
-| 8   | social_conversation | Social & Conversation   | Small talk, weather, compliments, hobbies        |
-| 9   | sightseeing_culture | Sightseeing & Culture   | Temples, museums, etiquette, customs             |
-| 10  | bars_nightlife      | Bars & Nightlife        | Izakaya, ordering drinks, karaoke, bar etiquette |
+| #   | Category Key        | Label                   | Example Topics                                                                                                                                  |
+| --- | ------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | greetings_basics    | Greetings & Basics      | Self-intro, thank you, excuse me, basic polite phrases                                                                                          |
+| 2   | travel_essentials   | Travel Essentials       | Portable travel literacy: numbers, quantities, counters, time, dates, money, forms, contact details, Wi-Fi, common signs, clarification phrases |
+| 3   | food_dining         | Food & Dining           | Restaurants, ordering, menu items, dietary needs                                                                                                |
+| 4   | transport           | Transport               | Trains, buses, taxis, buying tickets                                                                                                            |
+| 5   | shopping            | Shopping                | Convenience stores, souvenirs, prices, sizes                                                                                                    |
+| 6   | directions          | Directions & Navigation | Asking the way, landmarks, reading signs                                                                                                        |
+| 7   | hotel_accommodation | Hotel & Accommodation   | Check-in/out, room requests, problems                                                                                                           |
+| 8   | emergencies_health  | Emergencies & Health    | Pharmacy, doctor, lost items, police                                                                                                            |
+| 9   | social_conversation | Social & Conversation   | Small talk, weather, compliments, hobbies                                                                                                       |
+| 10  | sightseeing_culture | Sightseeing & Culture   | Temples, museums, etiquette, customs                                                                                                            |
+| 11  | bars_nightlife      | Bars & Nightlife        | Izakaya, ordering drinks, karaoke, bar etiquette                                                                                                |
 
 ### 2. Rotation Rules
 
 1. **2-3 sessions per category** — builds vocabulary depth before moving on
 2. **After 3 sessions in a category, must switch** to a different one
 3. **No ping-ponging** — once you leave a category, don't return to it until at least 4 other categories have been visited
-4. **Priority weighting for early sessions** — suggest starting with Greetings → Food → Transport → Shopping as a natural flow, but AI adapts based on performance
+4. **Priority weighting for early sessions** - suggest starting with Greetings -> Travel Essentials -> Food -> Transport -> Shopping as a natural flow, while respecting app-side category rotation rails
 5. **Replace the rigid session-count curriculum stages** (0-20 travel only, 20-40 daily life, 40+ social/work) with the category rotation system. Difficulty is controlled by the user's level, not by session count.
 
 ### 3. Topic Tracking Fix
@@ -95,7 +96,7 @@ The summary becomes a **handoff note** from one session to the next — concise,
 
 ```
 TOPIC CATEGORY ROTATION:
-Available categories: [list of 10]
+Available categories: [list of 11]
 Current category streak: "food_dining" × 2 sessions
 Recently visited (cannot return yet): ["greetings_basics" (3 sessions ago)]
 Never visited: ["bars_nightlife", "emergencies_health"]

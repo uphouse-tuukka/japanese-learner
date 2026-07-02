@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-07-01
+**Last updated:** 2026-07-02
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -72,7 +72,7 @@
 ### Topic Categories
 
 - The Learn-cycle source order starts with `greetings_basics`, then `travel_essentials`, then scenario categories such as `food_dining`, `transport`, and `shopping`.
-- `travel_essentials` means portable travel literacy, not a general bucket.
+- `travel_essentials` is labeled Travel Essentials and means portable travel literacy, not a general bucket.
 - It covers numbers, quantities, counters, time, dates, money, forms, contact details, Wi-Fi details, common signs, clarification phrases, and similar cross-scenario essentials.
 - Teach recognition and comprehension first, then spoken survival phrases.
 - Numbers and core portable basics should lead before dates, forms, contact details, Wi-Fi, and similar later essentials.
@@ -93,6 +93,6 @@
 
 ## Model Configuration
 
-- **Model:** gpt-4.1 (recommended upgrade from gpt-4o-mini)
+- **Model:** gpt-5.4 for Learn session generation and summaries
 - **Temperature:** 0.3 for generation, 0.2 for summaries
 - **Output format:** JSON mode enabled
