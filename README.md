@@ -115,10 +115,23 @@ Important values:
 - `/api/speaking/check`: authenticated multipart speaking exercise transcription and evaluation helper
 - `/api/tts`: server fallback TTS
 
+## Session completion and resume
+
+Learn and Practice session completion is claim based.
+The completion APIs move a planned `sessions` row into a transient `completing` status before writing results and finalizing the record.
+A completed retry by the same user returns the stored completion summary without duplicate exercise results, XP, token usage, or journal side effects.
+A concurrent completion for the same in-flight claim returns `409`, and an unknown or cross-user completed session returns `404`.
+Stale `completing` claims older than 30 minutes are reclaimed or removed with their partial exercise results when new session work starts.
+
+Browser resume state is intentionally conservative.
+New saved Learn and Practice sessions include `completionConfirmed: false`, and the pages mark that flag true after the completion API succeeds.
+Stored sessions marked complete are not resumable, while legacy all-answered saves without the flag are treated as stale because they cannot prove completion failed.
+
 ## Architecture summary
 
 - `src/lib/server/db.ts`: DB initialization, schema setup, migrations, query helpers, and mission seed loading
 - `src/lib/server/missions-seed.ts`: current mission definition seed data
+- `src/lib/stores/session.svelte.ts`: shared Learn/Practice session state, answer collection, and resume persistence
 - `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to the exercise components
 - `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
 - `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
@@ -142,7 +155,8 @@ Use Home page:
 
 Current table groups created on startup:
 
-- Core learning: `users`, `sessions`, `exercises`, `session_exercises`, `user_exercise_results`, `token_usage`
+- Core learning: `users`, `sessions`, `exercises`, `session_exercises`, `user_exercise_results`, `token_usage`.
+  The `sessions` table uses `planned`, transient `completing`, `completed`, and `error` statuses; while a row is `completing`, `completed_at` stores the active claim timestamp until finalization.
 - XP, streaks, and milestones: `user_xp`, `user_streaks`, `user_milestones`
 - Missions: `missions`, `user_missions`, `user_badges`, `user_mission_limits`
 - Portfolio challenge attempts: `portfolio_challenge_attempts`

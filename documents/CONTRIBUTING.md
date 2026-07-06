@@ -205,10 +205,12 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 
 ### Data Flow
 
-1. Session generated via AI → exercises stored in DB
-2. User answers exercises → results collected in frontend store
-3. Session completed → results sent to API → AI generates summary
-4. Progress journal updated after each session (AI-maintained, stored on user record)
+1. Session generated via AI and exercises stored in DB.
+2. User answers exercises and results are collected in the frontend store.
+3. The completion API claims the planned session as `completing`, then stores exercise results behind that claim.
+4. Learn completion builds or reuses a summary, while Practice completion builds the local practice summary.
+5. The completion record finalizes only if the claim timestamp still matches, which keeps retries idempotent and concurrent completions isolated.
+6. Progress journal updates are scheduled after finalization as non-fatal background work.
 
 ### Important Files
 
@@ -217,6 +219,7 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 | DB schema & queries     | `src/lib/server/db.ts`                      |
 | AI prompts & generation | `src/lib/server/ai.ts`                      |
 | Types                   | `src/lib/types.ts`                          |
+| Session state & resume  | `src/lib/stores/session.svelte.ts`          |
 | Design tokens           | `src/app.css`                               |
 | TTS utility             | `src/lib/utils/tts.ts`                      |
 | Exercise components     | `src/lib/components/exercises/*.svelte`     |
@@ -225,4 +228,7 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 
 ### Progress Journal
 
-Each user has a `progress_journal` TEXT column that holds an AI-maintained cumulative summary of all their learning. It's updated after each session completion and passed to the summary AI so it can avoid repeating suggestions.
+Each user has a `progress_journal` TEXT column that holds an AI-maintained cumulative summary of all their learning.
+It is passed to the summary AI so the summary can avoid repeating suggestions.
+It is scheduled for update after a session record is finalized, so failed completion attempts do not enqueue journal side effects.
+Journal generation, token telemetry, and scheduling failures are logged as non-fatal after the completed record is durable.

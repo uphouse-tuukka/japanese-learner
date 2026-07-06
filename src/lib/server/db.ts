@@ -405,6 +405,10 @@ LIMIT 1
   return { session, exercises };
 }
 
+/**
+ * Inserts exercise results for a session.
+ * When `completionClaimedAt` is provided, rows are inserted only if the active completion claim still matches.
+ */
 export async function createExerciseResults(input: {
   userId: string;
   sessionId: string;
@@ -456,12 +460,20 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 export const insertExerciseResults = createExerciseResults;
 export const saveExerciseResults = createExerciseResults;
 
+/**
+ * Result of trying to claim a session for completion.
+ * `already_completed` is reserved for same-user idempotent retries.
+ */
 export type SessionCompletionClaim =
   | { status: 'claimed'; claimedAt: string }
   | { status: 'already_completed'; session: Session }
   | { status: 'not_found' }
   | { status: 'busy' };
 
+/**
+ * Claims a planned session for completion and returns the claim timestamp.
+ * Fresh competing claims stay busy, while stale claims older than 30 minutes can be reclaimed after partial results are cleared.
+ */
 export async function claimSessionCompletion(
   userId: string,
   sessionId: string,
@@ -512,6 +524,7 @@ WHERE user_id = ? AND session_id = ?
   return { status: 'busy' };
 }
 
+/** Resets a failed completion claim only if the same claim timestamp is still current. */
 export async function resetSessionCompletionClaim(
   userId: string,
   sessionId: string,
@@ -540,6 +553,10 @@ WHERE id = ? AND user_id = ? AND status = 'completing' AND completed_at = ?
   return result.rowsAffected > 0;
 }
 
+/**
+ * Finalizes a session and returns whether the row matched.
+ * With `completionClaimedAt`, finalization succeeds only for the matching `completing` claim.
+ */
 export async function completeSession(
   sessionId: string,
   input: {
@@ -643,6 +660,7 @@ ORDER BY datetime(r.created_at) DESC
   }));
 }
 
+/** Deletes old planned sessions and stale completion claims before starting new work. */
 export async function deleteStaleGhostSessions(userId: string): Promise<void> {
   const db = await getDb();
   const staleWhereClause =

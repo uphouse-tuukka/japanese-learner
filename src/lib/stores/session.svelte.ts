@@ -16,6 +16,9 @@ type SessionState = {
   summary: SessionSummary | null;
 };
 
+/**
+ * Saved Learn and Practice state uses `completionConfirmed` to distinguish recoverable all-answered sessions from completed sessions.
+ */
 type PersistedSessionState = Partial<SessionState> & {
   completionConfirmed?: boolean;
   savedAt?: string;
@@ -106,6 +109,10 @@ export function completeSession(nextSummary: SessionSummary): void {
 
 const STORAGE_PREFIX = 'jp-session:';
 
+/**
+ * Returns true only for saved progress that can safely resume.
+ * Legacy fully answered saves did not have `completionConfirmed`, so they are treated as stale because they cannot prove completion failed.
+ */
 function isRestorableSessionData(data: PersistedSessionState): data is PersistedSessionState & {
   session: Session;
   exercises: Exercise[];
@@ -138,6 +145,7 @@ function isRestorableSessionData(data: PersistedSessionState): data is Persisted
   return true;
 }
 
+/** Saves an in-progress session as recoverable until a completion API response confirms finalization. */
 export function saveSessionToStorage(key: string): void {
   try {
     const data = {
@@ -147,7 +155,7 @@ export function saveSessionToStorage(key: string): void {
       currentIndex: stateInternal.currentIndex,
       savedAt: new Date().toISOString(),
       completionConfirmed: false,
-      // Don't save summary — completed sessions don't need resuming
+      // Don't save summary - completed sessions don't need resuming
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
   } catch (err) {
@@ -155,6 +163,7 @@ export function saveSessionToStorage(key: string): void {
   }
 }
 
+/** Marks a finalized completion so resume prompts do not reopen a finished session. */
 export function markSessionCompleteInStorage(key: string): void {
   try {
     const storageKey = STORAGE_PREFIX + key;

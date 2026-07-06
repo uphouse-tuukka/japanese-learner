@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-07-02
+**Last updated:** 2026-07-06
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -53,9 +53,9 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `README.md`
 
 - Status: active
-- Description: Current project overview, setup, route/API summary, optional repo-local CodeGraph navigation, and database notes.
-- Source files affected: `.env.example`, `package.json`, `src/routes/**`, `src/lib/server/**`, CodeGraph workflow docs
-- Last verified: 2026-05-26
+- Description: Current project overview, setup, route/API summary, session completion/resume behavior, optional repo-local CodeGraph navigation, and database notes.
+- Source files affected: `.env.example`, `package.json`, `src/routes/**`, `src/lib/server/**`, `src/lib/stores/**`, CodeGraph workflow docs
+- Last verified: 2026-07-06
 
 ### `AGENTS.md`
 
@@ -67,9 +67,9 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/CONTRIBUTING.md`
 
 - Status: active
-- Description: Project contribution guide for code quality, docs rules, repo-local CodeGraph navigation, agent workflow, review gates, and architecture notes.
+- Description: Project contribution guide for code quality, docs rules, repo-local CodeGraph navigation, agent workflow, review gates, session completion data flow, and architecture notes.
 - Source files affected: repository workflow and validation docs
-- Last verified: 2026-05-26
+- Last verified: 2026-07-06
 
 ### `documents/INDEX.md`
 
