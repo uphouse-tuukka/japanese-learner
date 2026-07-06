@@ -4,12 +4,14 @@ import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import type { Exercise, SessionMeta, SessionSummary } from '$lib/types';
 import {
+  claimSessionCompletion,
   completeSessionRecord,
   getProgressJournal,
   getRecentSessionSummaries,
   getSessionExercises,
   getUserById,
   insertExerciseResults,
+  resetSessionCompletionClaim,
   updateProgressJournal,
 } from '$lib/server/db';
 import { generateSessionSummary, generateUpdatedJournal } from '$lib/server/ai';
@@ -129,7 +131,46 @@ function deriveLegacyKeyPhrasesFromDetails(
     .filter((phrase): phrase is string => !!phrase);
 }
 
+function buildIdempotentSummary(
+  userId: string,
+  sessionId: string,
+  storedSummary: string | null,
+  results: ResultPayload[],
+): SessionSummary {
+  if (storedSummary) {
+    try {
+      const meta = JSON.parse(storedSummary) as Partial<SessionMeta>;
+      return {
+        sessionId,
+        userId,
+        summary: typeof meta.summaryText === 'string' ? meta.summaryText : storedSummary,
+        strengths: Array.isArray(meta.strengths) ? meta.strengths : [],
+        weaknesses: Array.isArray(meta.weaknesses) ? meta.weaknesses : [],
+        nextSteps: Array.isArray(meta.nextSteps) ? meta.nextSteps : undefined,
+        accuracy: typeof meta.accuracy === 'number' ? meta.accuracy : 0,
+        generatedAt: new Date().toISOString(),
+        miniLesson: meta.miniLesson ?? null,
+        levelUpRecommendation: null,
+      };
+    } catch {
+      return {
+        ...buildFallbackSummary(userId, sessionId, results),
+        summary: storedSummary,
+      };
+    }
+  }
+
+  return buildFallbackSummary(userId, sessionId, results);
+}
+
 export const POST: RequestHandler = async ({ request, cookies }) => {
+  let claimedCompletion: {
+    userId: string;
+    sessionId: string;
+    claimedAt: string;
+    finalized: boolean;
+  } | null = null;
+
   try {
     const bodyResult = await readJsonBody(request);
     if (!bodyResult.ok) {
@@ -157,9 +198,37 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return jsonError('Missing or invalid results.', 400);
     }
 
+    const completionClaim = await claimSessionCompletion(userId, sessionId);
+    if (completionClaim.status === 'not_found') {
+      return jsonError('Session not found.', 404);
+    }
+    if (completionClaim.status === 'busy') {
+      return jsonError('Session completion is already in progress.', 409);
+    }
+    if (completionClaim.status === 'already_completed') {
+      return json({
+        ok: true,
+        state: 'done',
+        summary: buildIdempotentSummary(
+          userId,
+          sessionId,
+          completionClaim.session.summary,
+          results,
+        ),
+        xp: null,
+      });
+    }
+    claimedCompletion = {
+      userId,
+      sessionId,
+      claimedAt: completionClaim.claimedAt,
+      finalized: false,
+    };
+
     await insertExerciseResults({
       userId,
       sessionId,
+      completionClaimedAt: claimedCompletion.claimedAt,
       mode: 'ai',
       results: results.map((result) => ({
         exerciseId: result.exerciseId,
@@ -189,6 +258,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     let handoffNotes: string[] = [];
     let summaryTokenInput = 0;
     let summaryTokenOutput = 0;
+    let summaryUsageEvent: {
+      model: string;
+      tokensIn: number;
+      tokensOut: number;
+    } | null = null;
+    let journalUpdateTask: (() => Promise<void>) | null = null;
     const budgetCheck = await checkBudget(userId);
     if (!budgetCheck.allowed || !user || exercises.length === 0) {
       summary = buildFallbackSummary(userId, sessionId, results);
@@ -223,42 +298,35 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         handoffNotes = aiResult.handoffNotes;
         summaryTokenInput = aiResult.tokenUsage.tokensIn;
         summaryTokenOutput = aiResult.tokenUsage.tokensOut;
-        // Fire-and-forget — do not block the main response on journal generation.
-        runBackgroundTask(
-          'session-complete-journal-update',
-          async () => {
-            const journalResult = await generateUpdatedJournal({
-              currentJournal: progressJournal,
-              sessionSummary: summary,
-              sessionMeta: {
-                category,
-                topic: lessonTopic,
-                exerciseTypes,
-                keyPhrases,
-              },
-              userLevel: user.level,
-            });
-            if (!journalResult?.journal) {
-              return;
-            }
-            await updateProgressJournal(userId, journalResult.journal);
-            await recordUsageEvent({
-              userId,
-              sessionId,
-              model: journalResult.tokenUsage.model,
-              tokensIn: journalResult.tokenUsage.tokensIn,
-              tokensOut: journalResult.tokenUsage.tokensOut,
-            });
-          },
-          { route: 'api/session/complete', sessionId, userId },
-        );
-        await recordUsageEvent({
-          userId,
-          sessionId,
+        summaryUsageEvent = {
           model: aiResult.tokenUsage.model,
           tokensIn: aiResult.tokenUsage.tokensIn,
           tokensOut: aiResult.tokenUsage.tokensOut,
-        });
+        };
+        journalUpdateTask = async () => {
+          const journalResult = await generateUpdatedJournal({
+            currentJournal: progressJournal,
+            sessionSummary: summary,
+            sessionMeta: {
+              category,
+              topic: lessonTopic,
+              exerciseTypes,
+              keyPhrases,
+            },
+            userLevel: user.level,
+          });
+          if (!journalResult?.journal) {
+            return;
+          }
+          await updateProgressJournal(userId, journalResult.journal);
+          await recordUsageEvent({
+            userId,
+            sessionId,
+            model: journalResult.tokenUsage.model,
+            tokensIn: journalResult.tokenUsage.tokensIn,
+            tokensOut: journalResult.tokenUsage.tokensOut,
+          });
+        };
       } catch (error) {
         console.error('[api/session/complete] ai summary failed, using fallback', {
           error,
@@ -270,7 +338,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       }
     }
 
-    await completeSessionRecord(sessionId, {
+    const completedSession = await completeSessionRecord(sessionId, {
       summary: JSON.stringify({
         summaryText: summary.summary,
         category,
@@ -289,7 +357,48 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       } satisfies SessionMeta),
       tokenInput: summaryTokenInput,
       tokenOutput: summaryTokenOutput,
+      completionClaimedAt: claimedCompletion.claimedAt,
     });
+    if (!completedSession) {
+      claimedCompletion = null;
+      return jsonError('Session completion is already in progress.', 409);
+    }
+    claimedCompletion.finalized = true;
+
+    if (summaryUsageEvent) {
+      try {
+        await recordUsageEvent({
+          userId,
+          sessionId,
+          model: summaryUsageEvent.model,
+          tokensIn: summaryUsageEvent.tokensIn,
+          tokensOut: summaryUsageEvent.tokensOut,
+        });
+      } catch (telemetryError) {
+        console.error('[api/session/complete] summary token telemetry failed (non-fatal)', {
+          error: telemetryError,
+          sessionId,
+          userId,
+        });
+      }
+    }
+
+    if (journalUpdateTask) {
+      try {
+        // Fire-and-forget — do not block the main response on journal generation.
+        runBackgroundTask('session-complete-journal-update', journalUpdateTask, {
+          route: 'api/session/complete',
+          sessionId,
+          userId,
+        });
+      } catch (telemetryError) {
+        console.error('[api/session/complete] journal scheduling failed (non-fatal)', {
+          error: telemetryError,
+          sessionId,
+          userId,
+        });
+      }
+    }
 
     let xpBreakdown: Awaited<ReturnType<typeof processSessionCompletion>> | null = null;
     try {
@@ -313,6 +422,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       xp: xpBreakdown,
     });
   } catch (error) {
+    if (claimedCompletion && !claimedCompletion.finalized) {
+      await resetSessionCompletionClaim(
+        claimedCompletion.userId,
+        claimedCompletion.sessionId,
+        claimedCompletion.claimedAt,
+      );
+    }
     console.error('[api/session/complete] failed', { error });
     return jsonError('Failed to complete session.', 500);
   }

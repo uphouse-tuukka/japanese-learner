@@ -18,6 +18,7 @@
     restoreSessionFromStorage,
     hasSavedSession,
     clearSessionStorage,
+    markSessionCompleteInStorage,
   } from '$lib/stores/session.svelte';
   import {
     recordCorrectAnswer,
@@ -212,6 +213,7 @@
       if (payload.xp) {
         setSessionXp(payload.xp);
       }
+      markSessionCompleteInStorage(STORAGE_KEY);
       completeSession(payload.summary);
       clearAllStorage();
       showContinuePrompt = false;

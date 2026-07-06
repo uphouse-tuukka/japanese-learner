@@ -42,7 +42,12 @@ export interface User {
 }
 
 export type SessionMode = 'ai' | 'practice';
-export type SessionStatus = 'planned' | 'completed' | 'error';
+
+/**
+ * `completing` is a transient completion claim.
+ * While a session is `completing`, `completedAt` stores the claim timestamp until finalization.
+ */
+export type SessionStatus = 'planned' | 'completing' | 'completed' | 'error';
 
 export interface Session {
   id: string;
@@ -54,6 +59,7 @@ export interface Session {
   tokenOutput: number;
   summary: string | null;
   createdAt: string;
+  /** Completion timestamp for completed sessions, or the claim timestamp while status is `completing`. */
   completedAt: string | null;
 }
 

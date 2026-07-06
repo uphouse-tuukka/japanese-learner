@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const CLAIMED_AT = '2026-01-01T00:00:00.000Z';
+
 const {
+  mockClaimSessionCompletion,
   mockCompleteSessionRecord,
   mockGenerateUpdatedJournal,
   mockGetProgressJournal,
@@ -8,9 +11,11 @@ const {
   mockInsertExerciseResults,
   mockProcessSessionCompletion,
   mockRecordUsageEvent,
+  mockResetSessionCompletionClaim,
   mockUpdateProgressJournal,
   mockRunBackgroundTask,
 } = vi.hoisted(() => ({
+  mockClaimSessionCompletion: vi.fn(),
   mockCompleteSessionRecord: vi.fn(),
   mockGenerateUpdatedJournal: vi.fn(),
   mockGetProgressJournal: vi.fn(),
@@ -18,15 +23,18 @@ const {
   mockInsertExerciseResults: vi.fn(),
   mockProcessSessionCompletion: vi.fn(),
   mockRecordUsageEvent: vi.fn(),
+  mockResetSessionCompletionClaim: vi.fn(),
   mockUpdateProgressJournal: vi.fn(),
   mockRunBackgroundTask: vi.fn(),
 }));
 
 vi.mock('$lib/server/db', () => ({
+  claimSessionCompletion: mockClaimSessionCompletion,
   completeSessionRecord: mockCompleteSessionRecord,
   getProgressJournal: mockGetProgressJournal,
   getUserById: mockGetUserById,
   insertExerciseResults: mockInsertExerciseResults,
+  resetSessionCompletionClaim: mockResetSessionCompletionClaim,
   updateProgressJournal: mockUpdateProgressJournal,
 }));
 
@@ -102,9 +110,11 @@ function expectNoWrites() {
   expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
   expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
   expect(mockGetProgressJournal).not.toHaveBeenCalled();
+  expect(mockClaimSessionCompletion).not.toHaveBeenCalled();
   expect(mockGetUserById).not.toHaveBeenCalled();
   expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
   expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+  expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
   expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
   expect(mockRunBackgroundTask).not.toHaveBeenCalled();
 }
@@ -115,6 +125,7 @@ describe('POST /api/practice/complete', () => {
   });
 
   beforeEach(() => {
+    mockClaimSessionCompletion.mockReset();
     mockCompleteSessionRecord.mockReset();
     mockGenerateUpdatedJournal.mockReset();
     mockGetProgressJournal.mockReset();
@@ -122,10 +133,12 @@ describe('POST /api/practice/complete', () => {
     mockInsertExerciseResults.mockReset();
     mockProcessSessionCompletion.mockReset();
     mockRecordUsageEvent.mockReset();
+    mockResetSessionCompletionClaim.mockReset();
     mockUpdateProgressJournal.mockReset();
     mockRunBackgroundTask.mockReset();
 
-    mockCompleteSessionRecord.mockResolvedValue(undefined);
+    mockClaimSessionCompletion.mockResolvedValue({ status: 'claimed', claimedAt: CLAIMED_AT });
+    mockCompleteSessionRecord.mockResolvedValue(true);
     mockGenerateUpdatedJournal.mockResolvedValue({
       journal: 'updated progress journal',
       tokenUsage: {
@@ -139,6 +152,7 @@ describe('POST /api/practice/complete', () => {
     mockInsertExerciseResults.mockResolvedValue(undefined);
     mockProcessSessionCompletion.mockResolvedValue({ totalXp: 12 });
     mockRecordUsageEvent.mockResolvedValue(undefined);
+    mockResetSessionCompletionClaim.mockResolvedValue(undefined);
     mockUpdateProgressJournal.mockResolvedValue(undefined);
   });
 
@@ -167,6 +181,7 @@ describe('POST /api/practice/complete', () => {
     expect(mockInsertExerciseResults).toHaveBeenCalledWith({
       userId: 'user-1',
       sessionId: 'session-1',
+      completionClaimedAt: CLAIMED_AT,
       mode: 'practice',
       results: [
         { exerciseId: 'exercise-1', answerText: 'こんにちは', isCorrect: true },
@@ -175,6 +190,7 @@ describe('POST /api/practice/complete', () => {
     });
     expect(mockCompleteSessionRecord).toHaveBeenCalledWith('session-1', {
       summary: 'Practice complete: 1/2 correct (50%).',
+      completionClaimedAt: CLAIMED_AT,
     });
     expect(mockProcessSessionCompletion).toHaveBeenCalledWith(
       'user-1',
@@ -213,6 +229,182 @@ describe('POST /api/practice/complete', () => {
       expect.any(Array),
       1,
     );
+  });
+
+  it('returns completed practice state without duplicate writes when completion is retried', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({
+      status: 'already_completed',
+      session: {
+        id: 'session-1',
+        userId: 'user-1',
+        mode: 'practice',
+        status: 'completed',
+        model: null,
+        tokenInput: 0,
+        tokenOutput: 0,
+        summary: 'Practice complete: 2/2 correct (100%).',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:05:00.000Z',
+      },
+    });
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      state: 'done',
+      summary: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        summary: 'Practice complete: 2/2 correct (100%).',
+        strengths: ['Consistent results in review mode'],
+        weaknesses: ['Aim for faster recall next time'],
+        accuracy: 100,
+        generatedAt: expect.any(String),
+      },
+      xp: null,
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('does not leak another user completed practice summary on retry', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({ status: 'not_found' });
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session not found.',
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 without side effects while another practice completion request owns the session claim', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({ status: 'busy' });
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session completion is already in progress.',
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('resets a claimed practice session after completion write failure so retry can complete', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCompleteSessionRecord.mockRejectedValueOnce(new Error('temporary write failure'));
+
+    const failedResponse = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(failedResponse.status).toBe(500);
+    await expect(failedResponse.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to complete practice session.',
+    });
+    expect(mockResetSessionCompletionClaim).toHaveBeenCalledWith('user-1', 'session-1', CLAIMED_AT);
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+
+    const retryResponse = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(retryResponse.status).toBe(200);
+    await expect(retryResponse.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'done',
+      xp: { totalXp: 12 },
+    });
+    expect(mockClaimSessionCompletion).toHaveBeenCalledTimes(2);
+    expect(mockCompleteSessionRecord).toHaveBeenCalledTimes(2);
+    expect(mockProcessSessionCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns busy without resetting when the practice completion claim is no longer current', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCompleteSessionRecord.mockResolvedValueOnce(false);
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session completion is already in progress.',
+    });
+    expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps a completed practice response successful when post-completion telemetry scheduling fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockRunBackgroundTask.mockImplementationOnce(() => {
+      throw new Error('scheduler unavailable');
+    });
+
+    const response = await completePractice({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'done',
+      xp: { totalXp: 12 },
+    });
+    expect(mockCompleteSessionRecord).toHaveBeenCalledOnce();
+    expect(mockProcessSessionCompletion).toHaveBeenCalledOnce();
   });
 
   it('returns 403 before writes or downstream calls when selected_user does not match body userId', async () => {

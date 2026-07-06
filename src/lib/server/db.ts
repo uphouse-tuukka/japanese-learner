@@ -38,6 +38,7 @@ const HELSINKI_DATE_FORMATTER = new Intl.DateTimeFormat('sv-SE', {
   month: '2-digit',
   day: '2-digit',
 });
+const SESSION_COMPLETION_CLAIM_STALE_MS = 30 * 60 * 1000;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -404,9 +405,14 @@ LIMIT 1
   return { session, exercises };
 }
 
+/**
+ * Inserts exercise results for a session.
+ * When `completionClaimedAt` is provided, rows are inserted only if the active completion claim still matches.
+ */
 export async function createExerciseResults(input: {
   userId: string;
   sessionId: string;
+  completionClaimedAt?: string;
   results: Array<{
     exerciseId: string;
     answerText: string;
@@ -418,7 +424,16 @@ export async function createExerciseResults(input: {
 }): Promise<void> {
   const db = await getDb();
   const statements: InStatement[] = input.results.map((result) => ({
-    sql: `
+    sql: input.completionClaimedAt
+      ? `
+INSERT INTO user_exercise_results (id, user_id, session_id, exercise_id, mode, is_correct, answer_text, created_at)
+SELECT ?, ?, ?, ?, ?, ?, ?, ?
+WHERE EXISTS (
+  SELECT 1 FROM sessions
+  WHERE id = ? AND user_id = ? AND status = 'completing' AND completed_at = ?
+)
+ `
+      : `
 INSERT INTO user_exercise_results (id, user_id, session_id, exercise_id, mode, is_correct, answer_text, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
  `,
@@ -431,6 +446,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       result.isCorrect ? 1 : 0,
       result.answerText,
       result.createdAt ?? nowIso(),
+      ...(input.completionClaimedAt
+        ? [input.sessionId, input.userId, input.completionClaimedAt]
+        : []),
     ],
   }));
 
@@ -442,22 +460,120 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 export const insertExerciseResults = createExerciseResults;
 export const saveExerciseResults = createExerciseResults;
 
+/**
+ * Result of trying to claim a session for completion.
+ * `already_completed` is reserved for same-user idempotent retries.
+ */
+export type SessionCompletionClaim =
+  | { status: 'claimed'; claimedAt: string }
+  | { status: 'already_completed'; session: Session }
+  | { status: 'not_found' }
+  | { status: 'busy' };
+
+/**
+ * Claims a planned session for completion and returns the claim timestamp.
+ * Fresh competing claims stay busy, while stale claims older than 30 minutes can be reclaimed after partial results are cleared.
+ */
+export async function claimSessionCompletion(
+  userId: string,
+  sessionId: string,
+): Promise<SessionCompletionClaim> {
+  const db = await getDb();
+  const claimedAt = nowIso();
+  const result = await db.execute({
+    sql: `
+UPDATE sessions
+SET status = 'completing', completed_at = ?
+WHERE id = ? AND user_id = ? AND status = 'planned'
+`,
+    args: [claimedAt, sessionId, userId],
+  });
+
+  if (result.rowsAffected > 0) {
+    return { status: 'claimed', claimedAt };
+  }
+
+  const staleBefore = new Date(Date.now() - SESSION_COMPLETION_CLAIM_STALE_MS).toISOString();
+  const staleClaimResult = await db.execute({
+    sql: `
+UPDATE sessions
+SET status = 'completing', completed_at = ?
+WHERE id = ? AND user_id = ? AND status = 'completing' AND completed_at < ?
+`,
+    args: [claimedAt, sessionId, userId, staleBefore],
+  });
+
+  if (staleClaimResult.rowsAffected > 0) {
+    await db.execute({
+      sql: `
+DELETE FROM user_exercise_results
+WHERE user_id = ? AND session_id = ?
+`,
+      args: [userId, sessionId],
+    });
+    return { status: 'claimed', claimedAt };
+  }
+
+  const existingSession = await getSession(sessionId);
+  if (!existingSession || existingSession.userId !== userId) {
+    return { status: 'not_found' };
+  }
+  if (existingSession.status === 'completed') {
+    return { status: 'already_completed', session: existingSession };
+  }
+  return { status: 'busy' };
+}
+
+/** Resets a failed completion claim only if the same claim timestamp is still current. */
+export async function resetSessionCompletionClaim(
+  userId: string,
+  sessionId: string,
+  claimedAt: string,
+): Promise<boolean> {
+  const db = await getDb();
+  await db.execute({
+    sql: `
+DELETE FROM user_exercise_results
+WHERE user_id = ? AND session_id = ?
+  AND EXISTS (
+    SELECT 1 FROM sessions
+    WHERE id = ? AND user_id = ? AND status = 'completing' AND completed_at = ?
+  )
+`,
+    args: [userId, sessionId, sessionId, userId, claimedAt],
+  });
+  const result = await db.execute({
+    sql: `
+UPDATE sessions
+SET status = 'planned', completed_at = NULL
+WHERE id = ? AND user_id = ? AND status = 'completing' AND completed_at = ?
+`,
+    args: [sessionId, userId, claimedAt],
+  });
+  return result.rowsAffected > 0;
+}
+
+/**
+ * Finalizes a session and returns whether the row matched.
+ * With `completionClaimedAt`, finalization succeeds only for the matching `completing` claim.
+ */
 export async function completeSession(
   sessionId: string,
   input: {
     status?: SessionStatus;
     completedAt?: string;
+    completionClaimedAt?: string;
     summary?: string | null;
     tokenInput?: number;
     tokenOutput?: number;
   },
-): Promise<void> {
+): Promise<boolean> {
   const db = await getDb();
-  await db.execute({
+  const result = await db.execute({
     sql: `
 UPDATE sessions
 SET status = ?, completed_at = ?, summary = COALESCE(?, summary), token_input = token_input + ?, token_output = token_output + ?
-WHERE id = ?
+WHERE id = ?${input.completionClaimedAt ? " AND status = 'completing' AND completed_at = ?" : ''}
 `,
     args: [
       input.status ?? 'completed',
@@ -466,8 +582,10 @@ WHERE id = ?
       Math.max(0, Math.floor(input.tokenInput ?? 0)),
       Math.max(0, Math.floor(input.tokenOutput ?? 0)),
       sessionId,
+      ...(input.completionClaimedAt ? [input.completionClaimedAt] : []),
     ],
   });
+  return result.rowsAffected > 0;
 }
 
 export const markSessionCompleted = completeSession;
@@ -542,10 +660,11 @@ ORDER BY datetime(r.created_at) DESC
   }));
 }
 
+/** Deletes old planned sessions and stale completion claims before starting new work. */
 export async function deleteStaleGhostSessions(userId: string): Promise<void> {
   const db = await getDb();
   const staleWhereClause =
-    "user_id = ? AND status = 'planned' AND datetime(created_at) < datetime('now', '-60 minutes')";
+    "user_id = ? AND ((status = 'planned' AND datetime(created_at) < datetime('now', '-60 minutes')) OR (status = 'completing' AND datetime(completed_at) < datetime('now', '-30 minutes')))";
 
   await db.batch([
     {
@@ -565,6 +684,15 @@ WHERE session_id IN (
 )
 `,
       args: [userId],
+    },
+    {
+      sql: `
+DELETE FROM user_exercise_results
+WHERE user_id = ? AND session_id IN (
+  SELECT id FROM sessions WHERE ${staleWhereClause}
+)
+`,
+      args: [userId, userId],
     },
     {
       sql: `

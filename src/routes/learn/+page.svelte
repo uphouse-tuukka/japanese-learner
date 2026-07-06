@@ -23,6 +23,7 @@
     hasSavedSession,
     getSavedSessionAt,
     clearSessionStorage,
+    markSessionCompleteInStorage,
   } from '$lib/stores/session.svelte';
   import {
     maxCombo,
@@ -382,6 +383,7 @@
       if (payload.xp) {
         setSessionXp(payload.xp);
       }
+      markSessionCompleteInStorage(storageKeys.session);
       completeSession(payload.summary);
       clearAllStorage();
       showContinuePrompt = false;

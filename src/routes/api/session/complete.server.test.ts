@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const CLAIMED_AT = '2026-01-01T00:00:00.000Z';
+
 const {
+  mockClaimSessionCompletion,
   mockCompleteSessionRecord,
   mockGenerateSessionSummary,
   mockGenerateUpdatedJournal,
@@ -11,10 +14,12 @@ const {
   mockInsertExerciseResults,
   mockProcessSessionCompletion,
   mockRecordUsageEvent,
+  mockResetSessionCompletionClaim,
   mockUpdateProgressJournal,
   mockCheckBudget,
   mockRunBackgroundTask,
 } = vi.hoisted(() => ({
+  mockClaimSessionCompletion: vi.fn(),
   mockCompleteSessionRecord: vi.fn(),
   mockGenerateSessionSummary: vi.fn(),
   mockGenerateUpdatedJournal: vi.fn(),
@@ -25,18 +30,21 @@ const {
   mockInsertExerciseResults: vi.fn(),
   mockProcessSessionCompletion: vi.fn(),
   mockRecordUsageEvent: vi.fn(),
+  mockResetSessionCompletionClaim: vi.fn(),
   mockUpdateProgressJournal: vi.fn(),
   mockCheckBudget: vi.fn(),
   mockRunBackgroundTask: vi.fn(),
 }));
 
 vi.mock('$lib/server/db', () => ({
+  claimSessionCompletion: mockClaimSessionCompletion,
   completeSessionRecord: mockCompleteSessionRecord,
   getProgressJournal: mockGetProgressJournal,
   getRecentSessionSummaries: mockGetRecentSessionSummaries,
   getSessionExercises: mockGetSessionExercises,
   getUserById: mockGetUserById,
   insertExerciseResults: mockInsertExerciseResults,
+  resetSessionCompletionClaim: mockResetSessionCompletionClaim,
   updateProgressJournal: mockUpdateProgressJournal,
 }));
 
@@ -113,6 +121,7 @@ function expectNoWrites() {
   expect(mockInsertExerciseResults).not.toHaveBeenCalled();
   expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
   expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+  expect(mockClaimSessionCompletion).not.toHaveBeenCalled();
   expect(mockGetUserById).not.toHaveBeenCalled();
   expect(mockGetSessionExercises).not.toHaveBeenCalled();
   expect(mockGetProgressJournal).not.toHaveBeenCalled();
@@ -121,6 +130,7 @@ function expectNoWrites() {
   expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
   expect(mockCheckBudget).not.toHaveBeenCalled();
   expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+  expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
   expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
   expect(mockRunBackgroundTask).not.toHaveBeenCalled();
 }
@@ -131,6 +141,7 @@ describe('POST /api/session/complete', () => {
   });
 
   beforeEach(() => {
+    mockClaimSessionCompletion.mockReset();
     mockCompleteSessionRecord.mockReset();
     mockGenerateSessionSummary.mockReset();
     mockGenerateUpdatedJournal.mockReset();
@@ -141,11 +152,13 @@ describe('POST /api/session/complete', () => {
     mockInsertExerciseResults.mockReset();
     mockProcessSessionCompletion.mockReset();
     mockRecordUsageEvent.mockReset();
+    mockResetSessionCompletionClaim.mockReset();
     mockUpdateProgressJournal.mockReset();
     mockCheckBudget.mockReset();
     mockRunBackgroundTask.mockReset();
 
-    mockCompleteSessionRecord.mockResolvedValue(undefined);
+    mockClaimSessionCompletion.mockResolvedValue({ status: 'claimed', claimedAt: CLAIMED_AT });
+    mockCompleteSessionRecord.mockResolvedValue(true);
     mockGenerateSessionSummary.mockResolvedValue({
       summary: {
         sessionId: 'session-1',
@@ -208,6 +221,7 @@ describe('POST /api/session/complete', () => {
     mockInsertExerciseResults.mockResolvedValue(undefined);
     mockProcessSessionCompletion.mockResolvedValue({ totalXp: 12 });
     mockRecordUsageEvent.mockResolvedValue(undefined);
+    mockResetSessionCompletionClaim.mockResolvedValue(undefined);
     mockUpdateProgressJournal.mockResolvedValue(undefined);
     mockCheckBudget.mockResolvedValue({ allowed: false, reason: 'budget_unavailable' });
   });
@@ -237,6 +251,7 @@ describe('POST /api/session/complete', () => {
     expect(mockInsertExerciseResults).toHaveBeenCalledWith({
       userId: 'user-1',
       sessionId: 'session-1',
+      completionClaimedAt: CLAIMED_AT,
       mode: 'ai',
       results: [
         { exerciseId: 'exercise-1', answerText: 'こんにちは', isCorrect: true },
@@ -278,6 +293,216 @@ describe('POST /api/session/complete', () => {
       'session-1',
       expect.any(Array),
       1,
+    );
+  });
+
+  it('returns completed session state without duplicate writes when completion is retried', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({
+      status: 'already_completed',
+      session: {
+        id: 'session-1',
+        userId: 'user-1',
+        mode: 'ai',
+        status: 'completed',
+        model: 'gpt-5.4',
+        tokenInput: 10,
+        tokenOutput: 20,
+        summary: JSON.stringify({
+          summaryText: 'Stored completed summary',
+          topic: 'Ordering Food',
+          accuracy: 50,
+          strengths: ['Stored strength'],
+          weaknesses: ['Stored weakness'],
+          nextSteps: ['Stored next step'],
+          exerciseTypes: ['translation'],
+          keyPhrases: ['こんにちは'],
+          miniLesson: null,
+        }),
+        createdAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:05:00.000Z',
+      },
+    });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      state: 'done',
+      summary: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        summary: 'Stored completed summary',
+        strengths: ['Stored strength'],
+        weaknesses: ['Stored weakness'],
+        nextSteps: ['Stored next step'],
+        accuracy: 50,
+        generatedAt: expect.any(String),
+        miniLesson: null,
+        levelUpRecommendation: null,
+      },
+      xp: null,
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGetSessionExercises).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetRecentSessionSummaries).not.toHaveBeenCalled();
+    expect(mockGenerateSessionSummary).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockCheckBudget).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('does not leak another user completed session summary on retry', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({ status: 'not_found' });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session not found.',
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGetSessionExercises).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetRecentSessionSummaries).not.toHaveBeenCalled();
+    expect(mockGenerateSessionSummary).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockCheckBudget).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 without side effects while another completion request owns the session claim', async () => {
+    mockClaimSessionCompletion.mockResolvedValueOnce({ status: 'busy' });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session completion is already in progress.',
+    });
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockGetUserById).not.toHaveBeenCalled();
+    expect(mockGetSessionExercises).not.toHaveBeenCalled();
+    expect(mockGetProgressJournal).not.toHaveBeenCalled();
+    expect(mockGetRecentSessionSummaries).not.toHaveBeenCalled();
+    expect(mockGenerateSessionSummary).not.toHaveBeenCalled();
+    expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
+    expect(mockCheckBudget).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+  });
+
+  it('resets a claimed session after completion write failure so retry can complete', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCompleteSessionRecord.mockRejectedValueOnce(new Error('temporary write failure'));
+
+    const failedResponse = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(failedResponse.status).toBe(500);
+    await expect(failedResponse.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to complete session.',
+    });
+    expect(mockResetSessionCompletionClaim).toHaveBeenCalledWith('user-1', 'session-1', CLAIMED_AT);
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+
+    const retryResponse = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(retryResponse.status).toBe(200);
+    await expect(retryResponse.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'done',
+      xp: { totalXp: 12 },
+    });
+    expect(mockClaimSessionCompletion).toHaveBeenCalledTimes(2);
+    expect(mockCompleteSessionRecord).toHaveBeenCalledTimes(2);
+    expect(mockProcessSessionCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns busy without resetting when the completion claim is no longer current', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCompleteSessionRecord.mockResolvedValueOnce(false);
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Session completion is already in progress.',
+    });
+    expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
+    expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
+    expect(mockRunBackgroundTask).not.toHaveBeenCalled();
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps a completed session response successful when post-completion telemetry fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+    mockRecordUsageEvent.mockRejectedValueOnce(new Error('token logging unavailable'));
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'done',
+      xp: { totalXp: 12 },
+    });
+    expect(mockCompleteSessionRecord).toHaveBeenCalledOnce();
+    expect(mockProcessSessionCompletion).toHaveBeenCalledOnce();
+    expect(mockRunBackgroundTask).toHaveBeenCalledWith(
+      'session-complete-journal-update',
+      expect.any(Function),
+      {
+        route: 'api/session/complete',
+        sessionId: 'session-1',
+        userId: 'user-1',
+      },
     );
   });
 
@@ -423,6 +648,7 @@ describe('POST /api/session/complete', () => {
     expect(mockInsertExerciseResults).toHaveBeenCalledWith({
       userId: 'user-1',
       sessionId: 'session-1',
+      completionClaimedAt: CLAIMED_AT,
       mode: 'ai',
       results: [
         { exerciseId: 'exercise-1', answerText: 'こんにちは', isCorrect: true },
@@ -432,7 +658,12 @@ describe('POST /api/session/complete', () => {
     expect(mockGenerateSessionSummary).not.toHaveBeenCalled();
     expect(mockCompleteSessionRecord).toHaveBeenCalledWith(
       'session-1',
-      expect.objectContaining({ tokenInput: 0, tokenOutput: 0, summary: expect.any(String) }),
+      expect.objectContaining({
+        tokenInput: 0,
+        tokenOutput: 0,
+        completionClaimedAt: CLAIMED_AT,
+        summary: expect.any(String),
+      }),
     );
   });
 
