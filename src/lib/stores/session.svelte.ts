@@ -16,6 +16,11 @@ type SessionState = {
   summary: SessionSummary | null;
 };
 
+type PersistedSessionState = Partial<SessionState> & {
+  completionConfirmed?: boolean;
+  savedAt?: string;
+};
+
 const stateInternal = $state<SessionState>({
   session: null,
   exercises: [],
@@ -101,6 +106,38 @@ export function completeSession(nextSummary: SessionSummary): void {
 
 const STORAGE_PREFIX = 'jp-session:';
 
+function isRestorableSessionData(data: PersistedSessionState): data is PersistedSessionState & {
+  session: Session;
+  exercises: Exercise[];
+} {
+  if (data.completionConfirmed === true) {
+    return false;
+  }
+
+  if (!data.session || !Array.isArray(data.exercises) || data.exercises.length === 0) {
+    return false;
+  }
+
+  const currentIndex = data.currentIndex ?? 0;
+  if (
+    !Number.isInteger(currentIndex) ||
+    currentIndex < 0 ||
+    currentIndex >= data.exercises.length
+  ) {
+    return false;
+  }
+
+  const hasCompletionMarker = Object.prototype.hasOwnProperty.call(data, 'completionConfirmed');
+  if (!hasCompletionMarker) {
+    const answeredCount = Array.isArray(data.answers)
+      ? data.answers.filter((answer) => answer != null).length
+      : 0;
+    return answeredCount < data.exercises.length;
+  }
+
+  return true;
+}
+
 export function saveSessionToStorage(key: string): void {
   try {
     const data = {
@@ -109,6 +146,7 @@ export function saveSessionToStorage(key: string): void {
       answers: stateInternal.answers,
       currentIndex: stateInternal.currentIndex,
       savedAt: new Date().toISOString(),
+      completionConfirmed: false,
       // Don't save summary — completed sessions don't need resuming
     };
     sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
@@ -117,12 +155,31 @@ export function saveSessionToStorage(key: string): void {
   }
 }
 
+export function markSessionCompleteInStorage(key: string): void {
+  try {
+    const storageKey = STORAGE_PREFIX + key;
+    const raw = sessionStorage.getItem(storageKey);
+    if (!raw) return;
+    const data = JSON.parse(raw) as PersistedSessionState;
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...data,
+        completionConfirmed: true,
+        savedAt: new Date().toISOString(),
+      }),
+    );
+  } catch (err) {
+    console.warn('[session-store] sessionStorage completion mark failed:', err);
+  }
+}
+
 export function restoreSessionFromStorage(key: string): boolean {
   try {
     const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return false;
-    const data = JSON.parse(raw) as Partial<SessionState>;
-    if (!data.session || !data.exercises || data.exercises.length === 0) return false;
+    const data = JSON.parse(raw) as PersistedSessionState;
+    if (!isRestorableSessionData(data)) return false;
     stateInternal.session = data.session;
     stateInternal.exercises = data.exercises;
     stateInternal.answers = data.answers ?? [];
@@ -139,8 +196,8 @@ export function hasSavedSession(key: string): boolean {
   try {
     const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return false;
-    const data = JSON.parse(raw);
-    return !!(data?.session && data?.exercises?.length > 0);
+    const data = JSON.parse(raw) as PersistedSessionState;
+    return isRestorableSessionData(data);
   } catch (err) {
     console.warn('[session-store] sessionStorage read failed:', err);
     return false;

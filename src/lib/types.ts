@@ -42,7 +42,7 @@ export interface User {
 }
 
 export type SessionMode = 'ai' | 'practice';
-export type SessionStatus = 'planned' | 'completed' | 'error';
+export type SessionStatus = 'planned' | 'completing' | 'completed' | 'error';
 
 export interface Session {
   id: string;
