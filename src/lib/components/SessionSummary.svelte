@@ -2,6 +2,7 @@
   import { invalidateAll } from '$app/navigation';
   import { page } from '$app/stores';
   import { type SessionSummary as SessionSummaryType, type SessionXpBreakdown } from '$lib/types';
+  import InlineAudio from '$lib/components/InlineAudio.svelte';
   import RichJapaneseText from '$lib/components/RichJapaneseText.svelte';
   import {
     buildLevelTransition,
@@ -149,7 +150,10 @@
         <p class="unlock-deck"><RichJapaneseText text={usefulUnlock.deck} /></p>
 
         <blockquote class="phrase-example">
-          <p class="jp">{usefulUnlock.phraseLine}</p>
+          <p class="jp">
+            {usefulUnlock.phraseLine}
+            <InlineAudio japanese={usefulUnlock.phrase.japanese} size="md" />
+          </p>
           <p class="english">“{usefulUnlock.phrase.english}”</p>
         </blockquote>
       </section>
