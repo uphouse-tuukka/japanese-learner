@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Exercise, Session } from '$lib/types';
 import {
+  answerCurrentExercise,
   hasSavedSession,
   markSessionCompleteInStorage,
   resetSession,
   restoreSessionFromStorage,
+  saveSessionToStorage,
   state,
+  startSession,
 } from './session.svelte';
 
 class FakeStorage {
@@ -100,6 +103,33 @@ describe('session store persistence', () => {
     resetSession();
     vi.restoreAllMocks();
     restoreDefaultSessionStorage();
+  });
+
+  it('persists the advanced exercise after a non-last incorrect answer', () => {
+    useFakeStorage();
+    const key = 'practice:user-1';
+    const session = buildSession('practice-session');
+    const activeExercises = buildExercises(2);
+
+    startSession(session, activeExercises);
+    const result = answerCurrentExercise({
+      exerciseId: activeExercises[0].id,
+      answerText: 'Wrong answer',
+      isCorrect: false,
+      createdAt: '2026-07-01T08:05:00.000Z',
+    });
+    saveSessionToStorage(key);
+
+    resetSession();
+
+    expect(result).toEqual({ answeredIndex: 0, isLast: false });
+    expect(restoreSessionFromStorage(key)).toBe(true);
+    expect(state.currentIndex).toBe(1);
+    expect(state.answers[0]).toMatchObject({
+      exerciseId: activeExercises[0].id,
+      answerText: 'Wrong answer',
+      isCorrect: false,
+    });
   });
 
   it('does not restore an explicitly completed Learn session at 8 of 8 as resumable progress', () => {

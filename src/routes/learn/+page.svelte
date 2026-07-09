@@ -14,8 +14,7 @@
     currentIndex,
     summary,
     startSession,
-    answerExercise,
-    nextExercise,
+    answerCurrentExercise,
     completeSession,
     resetSession,
     saveSessionToStorage,
@@ -338,16 +337,14 @@
 
   async function onAnswer(payload: ExerciseAnswerPayload): Promise<void> {
     if (!currentExercise) return;
-    answerExercise($currentIndex, payload);
-    saveState('active');
+    const { isLast } = answerCurrentExercise(payload);
     if (payload.isCorrect) {
       recordCorrectAnswer(10);
     } else {
       recordIncorrectAnswer();
     }
-    const isLast = $currentIndex >= $exercises.length - 1;
+    saveState('active');
     if (!isLast) {
-      nextExercise();
       return;
     }
     await finalizeSession();
