@@ -183,13 +183,14 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 ### Server Code
 
 - All server-only code in `src/lib/server/`
-- AI interactions in `src/lib/server/ai.ts`
+- Learning Session generation and summary interactions live in `src/lib/server/ai.ts`; focused AI capabilities such as missions, answer checking, and voice assessment live in dedicated modules under `src/lib/server/` and use the shared OpenAI client, token accounting, and sanitized logging boundaries.
 - Database operations in `src/lib/server/db.ts`
 - API routes under `src/routes/api/`
 
 ### AI Prompts
 
-- All prompts MUST require romaji in parentheses for Japanese text
+- Prompts that generate authored learner-visible Japanese MUST require romaji in parentheses or a paired structured romaji field.
+- Automatic speech-recognition prompts preserve the learner's Japanese transcript without adding generated romaji; the UI pairs that transcript with authored expected-answer romaji where feedback is shown.
 - Use structured JSON output where possible
 - Log only sanitized AI diagnostics: metadata, counts, statuses, and short non-sensitive previews when needed. Do not log secrets, auth data, full prompts, raw user learning content, or complete raw AI payloads.
 - Always include fallback behavior if AI call fails

@@ -131,9 +131,12 @@ Stored sessions marked complete are not resumable, while legacy all-answered sav
 
 - `src/lib/server/db.ts`: DB initialization, schema setup, migrations, query helpers, and mission seed loading
 - `src/lib/server/missions-seed.ts`: current mission definition seed data
+- `src/lib/server/voice-assessment.ts`: reusable audio validation, Japanese transcription, semantic assessment, and Spoken Mission outcome mapping
+- `src/lib/server/speaking-checker.ts`: Learn and Practice speaking compatibility adapter over the shared voice-assessment boundary
 - `src/lib/stores/session.svelte.ts`: shared Learn/Practice session state, answer collection, and resume persistence
 - `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to the exercise components
 - `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
+- `src/lib/utils/audio-recorder.ts`: reusable browser recorder lifecycle with permission, MIME, duration, cancel, retry, and track-cleanup handling
 - `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
 
 ## Token limiting

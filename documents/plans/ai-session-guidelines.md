@@ -23,6 +23,7 @@
 - Format: "ありがとうございます (arigatou gozaimasu)"
 - This applies to exercise prompts, lesson key phrases, and any user-facing Japanese
 - Structured exercise fields may split script and romanization when the schema has paired fields. For speaking exercises, `expectedAnswer` is Japanese script only and `expectedRomaji` is the matching romanization.
+- Automatic speech-recognition transcripts preserve the learner's Japanese utterance without adding generated romaji; the paired expected-answer display supplies the existing romaji accessibility support.
 
 ### Fill-in-the-blank exercises
 
@@ -43,6 +44,9 @@
 
 - Speaking exercises are private learn/practice exercises only. Public portfolio challenge output must not include `speaking` or require microphone access.
 - Raw audio is transient: validate it, send it for transcription/evaluation, then discard it. The transcript is stored as the learner's `answerText`; raw audio, confidence, and feedback are not persisted in the MVP.
+- Shared voice assessment accepts server-owned communicative goals, natural alternatives, and semantic rubrics so Spoken Missions never need to receive those evidence rules from the browser.
+- Spoken Mission assessment maps confident success to Accepted, confident semantic misses to Retry, and missing speech, provider failures, malformed responses, or low-confidence ambiguity to Could not assess.
+- Voice-assessment diagnostics contain only sanitized operational metadata, and both transcription and grading retain existing token-usage accounting when the provider reports tokens.
 - Grade transcript semantic correctness, not pronunciation scoring. Show the transcript and expected Japanese + romaji after processing.
 - Transcription may receive the prompt, expected answer, romaji, and accepted alternatives as hints, but only to resolve close or ambiguous Japanese speech; it must not invent the expected answer when audio is clearly different.
 - Speaking grading should be learner-friendly for non-native ASR transcripts: accept minor particle, kana/kanji, spacing, formality, clipped-politeness, and close-transcription differences when communicative intent remains intact. Still reject changed core meaning such as wrong objects, wrong actions, negation errors, or unrelated phrases.
