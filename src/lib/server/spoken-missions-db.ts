@@ -145,6 +145,41 @@ export class SpokenMissionProgressConflictError extends Error {
   }
 }
 
+export async function markSpokenMissionSupportUsed(input: {
+  attemptId: string;
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  turnNumber: number;
+}): Promise<SpokenMissionAttempt> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+UPDATE user_spoken_missions
+SET support_used = 1, updated_at = ?
+WHERE id = ?
+  AND user_id = ?
+  AND mission_id = ?
+  AND definition_version = ?
+  AND status = 'in_progress'
+  AND current_turn = ?
+`,
+    args: [
+      new Date().toISOString(),
+      input.attemptId,
+      input.userId,
+      input.missionId,
+      input.definitionVersion,
+      input.turnNumber,
+    ],
+  });
+
+  if (result.rowsAffected === 0) throw new SpokenMissionProgressConflictError();
+  const updated = await getSpokenMissionAttempt(input.attemptId);
+  if (!updated) throw new SpokenMissionProgressConflictError();
+  return updated;
+}
+
 export type RecordSpokenMissionAssessmentResult = {
   status: 'recorded' | 'duplicate';
   attempt: SpokenMissionAttempt;
@@ -181,13 +216,7 @@ export async function recordSpokenMissionAssessment(input: {
 
   const accepted = input.evidence.outcome === 'accepted';
   const successfulTurnCount = existing.successfulTurnCount + (accepted ? 1 : 0);
-  const supportUsed = existing.supportUsed || input.evidence.supportUsed;
   const completed = accepted && successfulTurnCount === 3;
-  const evidenceState: SpokenMissionEvidenceState | null = completed
-    ? supportUsed
-      ? 'supported'
-      : 'independent'
-    : null;
   const timestamp = new Date().toISOString();
   const conversationLog = [...existing.conversationLog, input.evidence];
   const currentTurn = completed
@@ -203,10 +232,14 @@ UPDATE user_spoken_missions
 SET
   status = ?,
   current_turn = ?,
-  support_used = ?,
+  support_used = CASE WHEN support_used = 1 OR ? = 1 THEN 1 ELSE 0 END,
   successful_turn_count = ?,
   conversation_log = ?,
-  evidence_state = ?,
+  evidence_state = CASE
+    WHEN ? = 1 THEN
+      CASE WHEN support_used = 1 OR ? = 1 THEN 'supported' ELSE 'independent' END
+    ELSE NULL
+  END,
   completed_at = ?,
   updated_at = ?
 WHERE id = ?
@@ -224,10 +257,11 @@ WHERE id = ?
     args: [
       completed ? 'completed' : 'in_progress',
       currentTurn,
-      supportUsed ? 1 : 0,
+      input.evidence.supportUsed ? 1 : 0,
       successfulTurnCount,
       JSON.stringify(conversationLog),
-      evidenceState,
+      completed ? 1 : 0,
+      input.evidence.supportUsed ? 1 : 0,
       completed ? timestamp : null,
       timestamp,
       input.attemptId,

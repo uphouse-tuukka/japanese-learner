@@ -3,11 +3,14 @@
   import type { AudioRecorderStatus } from '$lib/utils/audio-recorder';
 
   type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
+  type SupportDisclosureState = 'idle' | 'processing';
 
   type Props = {
     currentTurn: SpokenMissionServerTurn;
     maxRecordingSeconds: number;
     supportRevealed: boolean;
+    englishSupport: string | null;
+    supportDisclosureState: SupportDisclosureState;
     attemptSupportUsed: boolean;
     assessment: SpokenMissionTurnResponse['assessment'] | null;
     pendingNextTurn: SpokenMissionServerTurn | null;
@@ -34,6 +37,8 @@
     currentTurn,
     maxRecordingSeconds,
     supportRevealed,
+    englishSupport,
+    supportDisclosureState,
     attemptSupportUsed,
     assessment,
     pendingNextTurn,
@@ -84,15 +89,22 @@
         {audioPlaying ? 'Stop audio' : 'Replay Japanese'}
       </button>
       {#if !supportRevealed}
-        <button class="line-button support" type="button" onclick={onRevealSupport}>
-          Reveal English support
+        <button
+          class="line-button support"
+          type="button"
+          disabled={supportDisclosureState === 'processing'}
+          onclick={onRevealSupport}
+        >
+          {supportDisclosureState === 'processing'
+            ? 'Revealing English support…'
+            : 'Reveal English support'}
         </button>
       {/if}
     </div>
-    {#if supportRevealed}
+    {#if supportRevealed && englishSupport}
       <div class="support-copy">
         <span>English support used</span>
-        <p>{currentTurn.englishSupport}</p>
+        <p>{englishSupport}</p>
       </div>
     {:else if attemptSupportUsed}
       <p class="prior-support">

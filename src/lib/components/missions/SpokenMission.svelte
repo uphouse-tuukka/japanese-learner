@@ -15,6 +15,7 @@
     SpokenMissionResult,
     SpokenMissionServerTurn,
     SpokenMissionStartResponse,
+    SpokenMissionSupportResponse,
     SpokenMissionTurnResponse,
   } from '$lib/types';
 
@@ -29,6 +30,7 @@
 
   type Stage = 'briefing' | 'starting' | 'active' | 'complete';
   type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
+  type SupportDisclosureState = 'idle' | 'processing';
 
   let { missionId, userId, briefing, bestEvidence, resumable, onChooseWritten }: Props = $props();
 
@@ -38,6 +40,8 @@
   let currentTurn = $state<SpokenMissionServerTurn | null>(null);
   let pendingNextTurn = $state<SpokenMissionServerTurn | null>(null);
   let supportRevealed = $state(false);
+  let revealedEnglishSupport = $state<string | null>(null);
+  let supportDisclosureState = $state<SupportDisclosureState>('idle');
   let attemptSupportUsed = $state(false);
   let assessment = $state<SpokenMissionTurnResponse['assessment'] | null>(null);
   let result = $state<SpokenMissionResult | null>(null);
@@ -103,6 +107,8 @@
       currentTurn = payload.turn;
       attemptSupportUsed = payload.supportUsed;
       supportRevealed = false;
+      revealedEnglishSupport = null;
+      supportDisclosureState = 'idle';
       submissionState = 'idle';
       stage = 'active';
       resetRecorder();
@@ -178,14 +184,42 @@
     currentTurn = pendingNextTurn;
     pendingNextTurn = null;
     supportRevealed = false;
+    revealedEnglishSupport = null;
+    supportDisclosureState = 'idle';
     assessment = null;
     submissionState = 'idle';
     recorder?.retry();
   }
 
-  function revealSupport(): void {
-    supportRevealed = true;
-    attemptSupportUsed = true;
+  async function revealSupport(): Promise<void> {
+    if (!currentTurn || supportDisclosureState === 'processing') return;
+    supportDisclosureState = 'processing';
+    errorMessage = '';
+    try {
+      const response = await fetch(`/api/missions/${missionId}/spoken/support`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          attemptId,
+          turnNumber: currentTurn.turnNumber,
+        }),
+      });
+      const payload = (await response.json()) as Partial<SpokenMissionSupportResponse> & {
+        error?: string;
+      };
+      if (!response.ok || !payload.englishSupport || payload.supportUsed !== true) {
+        throw new Error(payload.error ?? 'Could not reveal English support.');
+      }
+
+      revealedEnglishSupport = payload.englishSupport;
+      supportRevealed = true;
+      attemptSupportUsed = true;
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Could not reveal English support.';
+    } finally {
+      supportDisclosureState = 'idle';
+    }
   }
 
   function clearAudioPoll(): void {
@@ -243,6 +277,8 @@
     {currentTurn}
     maxRecordingSeconds={briefing.maxRecordingSeconds}
     {supportRevealed}
+    englishSupport={revealedEnglishSupport}
+    {supportDisclosureState}
     {attemptSupportUsed}
     {assessment}
     {pendingNextTurn}

@@ -433,6 +433,11 @@ export interface SpokenMissionStartResponse {
   supportUsed: boolean;
 }
 
+export interface SpokenMissionSupportResponse {
+  englishSupport: string;
+  supportUsed: true;
+}
+
 export interface SpokenMissionTurnResponse {
   duplicate: boolean;
   assessment: {
