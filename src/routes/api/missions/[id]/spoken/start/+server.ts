@@ -12,10 +12,10 @@ import {
   toSpokenMissionHistory,
 } from '$lib/server/spoken-missions';
 import {
-  abandonSpokenMissionAttempt,
   createSpokenMissionAttempt,
   getMostRecentSpokenMissionVariant,
   getResumableSpokenMissionAttempt,
+  restartSpokenMissionAttempt,
   SpokenMissionProgressConflictError,
 } from '$lib/server/spoken-missions-db';
 import { getUser } from '$lib/server/users';
@@ -68,20 +68,22 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     }
 
     const previousVariant = await getMostRecentSpokenMissionVariant(userId, mission.id);
-    if (body.startOver && resumable) {
-      await abandonSpokenMissionAttempt({
-        attemptId: resumable.id,
-        userId,
-        missionId: mission.id,
-      });
-    }
     const wordingVariant = selectSpokenMissionVariant(definition, previousVariant);
-    const attempt = await createSpokenMissionAttempt({
-      userId,
-      missionId: mission.id,
-      definitionVersion: definition.version,
-      wordingVariant,
-    });
+    const attempt =
+      body.startOver && resumable
+        ? await restartSpokenMissionAttempt({
+            attemptId: resumable.id,
+            userId,
+            missionId: mission.id,
+            definitionVersion: definition.version,
+            wordingVariant,
+          })
+        : await createSpokenMissionAttempt({
+            userId,
+            missionId: mission.id,
+            definitionVersion: definition.version,
+            wordingVariant,
+          });
 
     return json(serializeStartResponse(definition, attempt, false));
   } catch (error) {

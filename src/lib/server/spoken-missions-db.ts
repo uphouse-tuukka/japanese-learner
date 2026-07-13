@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { InStatement } from '@libsql/client';
 import { getDb } from './db';
 import type {
   SpokenMissionAttempt,
@@ -75,6 +76,50 @@ const SPOKEN_ATTEMPT_COLUMNS = `
   updated_at
 `;
 
+type SpokenMissionAttemptCreationInput = {
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  wordingVariant: number;
+};
+
+function buildSpokenMissionAttemptInsert(
+  input: SpokenMissionAttemptCreationInput,
+  id: string,
+  timestamp: string,
+  restartGuard?: { attemptId: string; abandonedAt: string },
+): InStatement {
+  return {
+    sql: `
+INSERT INTO user_spoken_missions (
+  id, user_id, mission_id, definition_version, status, current_turn, support_used,
+  successful_turn_count, wording_variant, conversation_log, evidence_state,
+  completed_at, created_at, updated_at
+)
+SELECT ?, ?, ?, ?, 'in_progress', 1, 0, 0, ?, '[]', NULL, NULL, ?, ?
+${
+  restartGuard
+    ? `WHERE changes() = 1
+AND EXISTS (
+  SELECT 1 FROM user_spoken_missions
+  WHERE id = ? AND status = 'abandoned' AND updated_at = ?
+)`
+    : ''
+}
+`,
+    args: [
+      id,
+      input.userId,
+      input.missionId,
+      input.definitionVersion,
+      Math.max(0, Math.floor(input.wordingVariant)),
+      timestamp,
+      timestamp,
+      ...(restartGuard ? [restartGuard.attemptId, restartGuard.abandonedAt] : []),
+    ],
+  };
+}
+
 export async function getSpokenMissionAttempt(id: string): Promise<SpokenMissionAttempt | null> {
   const db = await getDb();
   const result = await db.execute({
@@ -104,34 +149,13 @@ LIMIT 1
   return row ? mapSpokenMissionAttempt(row) : null;
 }
 
-export async function createSpokenMissionAttempt(input: {
-  userId: string;
-  missionId: string;
-  definitionVersion: string;
-  wordingVariant: number;
-}): Promise<SpokenMissionAttempt> {
+export async function createSpokenMissionAttempt(
+  input: SpokenMissionAttemptCreationInput,
+): Promise<SpokenMissionAttempt> {
   const db = await getDb();
   const id = `spokenmission-${randomUUID()}`;
   const timestamp = new Date().toISOString();
-  await db.execute({
-    sql: `
-INSERT INTO user_spoken_missions (
-  id, user_id, mission_id, definition_version, status, current_turn, support_used,
-  successful_turn_count, wording_variant, conversation_log, evidence_state,
-  completed_at, created_at, updated_at
-)
-VALUES (?, ?, ?, ?, 'in_progress', 1, 0, 0, ?, '[]', NULL, NULL, ?, ?)
-`,
-    args: [
-      id,
-      input.userId,
-      input.missionId,
-      input.definitionVersion,
-      Math.max(0, Math.floor(input.wordingVariant)),
-      timestamp,
-      timestamp,
-    ],
-  });
+  await db.execute(buildSpokenMissionAttemptInsert(input, id, timestamp));
 
   const created = await getSpokenMissionAttempt(id);
   if (!created) throw new Error('[spoken-missions-db] failed to load created attempt');
@@ -329,20 +353,37 @@ LIMIT 1
   return value === undefined ? null : asNumber(value);
 }
 
-export async function abandonSpokenMissionAttempt(input: {
-  attemptId: string;
-  userId: string;
-  missionId: string;
-}): Promise<void> {
+export async function restartSpokenMissionAttempt(
+  input: SpokenMissionAttemptCreationInput & {
+    attemptId: string;
+  },
+): Promise<SpokenMissionAttempt> {
   const db = await getDb();
-  const result = await db.execute({
-    sql: `
+  const replacementId = `spokenmission-${randomUUID()}`;
+  const timestamp = new Date().toISOString();
+  const [abandoned, inserted] = await db.batch(
+    [
+      {
+        sql: `
 UPDATE user_spoken_missions
 SET status = 'abandoned', updated_at = ?
 WHERE id = ? AND user_id = ? AND mission_id = ? AND status = 'in_progress'
 `,
-    args: [new Date().toISOString(), input.attemptId, input.userId, input.missionId],
-  });
+        args: [timestamp, input.attemptId, input.userId, input.missionId],
+      },
+      buildSpokenMissionAttemptInsert(input, replacementId, timestamp, {
+        attemptId: input.attemptId,
+        abandonedAt: timestamp,
+      }),
+    ],
+    'write',
+  );
 
-  if (result.rowsAffected === 0) throw new SpokenMissionProgressConflictError();
+  if (abandoned.rowsAffected === 0 || inserted.rowsAffected === 0) {
+    throw new SpokenMissionProgressConflictError();
+  }
+
+  const replacement = await getSpokenMissionAttempt(replacementId);
+  if (!replacement) throw new Error('[spoken-missions-db] failed to load replacement attempt');
+  return replacement;
 }

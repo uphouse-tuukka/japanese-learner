@@ -357,15 +357,18 @@ export type SpokenMissionEvidenceState = 'supported' | 'independent';
 export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_assess';
 export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
 
-export interface SpokenMissionTurnEvidence {
-  goalKey: SpokenMissionGoalKey;
-  turnNumber: number;
-  npcJapanese: string;
-  npcRomaji: string;
+export interface SpokenMissionAssessment {
   transcript: string | null;
   outcome: SpokenMissionAssessmentOutcome;
   confidence: 'high' | 'medium' | 'low' | null;
   feedback: string;
+}
+
+export interface SpokenMissionTurnEvidence extends SpokenMissionAssessment {
+  goalKey: SpokenMissionGoalKey;
+  turnNumber: number;
+  npcJapanese: string;
+  npcRomaji: string;
   supportUsed: boolean;
   clientResponseId: string;
   assessedAt: string;
@@ -421,12 +424,7 @@ export interface SpokenMissionHistoryEntry {
     japanese: string;
     romaji: string;
   };
-  assessment: {
-    transcript: string | null;
-    outcome: SpokenMissionAssessmentOutcome;
-    confidence: 'high' | 'medium' | 'low' | null;
-    feedback: string;
-  };
+  assessment: SpokenMissionAssessment;
   supportUsed: boolean;
   assessedAt: string;
 }
@@ -459,12 +457,7 @@ export interface SpokenMissionSupportResponse {
 
 export interface SpokenMissionTurnResponse {
   duplicate: boolean;
-  assessment: {
-    outcome: SpokenMissionAssessmentOutcome;
-    transcript: string | null;
-    confidence: 'high' | 'medium' | 'low' | null;
-    feedback: string;
-  };
+  assessment: SpokenMissionAssessment;
   nextTurn: SpokenMissionServerTurn | null;
   isComplete: boolean;
   result: SpokenMissionResult | null;

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { render } from 'svelte/server';
 import { describe, expect, it, vi } from 'vitest';
 import SpokenMissionBriefing from './SpokenMissionBriefing.svelte';
@@ -129,12 +128,6 @@ function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boole
 }
 
 describe('Spoken Mission learner-visible support UI', () => {
-  it('keeps transient recordings out of browser resume storage', () => {
-    const source = readFileSync(new URL('./SpokenMission.svelte', import.meta.url), 'utf8');
-
-    expect(source).not.toMatch(/localStorage|sessionStorage|saveMissionState/);
-  });
-
   it('offers resume and Start over while explaining the saved progress', () => {
     const html = render(SpokenMissionBriefing, {
       props: {

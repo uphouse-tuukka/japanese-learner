@@ -4,6 +4,7 @@
   import SpokenMissionHistoryView from './SpokenMissionHistory.svelte';
   import SpokenMissionResultView from './SpokenMissionResult.svelte';
   import SpokenMissionTurnView from './SpokenMissionTurn.svelte';
+  import { requestSpokenMissionStart } from './spoken-mission-client';
   import {
     createAudioRecorder,
     type AudioRecorderController,
@@ -16,7 +17,6 @@
     SpokenMissionHistoryEntry,
     SpokenMissionResult,
     SpokenMissionServerTurn,
-    SpokenMissionStartResponse,
     SpokenMissionSupportResponse,
     SpokenMissionTurnResponse,
   } from '$lib/types';
@@ -98,13 +98,11 @@
     stage = 'starting';
     errorMessage = '';
     try {
-      const response = await fetch(`/api/missions/${missionId}/spoken/start`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId, startOver }),
+      const payload = await requestSpokenMissionStart({
+        missionId,
+        userId,
+        startOver,
       });
-      const payload = (await response.json()) as SpokenMissionStartResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? 'Could not start Spoken Mission.');
 
       attemptId = payload.attemptId;
       currentTurn = payload.turn;
