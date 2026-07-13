@@ -72,6 +72,35 @@ describe('Spoken Mission persistence', () => {
     ).resolves.toBeNull();
   });
 
+  it('abandons only the exact current in-progress attempt', async () => {
+    const spoken = await loadRepositories();
+    const olderAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 0,
+    });
+    const currentAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 1,
+    });
+
+    await spoken.abandonSpokenMissionAttempt({
+      attemptId: currentAttempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+    });
+
+    await expect(spoken.getSpokenMissionAttempt(currentAttempt.id)).resolves.toMatchObject({
+      status: 'abandoned',
+    });
+    await expect(spoken.getSpokenMissionAttempt(olderAttempt.id)).resolves.toMatchObject({
+      status: 'in_progress',
+    });
+  });
+
   it('records idempotent goal evidence and completes the third accepted goal atomically', async () => {
     const spoken = await loadRepositories();
     const attempt = await spoken.createSpokenMissionAttempt({

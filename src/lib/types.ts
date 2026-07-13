@@ -413,6 +413,24 @@ export interface SpokenMissionServerTurn {
   englishSupport: string;
 }
 
+export interface SpokenMissionHistoryEntry {
+  goalKey: SpokenMissionGoalKey;
+  goalTitle: string;
+  turnNumber: number;
+  npcDialogue: {
+    japanese: string;
+    romaji: string;
+  };
+  assessment: {
+    transcript: string | null;
+    outcome: SpokenMissionAssessmentOutcome;
+    confidence: 'high' | 'medium' | 'low' | null;
+    feedback: string;
+  };
+  supportUsed: boolean;
+  assessedAt: string;
+}
+
 export interface SpokenMissionResult {
   evidenceState: SpokenMissionEvidenceState;
   canDo: string;
@@ -428,6 +446,7 @@ export interface SpokenMissionStartResponse {
   attemptId: string;
   briefing: SpokenMissionBriefing;
   turn: SpokenMissionServerTurn;
+  history: SpokenMissionHistoryEntry[];
   totalTurns: 3;
   resumed: boolean;
   supportUsed: boolean;

@@ -48,11 +48,11 @@ function cookies() {
   return { get: (name: string) => (name === 'selected_user' ? 'user-1' : undefined) };
 }
 
-function startRequest(): Request {
+function startRequest(startOver = false): Request {
   return new Request('http://localhost/api/missions/mission-order-restaurant/spoken/start', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ userId: 'user-1', startOver: false }),
+    body: JSON.stringify({ userId: 'user-1', startOver }),
   });
 }
 
@@ -288,6 +288,89 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
       args: ['user-1'],
     });
     expect(readiness.rows[0]).toMatchObject({ level: 'beginner', progress_journal: null });
+  });
+
+  it('restores progress across refresh and starts over with fresh wording without retaining audio', async () => {
+    harness.assess.mockResolvedValue({
+      outcome: 'accepted',
+      transcript: 'ラーメンを一つお願いします。',
+      confidence: 'high',
+      feedback: 'You clearly ordered one ramen.',
+    });
+
+    const startRoute = await import('./spoken/start/+server');
+    const turnRoute = await import('./spoken/turn/+server');
+    const firstStartResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    const firstStart = await firstStartResponse.json();
+
+    const firstTurnResponse = await turnRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: turnRequest({
+        attemptId: firstStart.attemptId,
+        turnNumber: 1,
+        clientResponseId: 'resume-first-turn',
+      }),
+      cookies: cookies(),
+    } as never);
+    expect(firstTurnResponse.status).toBe(200);
+
+    const refreshedResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    const refreshed = await refreshedResponse.json();
+    expect(refreshed).toMatchObject({
+      attemptId: firstStart.attemptId,
+      resumed: true,
+      turn: { turnNumber: 2, goalKey: 'respond' },
+      history: [
+        {
+          goalKey: 'order',
+          assessment: {
+            transcript: 'ラーメンを一つお願いします。',
+            outcome: 'accepted',
+            feedback: 'You clearly ordered one ramen.',
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(refreshed.history)).not.toContain('"audio":');
+
+    const firstAttempt = await (
+      await import('$lib/server/spoken-missions-db')
+    ).getSpokenMissionAttempt(firstStart.attemptId);
+    const replacementResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(true),
+      cookies: cookies(),
+    } as never);
+    const replacement = await replacementResponse.json();
+    const spoken = await import('$lib/server/spoken-missions-db');
+    const abandoned = await spoken.getSpokenMissionAttempt(firstStart.attemptId);
+    const replacementAttempt = await spoken.getSpokenMissionAttempt(replacement.attemptId);
+
+    expect(replacement).toMatchObject({ resumed: false, history: [], turn: { turnNumber: 1 } });
+    expect(replacement.attemptId).not.toBe(firstStart.attemptId);
+    expect(abandoned?.status).toBe('abandoned');
+    expect(replacementAttempt?.status).toBe('in_progress');
+    expect(replacementAttempt?.wordingVariant).not.toBe(firstAttempt?.wordingVariant);
+
+    const abandonedTurnResponse = await turnRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: turnRequest({
+        attemptId: firstStart.attemptId,
+        turnNumber: 2,
+        clientResponseId: 'abandoned-extra-turn',
+      }),
+      cookies: cookies(),
+    } as never);
+    expect(abandonedTurnResponse.status).toBe(400);
+    expect(harness.assess).toHaveBeenCalledTimes(1);
   });
 
   it('completes with Supported evidence after English help and keeps support use monotonic', async () => {

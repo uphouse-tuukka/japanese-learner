@@ -65,6 +65,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
           resumable: resumableSpokenAttempt
             ? {
                 currentTurn: resumableSpokenAttempt.currentTurn,
+                completedGoalCount: resumableSpokenAttempt.successfulTurnCount,
               }
             : null,
         }

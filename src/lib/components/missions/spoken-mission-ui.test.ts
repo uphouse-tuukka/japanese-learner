@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { render } from 'svelte/server';
 import { describe, expect, it, vi } from 'vitest';
+import SpokenMissionBriefing from './SpokenMissionBriefing.svelte';
+import SpokenMissionHistory from './SpokenMissionHistory.svelte';
 import SpokenMissionResult from './SpokenMissionResult.svelte';
 import SpokenMissionTurn from './SpokenMissionTurn.svelte';
 import type {
   SpokenMissionResult as SpokenMissionResultData,
+  SpokenMissionHistoryEntry,
   SpokenMissionServerTurn,
 } from '$lib/types';
 
@@ -72,6 +76,26 @@ const result: SpokenMissionResultData = {
   },
 };
 
+const history: SpokenMissionHistoryEntry[] = [
+  {
+    goalKey: 'order',
+    goalTitle: 'Order',
+    turnNumber: 1,
+    npcDialogue: {
+      japanese: 'ご注文はお決まりですか。',
+      romaji: 'go-chuumon wa okimari desu ka.',
+    },
+    assessment: {
+      transcript: 'ラーメンを一つお願いします。',
+      outcome: 'accepted',
+      confidence: 'high',
+      feedback: 'You clearly ordered one ramen.',
+    },
+    supportUsed: false,
+    assessedAt: '2026-07-13T12:00:00.000Z',
+  },
+];
+
 function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boolean }): string {
   return render(SpokenMissionTurn, {
     props: {
@@ -105,6 +129,52 @@ function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boole
 }
 
 describe('Spoken Mission learner-visible support UI', () => {
+  it('keeps transient recordings out of browser resume storage', () => {
+    const source = readFileSync(new URL('./SpokenMission.svelte', import.meta.url), 'utf8');
+
+    expect(source).not.toMatch(/localStorage|sessionStorage|saveMissionState/);
+  });
+
+  it('offers resume and Start over while explaining the saved progress', () => {
+    const html = render(SpokenMissionBriefing, {
+      props: {
+        briefing: {
+          canDo: 'I can complete the restaurant task.',
+          situation: 'At a restaurant.',
+          assessment: 'Intent is assessed, not accent.',
+          privacy: 'Raw audio is discarded.',
+          approximateMinutes: 2,
+          maxRecordingSeconds: 12,
+          goals: [
+            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
+            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
+            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+          ],
+        },
+        bestEvidence: 'independent',
+        resumable: { currentTurn: 2, completedGoalCount: 1 },
+        errorMessage: '',
+        onStart: vi.fn(),
+        onChooseWritten: vi.fn(),
+      },
+    }).body;
+
+    expect(html).toContain('Resume goal 2');
+    expect(html).toContain('Start over');
+    expect(html).toContain('1 of 3 goals complete');
+    expect(html).toMatch(/transcript and feedback will be\s+restored/);
+  });
+
+  it('renders the stored conversation transcript and assessment on resume', () => {
+    const html = render(SpokenMissionHistory, { props: { history } }).body;
+
+    expect(html).toContain('Restored conversation');
+    expect(html).toContain('ご注文はお決まりですか。');
+    expect(html).toContain('ラーメンを一つお願いします。');
+    expect(html).toContain('Accepted');
+    expect(html).toContain('You clearly ordered one ramen.');
+  });
+
   it('offers optional English help and clearly marks the attempt after disclosure', () => {
     const hidden = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
     expect(hidden).toContain('ご注文はお決まりですか。');

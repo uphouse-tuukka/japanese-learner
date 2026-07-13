@@ -329,17 +329,20 @@ LIMIT 1
   return value === undefined ? null : asNumber(value);
 }
 
-export async function abandonResumableSpokenMissionAttempts(
-  userId: string,
-  missionId: string,
-): Promise<void> {
+export async function abandonSpokenMissionAttempt(input: {
+  attemptId: string;
+  userId: string;
+  missionId: string;
+}): Promise<void> {
   const db = await getDb();
-  await db.execute({
+  const result = await db.execute({
     sql: `
 UPDATE user_spoken_missions
 SET status = 'abandoned', updated_at = ?
-WHERE user_id = ? AND mission_id = ? AND status = 'in_progress'
+WHERE id = ? AND user_id = ? AND mission_id = ? AND status = 'in_progress'
 `,
-    args: [new Date().toISOString(), userId, missionId],
+    args: [new Date().toISOString(), input.attemptId, input.userId, input.missionId],
   });
+
+  if (result.rowsAffected === 0) throw new SpokenMissionProgressConflictError();
 }

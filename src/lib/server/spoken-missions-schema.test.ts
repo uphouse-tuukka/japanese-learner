@@ -13,6 +13,10 @@ describe('Spoken Mission database schema', () => {
     expect(String((table.rows[0] as Record<string, unknown>).sql)).toContain(
       "evidence_state TEXT CHECK(evidence_state IN ('supported', 'independent'))",
     );
+    const columns = await db.execute('PRAGMA table_info(user_spoken_missions)');
+    expect(columns.rows.map((row) => row.name)).not.toEqual(
+      expect.arrayContaining(['audio', 'audio_blob', 'raw_audio']),
+    );
 
     await expect(
       db.execute({
