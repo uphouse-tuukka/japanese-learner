@@ -16,6 +16,11 @@
     {result.evidenceState === 'independent' ? 'Independent evidence' : 'Supported evidence'}
   </h2>
   <p class="result-can-do">{result.canDo}</p>
+  <p class="evidence-explanation">
+    {result.evidenceState === 'independent'
+      ? 'You completed all three goals without English listening support.'
+      : 'You used English listening support during this attempt, so this evidence is Supported.'}
+  </p>
 
   <div class="evidence-list">
     {#each result.goals as goal}
@@ -87,6 +92,14 @@
   .result-can-do {
     max-width: 38rem;
     color: var(--text-bokashi);
+  }
+  .evidence-explanation {
+    max-width: 38rem;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border-light);
+    background: var(--bg-washi);
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
   }
   .evidence-list {
     width: 100%;

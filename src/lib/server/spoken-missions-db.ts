@@ -145,6 +145,41 @@ export class SpokenMissionProgressConflictError extends Error {
   }
 }
 
+export async function markSpokenMissionSupportUsed(input: {
+  attemptId: string;
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  turnNumber: number;
+}): Promise<SpokenMissionAttempt> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+UPDATE user_spoken_missions
+SET support_used = 1, updated_at = ?
+WHERE id = ?
+  AND user_id = ?
+  AND mission_id = ?
+  AND definition_version = ?
+  AND status = 'in_progress'
+  AND current_turn = ?
+`,
+    args: [
+      new Date().toISOString(),
+      input.attemptId,
+      input.userId,
+      input.missionId,
+      input.definitionVersion,
+      input.turnNumber,
+    ],
+  });
+
+  if (result.rowsAffected === 0) throw new SpokenMissionProgressConflictError();
+  const updated = await getSpokenMissionAttempt(input.attemptId);
+  if (!updated) throw new SpokenMissionProgressConflictError();
+  return updated;
+}
+
 export type RecordSpokenMissionAssessmentResult = {
   status: 'recorded' | 'duplicate';
   attempt: SpokenMissionAttempt;

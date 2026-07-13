@@ -60,17 +60,26 @@ function turnRequest(input: {
   attemptId: string;
   turnNumber: number;
   clientResponseId: string;
+  supportRevealed?: boolean;
 }): Request {
   const form = new FormData();
   form.set('userId', 'user-1');
   form.set('attemptId', input.attemptId);
   form.set('turnNumber', String(input.turnNumber));
   form.set('clientResponseId', input.clientResponseId);
-  form.set('supportRevealed', 'false');
+  form.set('supportRevealed', String(input.supportRevealed ?? false));
   form.set('audio', new File(['voice'], `turn-${input.turnNumber}.webm`, { type: 'audio/webm' }));
   return new Request('http://localhost/api/missions/mission-order-restaurant/spoken/turn', {
     method: 'POST',
     body: form,
+  });
+}
+
+function supportRequest(attemptId: string, turnNumber: number): Request {
+  return new Request('http://localhost/api/missions/mission-order-restaurant/spoken/support', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ userId: 'user-1', attemptId, turnNumber }),
   });
 }
 
@@ -279,5 +288,263 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
       args: ['user-1'],
     });
     expect(readiness.rows[0]).toMatchObject({ level: 'beginner', progress_journal: null });
+  });
+
+  it('completes with Supported evidence after English help and keeps support use monotonic', async () => {
+    harness.assess
+      .mockResolvedValueOnce({
+        outcome: 'retry',
+        transcript: 'ラーメンですか。',
+        confidence: 'high',
+        feedback: 'Try ordering one ramen.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'ラーメンを一つお願いします。',
+        confidence: 'high',
+        feedback: 'You clearly ordered one ramen.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'お水でお願いします。',
+        confidence: 'high',
+        feedback: 'You answered the drink question.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'いいえ、ラーメン一つです。',
+        confidence: 'high',
+        feedback: 'You repaired the misunderstanding.',
+      });
+
+    const startRoute = await import('./spoken/start/+server');
+    const supportRoute = await import('./spoken/support/+server');
+    const turnRoute = await import('./spoken/turn/+server');
+    const startResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    const started = await startResponse.json();
+
+    const supportResponse = await supportRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: supportRequest(started.attemptId, 1),
+      cookies: cookies(),
+    } as never);
+    expect(supportResponse.status).toBe(200);
+    await expect(supportResponse.json()).resolves.toEqual({
+      englishSupport: expect.any(String),
+      supportUsed: true,
+    });
+
+    const spoken = await import('$lib/server/spoken-missions-db');
+    await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
+      currentTurn: 1,
+      supportUsed: true,
+    });
+
+    const supportedRetry = await turnRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: turnRequest({
+        attemptId: started.attemptId,
+        turnNumber: 1,
+        clientResponseId: 'supported-retry',
+        supportRevealed: false,
+      }),
+      cookies: cookies(),
+    } as never);
+    expect(supportedRetry.status).toBe(200);
+    await expect(supportedRetry.json()).resolves.toMatchObject({
+      assessment: { outcome: 'retry' },
+      isComplete: false,
+    });
+
+    await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
+      currentTurn: 1,
+      supportUsed: true,
+    });
+
+    for (const turnNumber of [1, 2, 3]) {
+      const response = await turnRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: turnRequest({
+          attemptId: started.attemptId,
+          turnNumber,
+          clientResponseId: `supported-accepted-${turnNumber}`,
+          supportRevealed: false,
+        }),
+        cookies: cookies(),
+      } as never);
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      if (turnNumber === 3) {
+        expect(payload).toMatchObject({
+          isComplete: true,
+          result: {
+            evidenceState: 'supported',
+            goals: [
+              { goalKey: 'order', supportUsed: false },
+              { goalKey: 'respond', supportUsed: false },
+              { goalKey: 'repair', supportUsed: false },
+            ],
+            suggestedPhrase: {
+              japanese: 'すみません、ラーメンは一つです。',
+              romaji: 'sumimasen, raamen wa hitotsu desu.',
+              english: 'Sorry, it is one ramen.',
+            },
+          },
+        });
+      }
+    }
+
+    await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
+      status: 'completed',
+      supportUsed: true,
+      evidenceState: 'supported',
+    });
+    await expect(
+      spoken.getBestSpokenMissionEvidence('user-1', 'mission-order-restaurant'),
+    ).resolves.toBe('supported');
+  });
+
+  it('keeps Japanese, romaji, replay, and a Japanese repetition request independent', async () => {
+    harness.assess
+      .mockResolvedValueOnce({
+        outcome: 'retry',
+        transcript: 'もう一度お願いします。',
+        confidence: 'high',
+        feedback: 'The server repeats the question. Now complete the current goal.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'ラーメンを一つお願いします。',
+        confidence: 'high',
+        feedback: 'You clearly ordered one ramen.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'お水でお願いします。',
+        confidence: 'high',
+        feedback: 'You answered the drink question.',
+      })
+      .mockResolvedValueOnce({
+        outcome: 'accepted',
+        transcript: 'いいえ、ラーメン一つです。',
+        confidence: 'high',
+        feedback: 'You repaired the misunderstanding.',
+      });
+
+    const startRoute = await import('./spoken/start/+server');
+    const turnRoute = await import('./spoken/turn/+server');
+    const startResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    const started = await startResponse.json();
+    expect(started.turn).toMatchObject({
+      npcDialogue: {
+        japanese: expect.any(String),
+        romaji: expect.any(String),
+      },
+    });
+
+    const repetitionResponse = await turnRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: turnRequest({
+        attemptId: started.attemptId,
+        turnNumber: 1,
+        clientResponseId: 'repeat-in-japanese',
+      }),
+      cookies: cookies(),
+    } as never);
+    expect(repetitionResponse.status).toBe(200);
+    await expect(repetitionResponse.json()).resolves.toMatchObject({
+      assessment: {
+        outcome: 'retry',
+        transcript: 'もう一度お願いします。',
+      },
+      isComplete: false,
+    });
+
+    const spoken = await import('$lib/server/spoken-missions-db');
+    await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
+      currentTurn: 1,
+      supportUsed: false,
+    });
+
+    let completed: Record<string, unknown> | null = null;
+    for (const turnNumber of [1, 2, 3]) {
+      const response = await turnRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: turnRequest({
+          attemptId: started.attemptId,
+          turnNumber,
+          clientResponseId: `baseline-accepted-${turnNumber}`,
+        }),
+        cookies: cookies(),
+      } as never);
+      expect(response.status).toBe(200);
+      completed = await response.json();
+    }
+    expect(completed).toMatchObject({
+      isComplete: true,
+      result: { evidenceState: 'independent' },
+    });
+  });
+
+  it('does not downgrade earlier Independent evidence after a later Supported route completion', async () => {
+    harness.assess.mockResolvedValue({
+      outcome: 'accepted',
+      transcript: 'ラーメンを一つお願いします。',
+      confidence: 'high',
+      feedback: 'Goal accomplished.',
+    });
+
+    const startRoute = await import('./spoken/start/+server');
+    const supportRoute = await import('./spoken/support/+server');
+    const turnRoute = await import('./spoken/turn/+server');
+
+    async function completeAttempt(prefix: string, supported: boolean): Promise<string> {
+      const startResponse = await startRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: startRequest(),
+        cookies: cookies(),
+      } as never);
+      const started = await startResponse.json();
+      if (supported) {
+        const supportResponse = await supportRoute.POST({
+          params: { id: 'mission-order-restaurant' },
+          request: supportRequest(started.attemptId, 1),
+          cookies: cookies(),
+        } as never);
+        expect(supportResponse.status).toBe(200);
+      }
+      let finalEvidence = '';
+      for (const turnNumber of [1, 2, 3]) {
+        const response = await turnRoute.POST({
+          params: { id: 'mission-order-restaurant' },
+          request: turnRequest({
+            attemptId: started.attemptId,
+            turnNumber,
+            clientResponseId: `${prefix}-${turnNumber}`,
+            supportRevealed: false,
+          }),
+          cookies: cookies(),
+        } as never);
+        const payload = await response.json();
+        finalEvidence = payload.result?.evidenceState ?? finalEvidence;
+      }
+      return finalEvidence;
+    }
+
+    await expect(completeAttempt('independent', false)).resolves.toBe('independent');
+    await expect(completeAttempt('supported', true)).resolves.toBe('supported');
+
+    const spoken = await import('$lib/server/spoken-missions-db');
+    await expect(
+      spoken.getBestSpokenMissionEvidence('user-1', 'mission-order-restaurant'),
+    ).resolves.toBe('independent');
   });
 });
