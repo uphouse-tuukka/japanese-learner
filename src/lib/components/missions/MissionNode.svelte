@@ -20,11 +20,20 @@
     class:completed={mission.completedImmersion}
     class:available={mission.unlocked && !mission.completedImmersion}
     class:locked={!mission.unlocked}
-    aria-label={mission.title}
+    aria-label={`${mission.title}${mission.spokenAvailable ? ', Spoken Mission available' : ''}`}
     aria-disabled={!mission.unlocked}
     onclick={handleActivate}
   >
     <span class="emoji">{mission.badgeEmoji}</span>
+
+    {#if mission.spokenAvailable}
+      <span class="spoken-mark" title="Spoken Mission available" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
+          <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" />
+        </svg>
+      </span>
+    {/if}
 
     {#if mission.completedImmersion}
       <span class="overlay completed-overlay" aria-hidden="true">✓</span>
@@ -100,6 +109,36 @@
     place-items: center;
     font-size: var(--text-xs);
     border: 1px solid var(--border-light);
+  }
+
+  .spoken-mark {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: var(--text-usuzumi);
+    background: var(--bg-shoji);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .spoken-mark svg {
+    width: 11px;
+    height: 11px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mission-node.locked .spoken-mark {
+    color: var(--text-usuzumi);
+    background: var(--bg-kinu);
   }
 
   .completed-overlay {
