@@ -183,11 +183,27 @@ describe('checkSpeakingAnswer', () => {
     const transcriptionRequest = mockClient.audio.transcriptions.create.mock.calls[0]?.[0];
     const prompt = transcriptionRequest.prompt as string;
     expect(prompt).toContain('Japanese learner speaking practice');
-    expect(prompt).toContain('Expected answer: 水をください');
-    expect(prompt).toContain('Accepted alternatives: お水をください');
+    expect(prompt).toContain('Communicative goal: Say that you would like water.');
+    expect(prompt).toContain(
+      'Possible successful responses: 水をください; mizu o kudasai; お水をください',
+    );
     expect(prompt).toContain('Use this context only to resolve close or ambiguous Japanese speech');
     expect(prompt).toContain(
       'Do not invent or correct the answer if the audio is clearly different',
     );
+  });
+
+  it('keeps an invalid grading response recoverable for existing speaking exercises', async () => {
+    mockClient.responses.create.mockResolvedValue({
+      output_text: 'not valid JSON',
+      usage: { input_tokens: 100, output_tokens: 20 },
+    });
+
+    await expect(checkSpeakingAnswer(validInput())).resolves.toEqual({
+      transcript: '水をください',
+      correct: false,
+      confidence: 'low',
+      feedback: 'I could not grade that reliably. Please try again.',
+    });
   });
 });
