@@ -110,6 +110,7 @@ Important values:
 - `/api/session/*`: learn session generation/completion
 - `/api/practice/*`: practice session generation/completion
 - `/api/missions/*`: mission listing, start, response, and completion endpoints
+- `/api/missions/[id]/spoken/*`: profile-scoped Spoken Mission start and multipart voice-turn endpoints
 - `/api/portfolio/session/*`: portfolio challenge session start/current/progress/complete endpoints
 - `/api/check-answer`: answer evaluation helper
 - `/api/speaking/check`: authenticated multipart speaking exercise transcription and evaluation helper
@@ -161,7 +162,7 @@ Current table groups created on startup:
 - Core learning: `users`, `sessions`, `exercises`, `session_exercises`, `user_exercise_results`, `token_usage`.
   The `sessions` table uses `planned`, transient `completing`, `completed`, and `error` statuses; while a row is `completing`, `completed_at` stores the active claim timestamp until finalization.
 - XP, streaks, and milestones: `user_xp`, `user_streaks`, `user_milestones`
-- Missions: `missions`, `user_missions`, `user_badges`, `user_mission_limits`
+- Missions: `missions`, Written Mission `user_missions`, Spoken Mission `user_spoken_missions`, `user_badges`, and `user_mission_limits`
 - Portfolio challenge attempts: `portfolio_challenge_attempts`
 
 Mission definitions are seeded from `src/lib/server/missions-seed.ts` during DB initialization.

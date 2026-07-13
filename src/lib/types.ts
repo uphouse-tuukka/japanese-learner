@@ -348,6 +348,102 @@ export interface MissionWithProgress extends Mission {
   completedPractice: boolean;
   completedImmersion: boolean;
   badgeEarned: boolean;
+  spokenAvailable: boolean;
+  spokenEvidence: SpokenMissionEvidenceState | 'untried';
+}
+
+export type SpokenMissionAttemptStatus = 'in_progress' | 'completed' | 'abandoned';
+export type SpokenMissionEvidenceState = 'supported' | 'independent';
+export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_assess';
+export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
+
+export interface SpokenMissionTurnEvidence {
+  goalKey: SpokenMissionGoalKey;
+  turnNumber: number;
+  npcJapanese: string;
+  npcRomaji: string;
+  transcript: string | null;
+  outcome: SpokenMissionAssessmentOutcome;
+  confidence: 'high' | 'medium' | 'low' | null;
+  feedback: string;
+  supportUsed: boolean;
+  clientResponseId: string;
+  assessedAt: string;
+}
+
+export interface SpokenMissionAttempt {
+  id: string;
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  status: SpokenMissionAttemptStatus;
+  currentTurn: number;
+  supportUsed: boolean;
+  successfulTurnCount: number;
+  wordingVariant: number;
+  conversationLog: SpokenMissionTurnEvidence[];
+  evidenceState: SpokenMissionEvidenceState | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SpokenMissionBriefing {
+  canDo: string;
+  situation: string;
+  assessment: string;
+  privacy: string;
+  approximateMinutes: number;
+  maxRecordingSeconds: number;
+  goals: Array<{
+    key: SpokenMissionGoalKey;
+    title: string;
+    learnerGoal: string;
+  }>;
+}
+
+export interface SpokenMissionServerTurn {
+  turnNumber: number;
+  goalKey: SpokenMissionGoalKey;
+  goalTitle: string;
+  npcDialogue: {
+    japanese: string;
+    romaji: string;
+  };
+  englishSupport: string;
+}
+
+export interface SpokenMissionResult {
+  evidenceState: SpokenMissionEvidenceState;
+  canDo: string;
+  goals: Array<SpokenMissionTurnEvidence & { title: string }>;
+  suggestedPhrase: {
+    japanese: string;
+    romaji: string;
+    english: string;
+  };
+}
+
+export interface SpokenMissionStartResponse {
+  attemptId: string;
+  briefing: SpokenMissionBriefing;
+  turn: SpokenMissionServerTurn;
+  totalTurns: 3;
+  resumed: boolean;
+  supportUsed: boolean;
+}
+
+export interface SpokenMissionTurnResponse {
+  duplicate: boolean;
+  assessment: {
+    outcome: SpokenMissionAssessmentOutcome;
+    transcript: string | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+    feedback: string;
+  };
+  nextTurn: SpokenMissionServerTurn | null;
+  isComplete: boolean;
+  result: SpokenMissionResult | null;
 }
 
 export interface UserMission {

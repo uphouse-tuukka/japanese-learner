@@ -1,8 +1,17 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { config } from '$lib/server/config';
-import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db';
+import { isMissionUnlocked } from '$lib/server/mission-access';
+import {
+  getCategorySessionCount,
+  getMissionById,
+  hasCompletedMissionInMode,
+} from '$lib/server/missions-db';
 import { getUserById } from '$lib/server/db';
+import { getSpokenMissionDefinition, toSpokenMissionBriefing } from '$lib/server/spoken-missions';
+import {
+  getBestSpokenMissionEvidence,
+  getResumableSpokenMissionAttempt,
+} from '$lib/server/spoken-missions-db';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
   const selectedUserId = cookies.get('selected_user');
@@ -23,15 +32,42 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
     throw error(404, 'Mission not found.');
   }
 
-  const categorySessionCount = await getCategorySessionCount(selectedUserId, mission.category);
-  const unlocked =
-    config.missions.unlockAllOverride ||
-    mission.startUnlocked ||
-    categorySessionCount >= mission.unlockSessionsRequired;
+  const definition = getSpokenMissionDefinition(mission.id);
+  const [
+    categorySessionCount,
+    bestSpokenEvidence,
+    resumableSpokenAttempt,
+    completedPractice,
+    completedImmersion,
+  ] = await Promise.all([
+    getCategorySessionCount(selectedUserId, mission.category),
+    definition ? getBestSpokenMissionEvidence(selectedUserId, mission.id) : Promise.resolve(null),
+    definition
+      ? getResumableSpokenMissionAttempt(selectedUserId, mission.id)
+      : Promise.resolve(null),
+    hasCompletedMissionInMode(selectedUserId, mission.id, 'practice'),
+    hasCompletedMissionInMode(selectedUserId, mission.id, 'immersion'),
+  ]);
+  const unlocked = isMissionUnlocked(mission, categorySessionCount);
 
   return {
     selectedUserId,
     mission,
     unlocked,
+    writtenProgress: {
+      completedPractice,
+      completedImmersion,
+    },
+    spokenMission: definition
+      ? {
+          briefing: toSpokenMissionBriefing(definition),
+          bestEvidence: bestSpokenEvidence ?? 'untried',
+          resumable: resumableSpokenAttempt
+            ? {
+                currentTurn: resumableSpokenAttempt.currentTurn,
+              }
+            : null,
+        }
+      : null,
   };
 };

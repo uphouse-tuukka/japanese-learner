@@ -122,6 +122,27 @@ conversation_log TEXT NOT NULL DEFAULT '[]',
 completed_at TEXT,
 created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`,
+    `CREATE TABLE IF NOT EXISTS user_spoken_missions (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+mission_id TEXT NOT NULL,
+definition_version TEXT NOT NULL,
+status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'abandoned')) DEFAULT 'in_progress',
+current_turn INTEGER NOT NULL DEFAULT 1 CHECK(current_turn BETWEEN 1 AND 3),
+support_used INTEGER NOT NULL DEFAULT 0 CHECK(support_used IN (0, 1)),
+successful_turn_count INTEGER NOT NULL DEFAULT 0 CHECK(successful_turn_count BETWEEN 0 AND 3),
+wording_variant INTEGER NOT NULL DEFAULT 0 CHECK(wording_variant >= 0),
+conversation_log TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(conversation_log)),
+evidence_state TEXT CHECK(evidence_state IN ('supported', 'independent')),
+completed_at TEXT,
+created_at TEXT NOT NULL DEFAULT (datetime('now')),
+updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+CHECK(
+  (status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3)
+  OR
+  (status != 'completed' AND evidence_state IS NULL AND completed_at IS NULL)
+)
+);`,
     `CREATE TABLE IF NOT EXISTS user_badges (
 id TEXT PRIMARY KEY,
 user_id TEXT NOT NULL,
@@ -158,6 +179,8 @@ expires_at TEXT NOT NULL
     `CREATE INDEX IF NOT EXISTS idx_user_milestones_user_id ON user_milestones(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_user_missions_user ON user_missions(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_user_missions_mission ON user_missions(mission_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_user_mission ON user_spoken_missions(user_id, mission_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_resumable ON user_spoken_missions(user_id, mission_id, status, updated_at);`,
     `CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_missions_category ON missions(category);`,
     `CREATE INDEX IF NOT EXISTS idx_portfolio_attempts_cookie ON portfolio_challenge_attempts(cookie_id, started_at);`,
