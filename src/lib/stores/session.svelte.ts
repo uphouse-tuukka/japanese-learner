@@ -103,6 +103,20 @@ export function nextExercise(): void {
   stateInternal.currentIndex += 1;
 }
 
+export function answerCurrentExercise(
+  payload: Omit<ExerciseAnswer, 'createdAt'> & { createdAt?: string },
+): { answeredIndex: number; isLast: boolean } {
+  const answeredIndex = stateInternal.currentIndex;
+  answerExercise(answeredIndex, payload);
+  const isLast = answeredIndex >= stateInternal.exercises.length - 1;
+
+  if (!isLast) {
+    nextExercise();
+  }
+
+  return { answeredIndex, isLast };
+}
+
 export function completeSession(nextSummary: SessionSummary): void {
   stateInternal.summary = nextSummary;
 }
