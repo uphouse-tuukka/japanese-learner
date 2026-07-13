@@ -105,9 +105,8 @@ describe('mission detail loader Spoken Mission availability', () => {
       writtenProgress: { completedPractice: false, completedImmersion: false },
       spokenMission: {
         bestEvidence: 'independent',
-        resumable: { currentTurn: 2, supportUsed: false },
+        resumable: { currentTurn: 2 },
         briefing: {
-          definitionVersion: 'restaurant-order-v1',
           goals: [{ key: 'order' }, { key: 'respond' }, { key: 'repair' }],
         },
       },

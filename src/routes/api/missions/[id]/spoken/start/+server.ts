@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
-import { config } from '$lib/server/config';
+import { isMissionUnlocked } from '$lib/server/mission-access';
 import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import {
@@ -18,9 +18,6 @@ import {
 } from '$lib/server/spoken-missions-db';
 import { getUser } from '$lib/server/users';
 import type { SpokenMissionAttempt, SpokenMissionStartResponse } from '$lib/types';
-
-const SUPPORT_POLICY =
-  'Replaying Japanese audio and reading romaji do not change your evidence. Revealing English support makes a completed result Supported.';
 
 type StartSpokenMissionRequest = {
   userId?: string;
@@ -57,10 +54,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     if (!user) return jsonError('User not found.', 404);
 
     const categorySessionCount = await getCategorySessionCount(userId, mission.category);
-    const unlocked =
-      config.missions.unlockAllOverride ||
-      mission.startUnlocked ||
-      categorySessionCount >= mission.unlockSessionsRequired;
+    const unlocked = isMissionUnlocked(mission, categorySessionCount);
     if (!unlocked) return jsonError('Mission is locked.', 403);
 
     const resumable = await getResumableSpokenMissionAttempt(userId, mission.id);
@@ -86,7 +80,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     return json(serializeStartResponse(definition, attempt, false));
   } catch (error) {
     console.error('[api/missions/[id]/spoken/start] failed', {
-      error,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
       missionId: params.id,
     });
     return jsonError('Failed to start Spoken Mission.', 500);
@@ -100,12 +94,10 @@ function serializeStartResponse(
 ): SpokenMissionStartResponse {
   return {
     attemptId: attempt.id,
-    definitionVersion: definition.version,
     briefing: toSpokenMissionBriefing(definition),
     turn: getSpokenMissionServerTurn(definition, attempt.wordingVariant, attempt.currentTurn),
     totalTurns: 3,
     resumed,
     supportUsed: attempt.supportUsed,
-    supportPolicy: SUPPORT_POLICY,
   };
 }

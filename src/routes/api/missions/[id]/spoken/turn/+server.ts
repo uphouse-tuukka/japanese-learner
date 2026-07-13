@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError } from '$lib/server/api';
-import { config } from '$lib/server/config';
+import { isMissionUnlocked } from '$lib/server/mission-access';
 import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import {
@@ -88,10 +88,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       selectedUser.userId,
       mission.category,
     );
-    const unlocked =
-      config.missions.unlockAllOverride ||
-      mission.startUnlocked ||
-      categorySessionCount >= mission.unlockSessionsRequired;
+    const unlocked = isMissionUnlocked(mission, categorySessionCount);
     if (!unlocked) return jsonError('Mission is locked.', 403);
 
     const definition = getSpokenMissionDefinition(mission.id);
@@ -183,7 +180,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       return jsonError('Spoken Mission progress changed. Reload and try again.', 409);
     }
     console.error('[api/missions/[id]/spoken/turn] failed', {
-      error,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
       missionId,
       attemptId,
       turnNumber,

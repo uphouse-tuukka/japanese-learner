@@ -1,4 +1,10 @@
-export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
+import type {
+  SpokenMissionAttempt,
+  SpokenMissionBriefing,
+  SpokenMissionGoalKey,
+  SpokenMissionResult,
+  SpokenMissionServerTurn,
+} from '$lib/types';
 
 export type SpokenMissionServerLine = {
   japanese: string;
@@ -33,13 +39,6 @@ export type SpokenMissionDefinition = {
     english: string;
   };
 };
-
-import type {
-  SpokenMissionAttempt,
-  SpokenMissionBriefing,
-  SpokenMissionResult,
-  SpokenMissionServerTurn,
-} from '$lib/types';
 
 const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
   missionId: 'mission-order-restaurant',
@@ -160,7 +159,6 @@ export function toSpokenMissionBriefing(
   definition: SpokenMissionDefinition,
 ): SpokenMissionBriefing {
   return {
-    definitionVersion: definition.version,
     canDo: definition.canDo,
     situation: definition.briefing.situation,
     assessment: definition.briefing.assessment,
@@ -198,19 +196,20 @@ export function toSpokenMissionResult(
 ): SpokenMissionResult | null {
   if (attempt.status !== 'completed' || !attempt.evidenceState) return null;
 
+  const goals = definition.goals.map((goal) => {
+    const accepted = attempt.conversationLog.find(
+      (entry) => entry.goalKey === goal.key && entry.outcome === 'accepted',
+    );
+    if (!accepted) {
+      throw new Error(`[spoken-missions] completed attempt is missing ${goal.key} evidence`);
+    }
+    return { ...accepted, title: goal.title };
+  });
+
   return {
     evidenceState: attempt.evidenceState,
     canDo: definition.canDo,
-    goals: definition.goals.map((goal) => {
-      const accepted = attempt.conversationLog.find(
-        (entry) => entry.goalKey === goal.key && entry.outcome === 'accepted',
-      );
-      return {
-        key: goal.key,
-        title: goal.title,
-        transcript: accepted?.transcript ?? '',
-      };
-    }),
+    goals,
     suggestedPhrase: definition.suggestedPhrase,
   };
 }

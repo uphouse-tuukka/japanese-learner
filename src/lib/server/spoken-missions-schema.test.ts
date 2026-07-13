@@ -82,5 +82,26 @@ describe('Spoken Mission database schema', () => {
       sql: `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'user_spoken_missions'`,
     });
     expect(spokenTable.rows).toHaveLength(1);
+
+    const indexes = await db.execute({
+      sql: `SELECT name FROM sqlite_master
+        WHERE type = 'index' AND tbl_name = 'user_spoken_missions'
+        ORDER BY name`,
+    });
+    expect(indexes.rows.map((row) => row.name)).toEqual([
+      'idx_user_spoken_missions_resumable',
+      'idx_user_spoken_missions_user_mission',
+      'sqlite_autoindex_user_spoken_missions_1',
+    ]);
+
+    await expect(
+      db.execute({
+        sql: `INSERT INTO user_spoken_missions (
+          id, user_id, mission_id, definition_version, status, successful_turn_count,
+          evidence_state, completed_at
+        ) VALUES (?, ?, ?, ?, 'completed', 2, 'independent', datetime('now'))`,
+        args: ['invalid-completion', 'user-1', 'mission-order-restaurant', 'v1'],
+      }),
+    ).rejects.toThrow();
   });
 });

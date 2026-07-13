@@ -64,7 +64,6 @@ function turnRequest(input: {
   const form = new FormData();
   form.set('userId', 'user-1');
   form.set('attemptId', input.attemptId);
-  form.set('definitionVersion', 'restaurant-order-v1');
   form.set('turnNumber', String(input.turnNumber));
   form.set('clientResponseId', input.clientResponseId);
   form.set('supportRevealed', 'false');
@@ -85,6 +84,12 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     harness.assess.mockReset();
     const db = await import('$lib/server/db');
     await db.insertUser({ id: 'user-1', name: 'Test User', level: 'beginner' });
+    await harness.client.execute({
+      sql: `INSERT INTO user_streaks (
+        user_id, current_streak, longest_streak, last_activity_date, daily_goal_met, updated_at
+      ) VALUES (?, 4, 9, '2026-07-12', 1, '2026-07-12T12:00:00.000Z')`,
+      args: ['user-1'],
+    });
   });
 
   afterEach(() => {
@@ -186,12 +191,52 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
       result: {
         evidenceState: 'independent',
         goals: [
-          { key: 'order', transcript: 'ラーメンを一つお願いします。' },
-          { key: 'respond', transcript: 'お水でお願いします。' },
-          { key: 'repair', transcript: 'いいえ、ラーメン一つです。' },
+          {
+            goalKey: 'order',
+            transcript: 'ラーメンを一つお願いします。',
+            outcome: 'accepted',
+            confidence: 'high',
+            feedback: 'You clearly ordered one ramen.',
+            supportUsed: false,
+            clientResponseId: 'client-response-1',
+          },
+          {
+            goalKey: 'respond',
+            transcript: 'お水でお願いします。',
+            outcome: 'accepted',
+            confidence: 'medium',
+            feedback: 'You answered the drink question.',
+            supportUsed: false,
+            clientResponseId: 'client-response-2',
+          },
+          {
+            goalKey: 'repair',
+            transcript: 'いいえ、ラーメン一つです。',
+            outcome: 'accepted',
+            confidence: 'high',
+            feedback: 'You repaired the misunderstanding.',
+            supportUsed: false,
+            clientResponseId: 'client-response-3',
+          },
         ],
       },
     });
+    expect(Object.keys(completed.result.goals[0]).sort()).toEqual(
+      [
+        'assessedAt',
+        'clientResponseId',
+        'confidence',
+        'feedback',
+        'goalKey',
+        'npcJapanese',
+        'npcRomaji',
+        'outcome',
+        'supportUsed',
+        'title',
+        'transcript',
+        'turnNumber',
+      ].sort(),
+    );
 
     expect(harness.assess).toHaveBeenCalledTimes(3);
     const spoken = await import('$lib/server/spoken-missions-db');
@@ -211,7 +256,28 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
       `SELECT COUNT(*) AS total FROM user_missions`,
       `SELECT COUNT(*) AS total FROM user_badges`,
       `SELECT COUNT(*) AS total FROM user_xp`,
+      `SELECT COUNT(*) AS total FROM sessions`,
     ]);
-    expect(unrelatedCounts.map((result) => Number(result.rows[0]?.total ?? 0))).toEqual([0, 0, 0]);
+    expect(unrelatedCounts.map((result) => Number(result.rows[0]?.total ?? 0))).toEqual([
+      0, 0, 0, 0,
+    ]);
+
+    const streak = await harness.client!.execute({
+      sql: `SELECT current_streak, longest_streak, last_activity_date, daily_goal_met
+        FROM user_streaks WHERE user_id = ?`,
+      args: ['user-1'],
+    });
+    expect(streak.rows[0]).toMatchObject({
+      current_streak: 4,
+      longest_streak: 9,
+      last_activity_date: '2026-07-12',
+      daily_goal_met: 1,
+    });
+
+    const readiness = await harness.client!.execute({
+      sql: `SELECT level, progress_journal FROM users WHERE id = ?`,
+      args: ['user-1'],
+    });
+    expect(readiness.rows[0]).toMatchObject({ level: 'beginner', progress_journal: null });
   });
 });

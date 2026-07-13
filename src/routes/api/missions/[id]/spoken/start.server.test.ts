@@ -143,7 +143,6 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     const payload = await response.json();
     expect(payload).toMatchObject({
       attemptId: 'spokenmission-1',
-      definitionVersion: 'restaurant-order-v1',
       briefing: {
         canDo: definition.canDo,
         maxRecordingSeconds: 12,

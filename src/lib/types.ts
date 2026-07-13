@@ -355,9 +355,10 @@ export interface MissionWithProgress extends Mission {
 export type SpokenMissionAttemptStatus = 'in_progress' | 'completed' | 'abandoned';
 export type SpokenMissionEvidenceState = 'supported' | 'independent';
 export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_assess';
+export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
 
 export interface SpokenMissionTurnEvidence {
-  goalKey: 'order' | 'respond' | 'repair';
+  goalKey: SpokenMissionGoalKey;
   turnNumber: number;
   npcJapanese: string;
   npcRomaji: string;
@@ -388,7 +389,6 @@ export interface SpokenMissionAttempt {
 }
 
 export interface SpokenMissionBriefing {
-  definitionVersion: string;
   canDo: string;
   situation: string;
   assessment: string;
@@ -396,7 +396,7 @@ export interface SpokenMissionBriefing {
   approximateMinutes: number;
   maxRecordingSeconds: number;
   goals: Array<{
-    key: 'order' | 'respond' | 'repair';
+    key: SpokenMissionGoalKey;
     title: string;
     learnerGoal: string;
   }>;
@@ -404,7 +404,7 @@ export interface SpokenMissionBriefing {
 
 export interface SpokenMissionServerTurn {
   turnNumber: number;
-  goalKey: 'order' | 'respond' | 'repair';
+  goalKey: SpokenMissionGoalKey;
   goalTitle: string;
   npcDialogue: {
     japanese: string;
@@ -416,11 +416,7 @@ export interface SpokenMissionServerTurn {
 export interface SpokenMissionResult {
   evidenceState: SpokenMissionEvidenceState;
   canDo: string;
-  goals: Array<{
-    key: 'order' | 'respond' | 'repair';
-    title: string;
-    transcript: string;
-  }>;
+  goals: Array<SpokenMissionTurnEvidence & { title: string }>;
   suggestedPhrase: {
     japanese: string;
     romaji: string;
@@ -430,13 +426,11 @@ export interface SpokenMissionResult {
 
 export interface SpokenMissionStartResponse {
   attemptId: string;
-  definitionVersion: string;
   briefing: SpokenMissionBriefing;
   turn: SpokenMissionServerTurn;
   totalTurns: 3;
   resumed: boolean;
   supportUsed: boolean;
-  supportPolicy: string;
 }
 
 export interface SpokenMissionTurnResponse {

@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { config } from '$lib/server/config';
+import { isMissionUnlocked } from '$lib/server/mission-access';
 import {
   getCategorySessionCount,
   getMissionById,
@@ -48,10 +48,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
     hasCompletedMissionInMode(selectedUserId, mission.id, 'practice'),
     hasCompletedMissionInMode(selectedUserId, mission.id, 'immersion'),
   ]);
-  const unlocked =
-    config.missions.unlockAllOverride ||
-    mission.startUnlocked ||
-    categorySessionCount >= mission.unlockSessionsRequired;
+  const unlocked = isMissionUnlocked(mission, categorySessionCount);
 
   return {
     selectedUserId,
@@ -68,7 +65,6 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
           resumable: resumableSpokenAttempt
             ? {
                 currentTurn: resumableSpokenAttempt.currentTurn,
-                supportUsed: resumableSpokenAttempt.supportUsed,
               }
             : null,
         }
