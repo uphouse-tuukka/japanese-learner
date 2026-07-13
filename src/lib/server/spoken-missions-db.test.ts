@@ -250,4 +250,64 @@ describe('Spoken Mission persistence', () => {
       spoken.getBestSpokenMissionEvidence('user-1', 'mission-order-restaurant'),
     ).resolves.toBeNull();
   });
+
+  it('preserves a support reveal that lands concurrently with the completing assessment', async () => {
+    const spoken = await loadRepositories();
+    const attempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 0,
+    });
+
+    const recordAcceptedTurn = (turnNumber: number) =>
+      spoken.recordSpokenMissionAssessment({
+        attemptId: attempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        turnNumber,
+        evidence: {
+          goalKey: ['order', 'respond', 'repair'][turnNumber - 1] as 'order' | 'respond' | 'repair',
+          turnNumber,
+          npcJapanese: '日本語',
+          npcRomaji: 'nihongo',
+          transcript: '返事',
+          outcome: 'accepted' as const,
+          confidence: 'high' as const,
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: `concurrent-${turnNumber}`,
+          assessedAt: '2026-07-13T12:00:00.000Z',
+        },
+      });
+
+    await recordAcceptedTurn(1);
+    await recordAcceptedTurn(2);
+
+    const client = dbHarness.client!;
+    const execute = client.execute.bind(client);
+    let injectedReveal = false;
+    vi.spyOn(client, 'execute').mockImplementation(async (statement) => {
+      const sql = typeof statement === 'string' ? statement : (statement as { sql: string }).sql;
+      if (!injectedReveal && sql.includes('UPDATE user_spoken_missions\nSET\n  status = ?')) {
+        injectedReveal = true;
+        await execute({
+          sql: 'UPDATE user_spoken_missions SET support_used = 1 WHERE id = ?',
+          args: [attempt.id],
+        });
+      }
+      return execute(statement);
+    });
+
+    await expect(recordAcceptedTurn(3)).resolves.toMatchObject({
+      status: 'recorded',
+      attempt: {
+        status: 'completed',
+        supportUsed: true,
+        evidenceState: 'supported',
+      },
+    });
+    expect(injectedReveal).toBe(true);
+  });
 });

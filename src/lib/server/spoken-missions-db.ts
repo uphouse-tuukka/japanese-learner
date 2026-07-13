@@ -216,13 +216,7 @@ export async function recordSpokenMissionAssessment(input: {
 
   const accepted = input.evidence.outcome === 'accepted';
   const successfulTurnCount = existing.successfulTurnCount + (accepted ? 1 : 0);
-  const supportUsed = existing.supportUsed || input.evidence.supportUsed;
   const completed = accepted && successfulTurnCount === 3;
-  const evidenceState: SpokenMissionEvidenceState | null = completed
-    ? supportUsed
-      ? 'supported'
-      : 'independent'
-    : null;
   const timestamp = new Date().toISOString();
   const conversationLog = [...existing.conversationLog, input.evidence];
   const currentTurn = completed
@@ -238,10 +232,14 @@ UPDATE user_spoken_missions
 SET
   status = ?,
   current_turn = ?,
-  support_used = ?,
+  support_used = CASE WHEN support_used = 1 OR ? = 1 THEN 1 ELSE 0 END,
   successful_turn_count = ?,
   conversation_log = ?,
-  evidence_state = ?,
+  evidence_state = CASE
+    WHEN ? = 1 THEN
+      CASE WHEN support_used = 1 OR ? = 1 THEN 'supported' ELSE 'independent' END
+    ELSE NULL
+  END,
   completed_at = ?,
   updated_at = ?
 WHERE id = ?
@@ -259,10 +257,11 @@ WHERE id = ?
     args: [
       completed ? 'completed' : 'in_progress',
       currentTurn,
-      supportUsed ? 1 : 0,
+      input.evidence.supportUsed ? 1 : 0,
       successfulTurnCount,
       JSON.stringify(conversationLog),
-      evidenceState,
+      completed ? 1 : 0,
+      input.evidence.supportUsed ? 1 : 0,
       completed ? timestamp : null,
       timestamp,
       input.attemptId,

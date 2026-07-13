@@ -107,6 +107,9 @@ function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boole
 describe('Spoken Mission learner-visible support UI', () => {
   it('offers optional English help and clearly marks the attempt after disclosure', () => {
     const hidden = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
+    expect(hidden).toContain('ご注文はお決まりですか。');
+    expect(hidden).toContain('go-chuumon wa okimari desu ka.');
+    expect(hidden).toContain('Replay Japanese');
     expect(hidden).toContain('Reveal English support');
     expect(hidden).not.toContain('Are you ready to order?');
 
