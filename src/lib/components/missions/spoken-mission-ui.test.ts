@@ -180,6 +180,8 @@ describe('Spoken Mission learner-visible support UI', () => {
           canDo: 'I can complete the restaurant task.',
           situation: 'At a restaurant.',
           assessment: 'Intent is assessed, not accent.',
+          evidence:
+            'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
           privacy: 'Raw audio is discarded.',
           approximateMinutes: 2,
           maxRecordingSeconds: 12,
@@ -221,6 +223,39 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(resultHtml).toMatch(/<h2[^>]*id="result-heading"[^>]*tabindex="-1"/);
   });
 
+  it('explains retained evidence and the effect of English listening support before recording', () => {
+    const html = render(SpokenMissionBriefing, {
+      props: {
+        briefing: {
+          canDo: 'I can complete the restaurant task.',
+          situation: 'At a restaurant.',
+          assessment: 'Intent is assessed, not accent.',
+          evidence:
+            'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
+          privacy:
+            'Transcripts and semantic assessments are retained. Raw audio is discarded after assessment.',
+          approximateMinutes: 2,
+          maxRecordingSeconds: 12,
+          goals: [
+            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
+            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
+            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+          ],
+        },
+        bestEvidence: 'untried',
+        resumable: null,
+        errorMessage: '',
+        onStart: vi.fn(),
+        onChooseWritten: vi.fn(),
+      },
+    }).body;
+
+    expect(html).toContain('Transcripts and semantic assessments are retained.');
+    expect(html).toContain('Raw audio is discarded after assessment.');
+    expect(html).toContain('without English listening support for Independent evidence');
+    expect(html).toContain('English listening support records Supported evidence');
+  });
+
   it('offers resume and Start over while explaining the saved progress', () => {
     const html = render(SpokenMissionBriefing, {
       props: {
@@ -228,6 +263,8 @@ describe('Spoken Mission learner-visible support UI', () => {
           canDo: 'I can complete the restaurant task.',
           situation: 'At a restaurant.',
           assessment: 'Intent is assessed, not accent.',
+          evidence:
+            'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
           privacy: 'Raw audio is discarded.',
           approximateMinutes: 2,
           maxRecordingSeconds: 12,

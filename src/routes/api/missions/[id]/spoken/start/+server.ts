@@ -9,6 +9,7 @@ import {
   getSpokenMissionEnglishSupport,
   getSpokenMissionServerTurn,
   selectSpokenMissionVariant,
+  SPOKEN_MISSION_SUPPORT_POLICY,
   toSpokenMissionBriefing,
   toSpokenMissionHistory,
 } from '$lib/server/spoken-missions';
@@ -106,6 +107,8 @@ function serializeStartResponse(
 ): SpokenMissionStartResponse {
   return {
     attemptId: attempt.id,
+    definitionVersion: definition.version,
+    supportPolicy: SPOKEN_MISSION_SUPPORT_POLICY,
     briefing: toSpokenMissionBriefing(definition),
     turn: getSpokenMissionServerTurn(definition, attempt.wordingVariant, attempt.currentTurn),
     history: toSpokenMissionHistory(definition, attempt),

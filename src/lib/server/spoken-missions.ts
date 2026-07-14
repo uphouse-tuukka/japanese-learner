@@ -5,6 +5,7 @@ import type {
   SpokenMissionHistoryEntry,
   SpokenMissionResult,
   SpokenMissionServerTurn,
+  SpokenMissionSupportPolicy,
 } from '$lib/types';
 
 export type SpokenMissionServerLine = {
@@ -29,6 +30,7 @@ export type SpokenMissionDefinition = {
   briefing: {
     situation: string;
     assessment: string;
+    evidence: string;
     privacy: string;
   };
   approximateMinutes: number;
@@ -51,8 +53,10 @@ const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
       'You are ordering at a busy ramen restaurant. Complete all three goals in a short conversation with the server.',
     assessment:
       'Your communicative intent is assessed, not your pronunciation or accent. Natural wording and small particle or formality differences are welcome.',
+    evidence:
+      'Complete all three goals without English listening support for Independent evidence. If you reveal English listening support on any turn, completion records Supported evidence.',
     privacy:
-      'Each recording is sent for transcription and then discarded. Raw audio is never saved.',
+      'Each recording is sent for transcription and semantic assessment. Transcripts and semantic assessments are retained for evidence and resume. Raw audio is discarded after assessment and never saved.',
   },
   approximateMinutes: 2,
   maxRecordingSeconds: 12,
@@ -133,6 +137,12 @@ const SPOKEN_MISSIONS = new Map<string, SpokenMissionDefinition>([
   [ORDER_AT_A_RESTAURANT.missionId, ORDER_AT_A_RESTAURANT],
 ]);
 
+export const SPOKEN_MISSION_SUPPORT_POLICY: SpokenMissionSupportPolicy = {
+  englishListeningSupport: 'optional',
+  evidenceWithoutEnglishSupport: 'independent',
+  evidenceWithEnglishSupport: 'supported',
+};
+
 export function listSpokenMissionIds(): string[] {
   return [...SPOKEN_MISSIONS.keys()];
 }
@@ -163,6 +173,7 @@ export function toSpokenMissionBriefing(
     canDo: definition.canDo,
     situation: definition.briefing.situation,
     assessment: definition.briefing.assessment,
+    evidence: definition.briefing.evidence,
     privacy: definition.briefing.privacy,
     approximateMinutes: definition.approximateMinutes,
     maxRecordingSeconds: definition.maxRecordingSeconds,

@@ -26,7 +26,10 @@ They enforce the selected-user boundary, user and mission existence, the existin
 `POST /api/missions/[id]/spoken/start` accepts JSON with `userId` and optional boolean `startOver`.
 Without `startOver`, the endpoint resumes the newest matching in-progress attempt when one exists.
 With `startOver`, it atomically abandons the current in-progress attempt and creates a replacement without deleting completed evidence.
-The response contains the attempt id, learner-safe briefing, current authored server turn, restored transcript and assessment history, support-used state, and total turn count.
+The response contains the attempt id, server-owned definition version, structured listening-support policy, learner-safe briefing, current authored server turn, restored transcript and assessment history, support-used state, and total turn count.
+The briefing states that completing without English listening support records Independent evidence, while revealing that support records Supported evidence.
+It also states that transcripts and semantic assessments are retained for evidence and resume while raw audio is discarded after assessment.
+The structured policy exposes only learner-safe support availability and resulting evidence labels, never accepted answers, alternatives, or semantic rubrics.
 English listening-support text is omitted unless support was already revealed for the current goal, in which case the response restores that disclosure after refresh.
 
 ### Reveal listening support
