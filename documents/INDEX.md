@@ -203,6 +203,13 @@ Use this index before following older plans or decisions. Status labels are cons
 
 ## Analyses
 
+### `documents/analyses/2026-07-13-next-build-opportunities.md`
+
+- Status: analysis
+- Description: Evidence-backed opportunity ranking for the next Japanese Learner build, recommending a Spoken Can-do Loop that connects Travel Missions, speaking, transfer practice, and task-based readiness evidence.
+- Source files affected: future work across mission, speaking, practice, coverage-evidence, and progress surfaces; no implementation is included in the analysis.
+- Last verified: 2026-07-13
+
 ### `documents/analyses/ai-model-comparison.md`
 
 - Status: analysis
