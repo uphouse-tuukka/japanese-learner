@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
-import { config } from './config';
+import { isMissionUnlocked } from './mission-access';
 import type {
   Mission,
   MissionMode,
@@ -235,14 +235,11 @@ GROUP BY JSON_EXTRACT(${sessionCategoryColumn}, '$.category')
   return (missionsResult.rows as Array<Record<string, unknown>>).map((row) => {
     const mission = mapMissionRow(row);
     const sessionsCompletedInCategory = categorySessionCounts.get(mission.category) ?? 0;
-    const unlockedByCategory = sessionsCompletedInCategory >= mission.unlockSessionsRequired;
-    const unlocked =
-      config.missions.unlockAllOverride || mission.startUnlocked || unlockedByCategory;
     const spokenEvidenceRank = asNumber(row.spoken_evidence_rank);
 
     return {
       ...mission,
-      unlocked,
+      unlocked: isMissionUnlocked(mission, sessionsCompletedInCategory),
       completedPractice: asNumber(row.completed_practice) === 1,
       completedImmersion: asNumber(row.completed_immersion) === 1,
       badgeEarned: asNumber(row.badge_earned) === 1,
