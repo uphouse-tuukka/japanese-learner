@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte';
   import type { SpokenMissionResult } from '$lib/types';
 
   type Props = {
@@ -7,12 +8,18 @@
   };
 
   let { result, onTryAgain }: Props = $props();
+
+  let headingElement: HTMLHeadingElement;
+
+  onMount(() => {
+    void tick().then(() => headingElement.focus());
+  });
 </script>
 
 <section class="spoken-shell" aria-labelledby="result-heading">
   <div class="result-seal" data-evidence={result.evidenceState} aria-hidden="true">話</div>
   <p class="eyebrow">Spoken Mission complete</p>
-  <h2 id="result-heading">
+  <h2 id="result-heading" tabindex="-1" bind:this={headingElement}>
     {result.evidenceState === 'independent' ? 'Independent evidence' : 'Supported evidence'}
   </h2>
   <p class="result-can-do">{result.canDo}</p>

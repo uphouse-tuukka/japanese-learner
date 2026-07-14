@@ -249,7 +249,7 @@
   }
 
   .nav-link.active .nav-ja {
-    color: var(--accent-shu-soft);
+    color: var(--accent-shu-deep);
   }
 
   .main {

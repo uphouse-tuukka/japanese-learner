@@ -92,6 +92,7 @@ Important values:
 - `AGENTS.md`: root boot guide for AI agents.
 - `documents/CONTRIBUTING.md`: contribution, validation, documentation, and review workflow.
 - `documents/INDEX.md`: status index for active, implemented, superseded, planning, analysis, and decision docs. Check it before following older plans.
+- `documents/spoken-missions.md`: active Spoken Mission API, persistence, evidence, privacy, and configuration guide.
 
 ## App routes
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import type {
     SpokenMissionServerTurn,
     SpokenMissionTurnRecovery,
@@ -66,13 +67,78 @@
     onRetryUpload,
     onChooseWritten,
   }: Props = $props();
+
+  let headingElement = $state<HTMLHeadingElement>();
+  let supportCopyElement = $state<HTMLDivElement>();
+  let feedbackHeadingElement = $state<HTMLHeadingElement>();
+  let recordButtonElement = $state<HTMLButtonElement>();
+  let stopButtonElement = $state<HTMLButtonElement>();
+  let recorderErrorElement = $state<HTMLParagraphElement>();
+  let errorMessageElement = $state<HTMLParagraphElement>();
+  let focusedTurnNumber = 0;
+  let previousRecorderStatus: AudioRecorderStatus | null = null;
+  let previousSubmissionState: SubmissionState | null = null;
+  let previousSubmissionTurnNumber: number | null = null;
+  let previousSupportRevealed: boolean | null = null;
+
+  function focusAfterRender(getElement: () => HTMLElement | undefined): void {
+    void tick().then(() => getElement()?.focus());
+  }
+
+  $effect(() => {
+    const turnNumber = currentTurn.turnNumber;
+    if (turnNumber === focusedTurnNumber) return;
+    focusedTurnNumber = turnNumber;
+    focusAfterRender(() => headingElement);
+  });
+
+  $effect(() => {
+    const revealed = supportRevealed;
+    if (revealed && previousSupportRevealed === false) {
+      focusAfterRender(() => supportCopyElement);
+    }
+    previousSupportRevealed = revealed;
+  });
+
+  $effect(() => {
+    const nextSubmissionState = submissionState;
+    const nextTurnNumber = currentTurn.turnNumber;
+    if (nextSubmissionState === 'feedback' && previousSubmissionState !== null) {
+      focusAfterRender(() => feedbackHeadingElement);
+    } else if (nextSubmissionState === 'error' && previousSubmissionState !== 'error') {
+      focusAfterRender(() => errorMessageElement);
+    } else if (
+      nextSubmissionState === 'idle' &&
+      (previousSubmissionState === 'feedback' || previousSubmissionState === 'error') &&
+      previousSubmissionTurnNumber === nextTurnNumber
+    ) {
+      focusAfterRender(() => recordButtonElement);
+    }
+    previousSubmissionState = nextSubmissionState;
+    previousSubmissionTurnNumber = nextTurnNumber;
+  });
+
+  $effect(() => {
+    const nextRecorderStatus = recorderStatus;
+    if (nextRecorderStatus === 'recording' && previousRecorderStatus !== null) {
+      focusAfterRender(() => stopButtonElement);
+    } else if (nextRecorderStatus === 'idle' && previousRecorderStatus === 'recording') {
+      focusAfterRender(() => recordButtonElement);
+    } else if (
+      (nextRecorderStatus === 'error' || nextRecorderStatus === 'unsupported') &&
+      nextRecorderStatus !== previousRecorderStatus
+    ) {
+      focusAfterRender(() => recorderErrorElement);
+    }
+    previousRecorderStatus = nextRecorderStatus;
+  });
 </script>
 
 <section class="spoken-shell" aria-labelledby="turn-heading">
   <header class="turn-header">
     <div>
       <p class="eyebrow">Goal {currentTurn.turnNumber} of 3</p>
-      <h2 id="turn-heading">{currentTurn.goalTitle}</h2>
+      <h2 id="turn-heading" tabindex="-1" bind:this={headingElement}>{currentTurn.goalTitle}</h2>
     </div>
     <div class="goal-dots" aria-label={`Goal ${currentTurn.turnNumber} of 3`}>
       {#each [1, 2, 3] as goalNumber}
@@ -108,7 +174,7 @@
       {/if}
     </div>
     {#if supportRevealed && englishSupport}
-      <div class="support-copy">
+      <div class="support-copy" role="status" tabindex="-1" bind:this={supportCopyElement}>
         <span>English support used</span>
         <p>{englishSupport}</p>
       </div>
@@ -121,13 +187,13 @@
 
   {#if submissionState === 'feedback' && assessment}
     <article class="assessment" data-outcome={assessment.outcome} aria-live="polite">
-      <p class="outcome">
+      <h3 class="outcome" tabindex="-1" bind:this={feedbackHeadingElement}>
         {assessment.outcome === 'accepted'
           ? 'Accepted'
           : assessment.outcome === 'retry'
             ? 'Try this goal again'
             : 'Could not assess'}
-      </p>
+      </h3>
       {#if assessment.transcript}
         <div class="transcript">
           <span>Transcript</span>
@@ -161,8 +227,11 @@
 
       <div class="record-actions">
         {#if recorderStatus === 'recording'}
-          <button class="btn btn-primary record-button" type="button" onclick={onStopRecording}
-            >Stop and assess</button
+          <button
+            class="btn btn-primary record-button"
+            type="button"
+            bind:this={stopButtonElement}
+            onclick={onStopRecording}>Stop and assess</button
           >
           <button class="btn btn-ghost" type="button" onclick={onCancelRecording}>Cancel</button>
         {:else if recorderStatus === 'requesting_permission' || recorderStatus === 'stopping' || submissionState === 'processing'}
@@ -186,6 +255,7 @@
             class="btn btn-primary record-button"
             type="button"
             disabled={!canRecord}
+            bind:this={recordButtonElement}
             onclick={onStartRecording}
           >
             <span class="record-icon" aria-hidden="true"></span> Record response
@@ -201,10 +271,14 @@
   {/if}
 
   {#if recorderError}
-    <p class="message error" role="alert">{recorderError}</p>
+    <p class="message error" role="alert" tabindex="-1" bind:this={recorderErrorElement}>
+      {recorderError}
+    </p>
   {/if}
   {#if errorMessage}
-    <p class="message error" role="alert">{errorMessage}</p>
+    <p class="message error" role="alert" tabindex="-1" bind:this={errorMessageElement}>
+      {errorMessage}
+    </p>
   {/if}
 </section>
 
@@ -294,8 +368,8 @@
     margin-top: var(--space-3);
   }
   .line-button {
-    min-height: auto;
-    padding: 0;
+    min-height: 2.75rem;
+    padding: var(--space-2) 0;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -362,6 +436,7 @@
     background: var(--accent-matcha-wash);
   }
   .outcome {
+    margin: 0;
     font-size: var(--text-lg);
     font-weight: var(--weight-semibold);
   }
