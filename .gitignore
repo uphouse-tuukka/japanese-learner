@@ -9,6 +9,9 @@ build
 # Local CodeGraph index
 .codegraph/
 
+# Local agent review artifacts
+.lavish/
+
 # Environment files
 .env
 .env.*
