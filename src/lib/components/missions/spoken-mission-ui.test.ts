@@ -5,23 +5,17 @@ import SpokenMissionChoiceStatus from './SpokenMissionChoiceStatus.svelte';
 import SpokenMissionHistory from './SpokenMissionHistory.svelte';
 import SpokenMissionResult from './SpokenMissionResult.svelte';
 import SpokenMissionTurn from './SpokenMissionTurn.svelte';
+import {
+  createSpokenMissionTurnProps,
+  spokenMissionEnglishSupport,
+  spokenMissionServerTurn,
+  type SpokenMissionTurnFixtureInput,
+} from './spoken-mission-turn.test-fixtures';
 import type {
   SpokenMissionResult as SpokenMissionResultData,
   SpokenMissionAssessment,
   SpokenMissionHistoryEntry,
-  SpokenMissionServerTurn,
 } from '$lib/types';
-
-const serverTurn: SpokenMissionServerTurn = {
-  turnNumber: 1,
-  goalKey: 'order',
-  goalTitle: 'Order',
-  npcDialogue: {
-    japanese: 'ご注文はお決まりですか。',
-    romaji: 'go-chuumon wa okimari desu ka.',
-  },
-};
-const englishSupport = 'Are you ready to order?';
 
 const result: SpokenMissionResultData = {
   evidenceState: 'supported',
@@ -97,60 +91,9 @@ const history: SpokenMissionHistoryEntry[] = [
   },
 ];
 
-function renderTurn(input: {
-  supportRevealed: boolean;
-  attemptSupportUsed: boolean;
-  submissionState?: 'idle' | 'processing' | 'feedback' | 'error';
-  submissionRecovery?: 'retry_upload' | 'record_again' | 'none';
-  hasPendingAudio?: boolean;
-  recorderStatus?:
-    | 'idle'
-    | 'requesting_permission'
-    | 'recording'
-    | 'stopping'
-    | 'error'
-    | 'unsupported';
-  recorderError?: string;
-  errorMessage?: string;
-  assessment?: SpokenMissionAssessment;
-}): string {
+function renderTurn(input: SpokenMissionTurnFixtureInput): string {
   return render(SpokenMissionTurn, {
-    props: {
-      currentTurn: serverTurn,
-      maxRecordingSeconds: 12,
-      supportRevealed: input.supportRevealed,
-      englishSupport: input.supportRevealed ? englishSupport : null,
-      supportDisclosureState: 'idle',
-      attemptSupportUsed: input.attemptSupportUsed,
-      assessment:
-        input.submissionState === 'feedback'
-          ? (input.assessment ?? {
-              transcript: 'ラーメンを一つお願いします。',
-              outcome: 'accepted',
-              confidence: 'high',
-              feedback: 'You ordered one ramen.',
-            })
-          : null,
-      pendingNextTurn: null,
-      recorderStatus: input.recorderStatus ?? 'idle',
-      recordingSeconds: 0,
-      submissionState: input.submissionState ?? 'idle',
-      submissionRecovery: input.submissionRecovery ?? 'none',
-      canRecord: true,
-      audioPlaying: false,
-      recorderError: input.recorderError ?? '',
-      errorMessage: input.errorMessage ?? '',
-      hasPendingAudio: input.hasPendingAudio ?? false,
-      onPlayServerLine: vi.fn(),
-      onRevealSupport: vi.fn(),
-      onContinue: vi.fn(),
-      onRetryGoal: vi.fn(),
-      onStartRecording: vi.fn(),
-      onStopRecording: vi.fn(),
-      onCancelRecording: vi.fn(),
-      onRetryUpload: vi.fn(),
-      onChooseWritten: vi.fn(),
-    },
+    props: createSpokenMissionTurnProps(input),
   }).body;
 }
 
@@ -302,7 +245,7 @@ describe('Spoken Mission learner-visible support UI', () => {
 
   it('offers optional English help and clearly marks the attempt after disclosure', () => {
     const hidden = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
-    expect(hidden).toContain('ご注文はお決まりですか。');
+    expect(hidden).toContain(spokenMissionServerTurn.npcDialogue.japanese);
     expect(hidden).toContain('go-chuumon wa okimari desu ka.');
     expect(hidden).toContain('Replay Japanese');
     expect(hidden).toContain('Reveal English support');
@@ -310,7 +253,7 @@ describe('Spoken Mission learner-visible support UI', () => {
 
     const revealed = renderTurn({ supportRevealed: true, attemptSupportUsed: true });
     expect(revealed).toContain('English support used');
-    expect(revealed).toContain('Are you ready to order?');
+    expect(revealed).toContain(spokenMissionEnglishSupport);
 
     const laterTurn = renderTurn({ supportRevealed: false, attemptSupportUsed: true });
     expect(laterTurn).toContain(

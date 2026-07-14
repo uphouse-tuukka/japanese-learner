@@ -1,72 +1,30 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import type {
-    SpokenMissionServerTurn,
-    SpokenMissionTurnRecovery,
-    SpokenMissionTurnResponse,
-  } from '$lib/types';
+    SpokenMissionSubmissionState,
+    SpokenMissionTurnProps,
+  } from './spoken-mission-turn-contract';
   import type { AudioRecorderStatus } from '$lib/utils/audio-recorder';
 
-  type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
-  type SupportDisclosureState = 'idle' | 'processing';
+  let { viewState, actions }: SpokenMissionTurnProps = $props();
 
-  type Props = {
-    currentTurn: SpokenMissionServerTurn;
-    maxRecordingSeconds: number;
-    supportRevealed: boolean;
-    englishSupport: string | null;
-    supportDisclosureState: SupportDisclosureState;
-    attemptSupportUsed: boolean;
-    assessment: SpokenMissionTurnResponse['assessment'] | null;
-    pendingNextTurn: SpokenMissionServerTurn | null;
-    recorderStatus: AudioRecorderStatus;
-    recordingSeconds: number;
-    submissionState: SubmissionState;
-    submissionRecovery: SpokenMissionTurnRecovery;
-    canRecord: boolean;
-    audioPlaying: boolean;
-    recorderError: string;
-    errorMessage: string;
-    hasPendingAudio: boolean;
-    onPlayServerLine: () => void;
-    onRevealSupport: () => void;
-    onContinue: () => void;
-    onRetryGoal: () => void;
-    onStartRecording: () => void;
-    onStopRecording: () => void;
-    onCancelRecording: () => void;
-    onRetryUpload: () => void;
-    onChooseWritten: () => void;
-  };
-
-  let {
-    currentTurn,
-    maxRecordingSeconds,
-    supportRevealed,
-    englishSupport,
-    supportDisclosureState,
-    attemptSupportUsed,
-    assessment,
-    pendingNextTurn,
-    recorderStatus,
-    recordingSeconds,
-    submissionState,
-    submissionRecovery,
-    canRecord,
-    audioPlaying,
-    recorderError,
-    errorMessage,
-    hasPendingAudio,
-    onPlayServerLine,
-    onRevealSupport,
-    onContinue,
-    onRetryGoal,
-    onStartRecording,
-    onStopRecording,
-    onCancelRecording,
-    onRetryUpload,
-    onChooseWritten,
-  }: Props = $props();
+  let currentTurn = $derived(viewState.turn);
+  let maxRecordingSeconds = $derived(viewState.recorder.maxRecordingSeconds);
+  let recorderStatus = $derived(viewState.recorder.status);
+  let recordingSeconds = $derived(viewState.recorder.recordingSeconds);
+  let canRecord = $derived(viewState.recorder.canRecord);
+  let recorderError = $derived(viewState.recorder.errorMessage);
+  let supportRevealed = $derived(viewState.support.revealed);
+  let englishSupport = $derived(viewState.support.englishText);
+  let supportDisclosureState = $derived(viewState.support.disclosureState);
+  let attemptSupportUsed = $derived(viewState.support.usedDuringAttempt);
+  let submissionState = $derived(viewState.assessment.submissionState);
+  let assessment = $derived(viewState.assessment.result);
+  let pendingNextTurn = $derived(viewState.assessment.pendingNextTurn);
+  let submissionRecovery = $derived(viewState.recovery.submissionRecovery);
+  let hasPendingAudio = $derived(viewState.recovery.hasPendingAudio);
+  let errorMessage = $derived(viewState.recovery.errorMessage);
+  let audioPlaying = $derived(viewState.audio.playing);
 
   let headingElement = $state<HTMLHeadingElement>();
   let supportCopyElement = $state<HTMLDivElement>();
@@ -77,7 +35,7 @@
   let errorMessageElement = $state<HTMLParagraphElement>();
   let focusedTurnNumber = 0;
   let previousRecorderStatus: AudioRecorderStatus | null = null;
-  let previousSubmissionState: SubmissionState | null = null;
+  let previousSubmissionState: SpokenMissionSubmissionState | null = null;
   let previousSubmissionTurnNumber: number | null = null;
   let previousSupportRevealed: boolean | null = null;
 
@@ -157,7 +115,7 @@
     <p class="japanese">{currentTurn.npcDialogue.japanese}</p>
     <p class="romaji">{currentTurn.npcDialogue.romaji}</p>
     <div class="line-actions">
-      <button class="line-button" type="button" onclick={onPlayServerLine}>
+      <button class="line-button" type="button" onclick={actions.audio.toggleServerLine}>
         {audioPlaying ? 'Stop audio' : 'Replay Japanese'}
       </button>
       {#if !supportRevealed}
@@ -165,7 +123,7 @@
           class="line-button support"
           type="button"
           disabled={supportDisclosureState === 'processing'}
-          onclick={onRevealSupport}
+          onclick={actions.support.reveal}
         >
           {supportDisclosureState === 'processing'
             ? 'Revealing English support…'
@@ -202,9 +160,13 @@
       {/if}
       <p class="feedback">{assessment.feedback}</p>
       {#if assessment.outcome === 'accepted' && pendingNextTurn}
-        <button class="btn btn-primary" type="button" onclick={onContinue}>Continue</button>
+        <button class="btn btn-primary" type="button" onclick={actions.assessment.continue}
+          >Continue</button
+        >
       {:else}
-        <button class="btn btn-primary" type="button" onclick={onRetryGoal}>Record again</button>
+        <button class="btn btn-primary" type="button" onclick={actions.assessment.retryGoal}
+          >Record again</button
+        >
       {/if}
     </article>
   {:else}
@@ -231,23 +193,25 @@
             class="btn btn-primary record-button"
             type="button"
             bind:this={stopButtonElement}
-            onclick={onStopRecording}>Stop and assess</button
+            onclick={actions.recorder.stop}>Stop and assess</button
           >
-          <button class="btn btn-ghost" type="button" onclick={onCancelRecording}>Cancel</button>
+          <button class="btn btn-ghost" type="button" onclick={actions.recorder.cancel}
+            >Cancel</button
+          >
         {:else if recorderStatus === 'requesting_permission' || recorderStatus === 'stopping' || submissionState === 'processing'}
           <button class="btn btn-primary" type="button" disabled>Working…</button>
         {:else if submissionState === 'error'}
           {#if submissionRecovery === 'retry_upload' && hasPendingAudio}
-            <button class="btn btn-primary" type="button" onclick={onRetryUpload}
+            <button class="btn btn-primary" type="button" onclick={actions.recovery.retryUpload}
               >Retry upload</button
             >
           {/if}
           {#if submissionRecovery === 'record_again'}
-            <button class="btn btn-secondary" type="button" onclick={onRetryGoal}
+            <button class="btn btn-secondary" type="button" onclick={actions.recovery.recordAgain}
               >Record again</button
             >
           {/if}
-          <button class="btn btn-secondary" type="button" onclick={onChooseWritten}
+          <button class="btn btn-secondary" type="button" onclick={actions.recovery.chooseWritten}
             >Use Written Mission</button
           >
         {:else if recorderStatus !== 'unsupported'}
@@ -256,13 +220,13 @@
             type="button"
             disabled={!canRecord}
             bind:this={recordButtonElement}
-            onclick={onStartRecording}
+            onclick={actions.recorder.start}
           >
             <span class="record-icon" aria-hidden="true"></span> Record response
           </button>
         {/if}
         {#if submissionState !== 'error' && (recorderStatus === 'unsupported' || recorderStatus === 'error')}
-          <button class="btn btn-secondary" type="button" onclick={onChooseWritten}
+          <button class="btn btn-secondary" type="button" onclick={actions.recovery.chooseWritten}
             >Use Written Mission</button
           >
         {/if}
