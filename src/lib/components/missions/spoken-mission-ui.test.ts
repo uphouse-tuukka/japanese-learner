@@ -119,7 +119,15 @@ function renderTurn(input: {
       englishSupport: input.supportRevealed ? serverTurn.englishSupport : null,
       supportDisclosureState: 'idle',
       attemptSupportUsed: input.attemptSupportUsed,
-      assessment: null,
+      assessment:
+        input.submissionState === 'feedback'
+          ? {
+              transcript: 'ラーメンを一つお願いします。',
+              outcome: 'accepted',
+              confidence: 'high',
+              feedback: 'You ordered one ramen.',
+            }
+          : null,
       pendingNextTurn: null,
       recorderStatus: input.recorderStatus ?? 'idle',
       recordingSeconds: 0,
@@ -144,6 +152,54 @@ function renderTurn(input: {
 }
 
 describe('Spoken Mission learner-visible support UI', () => {
+  it('exposes programmatic focus destinations for each changing mission stage', () => {
+    const briefingHtml = render(SpokenMissionBriefing, {
+      props: {
+        briefing: {
+          canDo: 'I can complete the restaurant task.',
+          situation: 'At a restaurant.',
+          assessment: 'Intent is assessed, not accent.',
+          privacy: 'Raw audio is discarded.',
+          approximateMinutes: 2,
+          maxRecordingSeconds: 12,
+          goals: [
+            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
+            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
+            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+          ],
+        },
+        bestEvidence: 'untried',
+        resumable: null,
+        errorMessage: '',
+        onStart: vi.fn(),
+        onChooseWritten: vi.fn(),
+      },
+    }).body;
+    const turnHtml = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
+    const supportHtml = renderTurn({ supportRevealed: true, attemptSupportUsed: true });
+    const feedbackHtml = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      submissionState: 'feedback',
+    });
+    const errorHtml = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      submissionState: 'error',
+      errorMessage: 'The network request failed.',
+    });
+    const resultHtml = render(SpokenMissionResult, {
+      props: { result, onTryAgain: vi.fn() },
+    }).body;
+
+    expect(briefingHtml).toMatch(/<h2[^>]*id="spoken-heading"[^>]*tabindex="-1"/);
+    expect(turnHtml).toMatch(/<h2[^>]*id="turn-heading"[^>]*tabindex="-1"/);
+    expect(supportHtml).toMatch(/<div[^>]*class="support-copy[^>]*tabindex="-1"/);
+    expect(feedbackHtml).toMatch(/<h3[^>]*class="outcome[^>]*tabindex="-1"/);
+    expect(errorHtml).toMatch(/<p[^>]*role="alert"[^>]*tabindex="-1"/);
+    expect(resultHtml).toMatch(/<h2[^>]*id="result-heading"[^>]*tabindex="-1"/);
+  });
+
   it('offers resume and Start over while explaining the saved progress', () => {
     const html = render(SpokenMissionBriefing, {
       props: {

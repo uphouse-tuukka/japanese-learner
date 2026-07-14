@@ -80,10 +80,10 @@ function browserDependencies(): AudioRecorderDependencies | null {
         stream as MediaStream,
         mimeType ? { mimeType } : undefined,
       ) as unknown as RecorderLike,
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
+    setTimeout: (callback, milliseconds) => globalThis.setTimeout(callback, milliseconds),
+    clearTimeout: (timer) => globalThis.clearTimeout(timer),
+    setInterval: (callback, milliseconds) => globalThis.setInterval(callback, milliseconds),
+    clearInterval: (timer) => globalThis.clearInterval(timer),
   };
 }
 

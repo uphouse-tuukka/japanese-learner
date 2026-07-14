@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAudioRecorder,
   type AudioRecorderDependencies,
@@ -40,6 +40,67 @@ function createHarness() {
 describe('createAudioRecorder', () => {
   beforeEach(() => {
     vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts through browser APIs without invoking host timers as object methods', async () => {
+    const track = { stop: vi.fn() };
+    const stream: RecorderStreamLike = { getTracks: () => [track] };
+    const originalSetInterval = globalThis.setInterval;
+    const hostSetInterval = function (
+      this: typeof globalThis | undefined,
+      callback: () => void,
+      milliseconds: number,
+    ): ReturnType<typeof setInterval> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return originalSetInterval(callback, milliseconds);
+    };
+
+    class BrowserMediaRecorder implements RecorderLike {
+      static isTypeSupported(mimeType: string): boolean {
+        return mimeType === 'audio/webm;codecs=opus';
+      }
+
+      state = 'inactive';
+      mimeType: string;
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_stream: RecorderStreamLike, options?: { mimeType?: string }) {
+        this.mimeType = options?.mimeType ?? 'audio/webm';
+      }
+
+      start(): void {
+        this.state = 'recording';
+      }
+
+      stop(): void {
+        this.state = 'inactive';
+        this.onstop?.();
+      }
+    }
+
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: vi.fn(async () => stream) },
+    });
+    vi.stubGlobal('MediaRecorder', BrowserMediaRecorder);
+    vi.stubGlobal('setInterval', hostSetInterval);
+
+    const controller = createAudioRecorder({
+      maxDurationSeconds: 12,
+      onStateChange: vi.fn(),
+      onRecordingReady: vi.fn(),
+    });
+
+    await controller.start();
+
+    expect(controller.snapshot.status).toBe('recording');
+    controller.dispose();
+    expect(track.stop).toHaveBeenCalledTimes(1);
   });
 
   it('requests permission only on explicit start and negotiates the preferred MIME type', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte';
   import type { SpokenMissionBriefing, SpokenMissionEvidenceState } from '$lib/types';
 
   type Props = {
@@ -12,6 +13,12 @@
 
   let { briefing, bestEvidence, resumable, errorMessage, onStart, onChooseWritten }: Props =
     $props();
+
+  let headingElement: HTMLHeadingElement;
+
+  onMount(() => {
+    void tick().then(() => headingElement.focus());
+  });
 
   const evidenceLabel = $derived(
     bestEvidence === 'untried'
@@ -37,7 +44,7 @@
 
   <div class="briefing-lead">
     <p class="eyebrow">Can-do</p>
-    <h2 id="spoken-heading">{briefing.canDo}</h2>
+    <h2 id="spoken-heading" tabindex="-1" bind:this={headingElement}>{briefing.canDo}</h2>
     <p>{briefing.situation}</p>
   </div>
 

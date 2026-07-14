@@ -70,6 +70,8 @@
 
   let showContinuePrompt = $state(false);
   let threadContainer = $state<HTMLDivElement | null>(null);
+  let missionChoiceHeading = $state<HTMLHeadingElement | null>(null);
+  let writtenMissionHeading = $state<HTMLHeadingElement | null>(null);
 
   async function scrollToLatestTurn(): Promise<void> {
     if (uiState !== 'active') return;
@@ -196,16 +198,20 @@
     mode = mode === 'practice' ? 'immersion' : 'practice';
   }
 
-  function chooseWrittenMission(): void {
+  async function chooseWrittenMission(): Promise<void> {
     missionExperience = 'written';
+    await tick();
+    writtenMissionHeading?.focus();
   }
 
   function chooseSpokenMission(): void {
     missionExperience = 'spoken';
   }
 
-  function returnToMissionChoice(): void {
+  async function returnToMissionChoice(): Promise<void> {
     missionExperience = 'choice';
+    await tick();
+    missionChoiceHeading?.focus();
   }
 
   async function startMission(): Promise<void> {
@@ -384,7 +390,9 @@
     <section class="card mission-choice" aria-labelledby="mission-choice-heading">
       <div class="choice-heading">
         <p class="choice-kicker">Choose how to practice</p>
-        <h2 id="mission-choice-heading">One situation, two real ways to prepare.</h2>
+        <h2 id="mission-choice-heading" tabindex="-1" bind:this={missionChoiceHeading}>
+          One situation, two real ways to prepare.
+        </h2>
         <p>Written and spoken work stay separate, so you can choose the evidence you want today.</p>
       </div>
 
@@ -455,6 +463,11 @@
     </section>
   {:else if uiState === 'ready'}
     <section class="card ready-card">
+      {#if data.spokenMission}
+        <h2 class="written-heading" tabindex="-1" bind:this={writtenMissionHeading}>
+          Written Mission
+        </h2>
+      {/if}
       {#if data.spokenMission}
         <button class="choice-back" type="button" onclick={returnToMissionChoice}>
           ← Choose mission type
@@ -633,6 +646,12 @@
     gap: var(--space-6);
     padding: clamp(var(--space-5), 5vw, var(--space-8));
     min-width: 0;
+  }
+
+  .written-heading {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-light);
   }
 
   .choice-heading {
