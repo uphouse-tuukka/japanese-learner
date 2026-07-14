@@ -20,6 +20,7 @@
     SpokenMissionEvidenceState,
     SpokenMissionHistoryEntry,
     SpokenMissionResult,
+    SpokenMissionResumeProgress,
     SpokenMissionServerTurn,
     SpokenMissionSupportResponse,
     SpokenMissionTurnRecovery,
@@ -31,7 +32,7 @@
     userId: string;
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
-    resumable: { currentTurn: number; completedGoalCount: number } | null;
+    resumable: SpokenMissionResumeProgress | null;
     onChooseWritten: () => void;
   };
 

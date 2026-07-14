@@ -4,10 +4,10 @@
   import MissionCompletion from '$lib/components/missions/MissionCompletion.svelte';
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
   import SpokenMission from '$lib/components/missions/SpokenMission.svelte';
+  import SpokenMissionChoiceStatus from '$lib/components/missions/SpokenMissionChoiceStatus.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
   import { canCompleteMission, shouldShowMissionResponseControls } from '$lib/utils/mission-state';
-  import { getSpokenMissionEvidenceLabel } from '$lib/utils/spoken-mission';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -431,11 +431,10 @@
               >Order, respond, and repair in three short push-to-talk turns. Accent is not scored.</small
             >
           </span>
-          <span class="type-status spoken-status" data-evidence={data.spokenMission.bestEvidence}>
-            {data.spokenMission.resumable
-              ? `Resume goal ${data.spokenMission.resumable.currentTurn}`
-              : getSpokenMissionEvidenceLabel(data.spokenMission.bestEvidence)}
-          </span>
+          <SpokenMissionChoiceStatus
+            bestEvidence={data.spokenMission.bestEvidence}
+            resumable={data.spokenMission.resumable}
+          />
         </button>
       </div>
 
@@ -776,11 +775,6 @@
     background: var(--bg-kinu);
     color: var(--text-bokashi);
     font-size: var(--text-xs);
-  }
-
-  .spoken-status[data-evidence='independent'] {
-    background: var(--accent-matcha-wash);
-    color: var(--accent-matcha);
   }
 
   .back-link,

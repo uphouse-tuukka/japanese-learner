@@ -358,6 +358,11 @@ export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_a
 export type SpokenMissionTurnRecovery = 'retry_upload' | 'record_again' | 'none';
 export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
 
+export interface SpokenMissionResumeProgress {
+  currentTurn: number;
+  completedGoalCount: number;
+}
+
 export interface SpokenMissionAssessment {
   transcript: string | null;
   outcome: SpokenMissionAssessmentOutcome;
