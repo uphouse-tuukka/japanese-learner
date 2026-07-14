@@ -65,6 +65,58 @@ describe('createAudioRecorder', () => {
     expect(controller.snapshot.status).toBe('recording');
   });
 
+  it('falls back to MP4 when the browser does not support WebM recording', async () => {
+    const { dependencies } = createHarness();
+    vi.mocked(dependencies.isTypeSupported).mockImplementation(
+      (mimeType) => mimeType === 'audio/mp4',
+    );
+    const controller = createAudioRecorder({
+      maxDurationSeconds: 12,
+      dependencies,
+      onStateChange: vi.fn(),
+      onRecordingReady: vi.fn(),
+    });
+
+    await controller.start();
+
+    expect(dependencies.createRecorder).toHaveBeenCalledWith(expect.anything(), 'audio/mp4');
+  });
+
+  it('reports unsupported browsers without requesting microphone access', async () => {
+    const states: string[] = [];
+    const controller = createAudioRecorder({
+      maxDurationSeconds: 12,
+      dependencies: null,
+      onStateChange: (snapshot) => states.push(snapshot.status),
+      onRecordingReady: vi.fn(),
+    });
+
+    await controller.start();
+
+    expect(controller.snapshot.status).toBe('unsupported');
+    expect(states).toContain('unsupported');
+  });
+
+  it('falls back as unsupported when no approved recording MIME type is available', async () => {
+    const { dependencies } = createHarness();
+    vi.mocked(dependencies.isTypeSupported).mockReturnValue(false);
+    const controller = createAudioRecorder({
+      maxDurationSeconds: 12,
+      dependencies,
+      onStateChange: vi.fn(),
+      onRecordingReady: vi.fn(),
+    });
+
+    await controller.start();
+
+    expect(controller.snapshot).toMatchObject({
+      status: 'unsupported',
+      errorMessage: 'This browser cannot record a supported WebM or MP4 audio format.',
+    });
+    expect(dependencies.getUserMedia).not.toHaveBeenCalled();
+    expect(dependencies.createRecorder).not.toHaveBeenCalled();
+  });
+
   it('returns recorded audio and releases every media track after a manual stop', async () => {
     const { dependencies, track } = createHarness();
     const onRecordingReady = vi.fn();

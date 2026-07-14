@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { SpokenMissionServerTurn, SpokenMissionTurnResponse } from '$lib/types';
+  import type {
+    SpokenMissionServerTurn,
+    SpokenMissionTurnRecovery,
+    SpokenMissionTurnResponse,
+  } from '$lib/types';
   import type { AudioRecorderStatus } from '$lib/utils/audio-recorder';
 
   type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
@@ -17,6 +21,7 @@
     recorderStatus: AudioRecorderStatus;
     recordingSeconds: number;
     submissionState: SubmissionState;
+    submissionRecovery: SpokenMissionTurnRecovery;
     canRecord: boolean;
     audioPlaying: boolean;
     recorderError: string;
@@ -45,6 +50,7 @@
     recorderStatus,
     recordingSeconds,
     submissionState,
+    submissionRecovery,
     canRecord,
     audioPlaying,
     recorderError,
@@ -161,8 +167,19 @@
           <button class="btn btn-ghost" type="button" onclick={onCancelRecording}>Cancel</button>
         {:else if recorderStatus === 'requesting_permission' || recorderStatus === 'stopping' || submissionState === 'processing'}
           <button class="btn btn-primary" type="button" disabled>Working…</button>
-        {:else if submissionState === 'error' && hasPendingAudio}
-          <button class="btn btn-primary" type="button" onclick={onRetryUpload}>Retry upload</button
+        {:else if submissionState === 'error'}
+          {#if submissionRecovery === 'retry_upload' && hasPendingAudio}
+            <button class="btn btn-primary" type="button" onclick={onRetryUpload}
+              >Retry upload</button
+            >
+          {/if}
+          {#if submissionRecovery === 'record_again'}
+            <button class="btn btn-secondary" type="button" onclick={onRetryGoal}
+              >Record again</button
+            >
+          {/if}
+          <button class="btn btn-secondary" type="button" onclick={onChooseWritten}
+            >Use Written Mission</button
           >
         {:else if recorderStatus !== 'unsupported'}
           <button
@@ -174,7 +191,7 @@
             <span class="record-icon" aria-hidden="true"></span> Record response
           </button>
         {/if}
-        {#if recorderStatus === 'unsupported' || recorderStatus === 'error'}
+        {#if submissionState !== 'error' && (recorderStatus === 'unsupported' || recorderStatus === 'error')}
           <button class="btn btn-secondary" type="button" onclick={onChooseWritten}
             >Use Written Mission</button
           >

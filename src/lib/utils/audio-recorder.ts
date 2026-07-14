@@ -151,6 +151,15 @@ export class AudioRecorderController {
     }
     if (this.snapshot.status !== 'idle' && this.snapshot.status !== 'error') return;
 
+    const mimeType = negotiateAudioMimeType(this.dependencies.isTypeSupported);
+    if (!mimeType) {
+      this.update({
+        status: 'unsupported',
+        errorMessage: 'This browser cannot record a supported WebM or MP4 audio format.',
+      });
+      return;
+    }
+
     const permissionRequestId = ++this.permissionRequestId;
     this.update({ status: 'requesting_permission', errorMessage: undefined });
     try {
@@ -160,7 +169,6 @@ export class AudioRecorderController {
         return;
       }
       this.stream = stream;
-      const mimeType = negotiateAudioMimeType(this.dependencies.isTypeSupported);
       this.recorder = this.dependencies.createRecorder(this.stream, mimeType);
       const recorder = this.recorder;
       this.chunks = [];

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { requestSpokenMissionStart } from './spoken-mission-client';
+import { requestSpokenMissionStart, requestSpokenMissionTurn } from './spoken-mission-client';
 
 const originalSessionStorageDescriptor = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -57,6 +57,12 @@ function startResponse(resumed: boolean): Response {
   });
 }
 
+function turnForm(): FormData {
+  const form = new FormData();
+  form.set('audio', new File(['voice-data'], 'turn.webm', { type: 'audio/webm' }));
+  return form;
+}
+
 afterEach(() => {
   restoreSessionStorage();
 });
@@ -107,5 +113,56 @@ describe('Spoken Mission browser start boundary', () => {
 
     expect(result.history[0]?.assessment.transcript).toBe('ラーメンを一つお願いします。');
     expect(storage.setItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('Spoken Mission browser turn boundary', () => {
+  it('preserves the recorded response for a network retry', async () => {
+    const form = turnForm();
+
+    await expect(
+      requestSpokenMissionTurn({
+        missionId: 'mission-order-restaurant',
+        form,
+        fetcher: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      }),
+    ).rejects.toMatchObject({
+      message: 'Could not reach the assessment service. Your attempt is saved.',
+      recovery: 'retry_upload',
+    });
+
+    expect(form.get('audio')).toBeInstanceOf(File);
+  });
+
+  it.each([
+    [
+      'unsupported audio',
+      400,
+      'Unsupported audio format. Please try recording again.',
+      'record_again',
+    ],
+    [
+      'oversized audio',
+      400,
+      'Audio file is too large. Please record a shorter answer.',
+      'record_again',
+    ],
+    ['budget exhaustion', 429, 'Daily AI budget exhausted. Your attempt is saved.', 'retry_upload'],
+    [
+      'service failure',
+      500,
+      'Failed to assess Spoken Mission response. Your attempt is saved.',
+      'retry_upload',
+    ],
+  ] as const)('maps %s to a safe recovery action', async (_case, status, error, recovery) => {
+    await expect(
+      requestSpokenMissionTurn({
+        missionId: 'mission-order-restaurant',
+        form: turnForm(),
+        fetcher: vi
+          .fn()
+          .mockResolvedValue(Response.json({ ok: false, error, recovery }, { status })),
+      }),
+    ).rejects.toMatchObject({ message: error, recovery });
   });
 });

@@ -4,7 +4,11 @@
   import SpokenMissionHistoryView from './SpokenMissionHistory.svelte';
   import SpokenMissionResultView from './SpokenMissionResult.svelte';
   import SpokenMissionTurnView from './SpokenMissionTurn.svelte';
-  import { requestSpokenMissionStart } from './spoken-mission-client';
+  import {
+    requestSpokenMissionStart,
+    requestSpokenMissionTurn,
+    SpokenMissionTurnRequestError,
+  } from './spoken-mission-client';
   import {
     createAudioRecorder,
     type AudioRecorderController,
@@ -18,6 +22,7 @@
     SpokenMissionResult,
     SpokenMissionServerTurn,
     SpokenMissionSupportResponse,
+    SpokenMissionTurnRecovery,
     SpokenMissionTurnResponse,
   } from '$lib/types';
 
@@ -33,11 +38,17 @@
   type Stage = 'briefing' | 'starting' | 'active' | 'complete';
   type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
   type SupportDisclosureState = 'idle' | 'processing';
+  type PendingRecording = {
+    audio: Blob;
+    responseId: string;
+    mimeType: string;
+  };
 
   let { missionId, userId, briefing, bestEvidence, resumable, onChooseWritten }: Props = $props();
 
   let stage = $state<Stage>('briefing');
   let submissionState = $state<SubmissionState>('idle');
+  let submissionRecovery = $state<SpokenMissionTurnRecovery>('none');
   let attemptId = $state('');
   let currentTurn = $state<SpokenMissionServerTurn | null>(null);
   let pendingNextTurn = $state<SpokenMissionServerTurn | null>(null);
@@ -49,11 +60,9 @@
   let assessment = $state<SpokenMissionTurnResponse['assessment'] | null>(null);
   let result = $state<SpokenMissionResult | null>(null);
   let errorMessage = $state('');
-  let pendingAudio = $state<Blob | null>(null);
-  let pendingResponseId = $state('');
+  let pendingRecording = $state<PendingRecording | null>(null);
   let recorderStatus = $state<AudioRecorderStatus>('idle');
   let recordingSeconds = $state(0);
-  let selectedMimeType = $state('');
   let recorderError = $state('');
   let audioPlaying = $state(false);
   let audioPoll: ReturnType<typeof setInterval> | null = null;
@@ -77,7 +86,6 @@
       onStateChange: (snapshot) => {
         recorderStatus = snapshot.status;
         recordingSeconds = snapshot.elapsedSeconds;
-        selectedMimeType = snapshot.mimeType;
         recorderError = snapshot.errorMessage?.includes('permission was denied')
           ? 'Microphone permission was denied. Retry recording or use Written Mission.'
           : (snapshot.errorMessage ??
@@ -86,9 +94,7 @@
               : ''));
       },
       onRecordingReady: ({ audio, mimeType }) => {
-        selectedMimeType = mimeType;
-        pendingAudio = audio;
-        pendingResponseId = createResponseId();
+        pendingRecording = { audio, mimeType, responseId: createResponseId() };
         void submitRecording();
       },
     });
@@ -112,6 +118,7 @@
       revealedEnglishSupport = null;
       supportDisclosureState = 'idle';
       submissionState = 'idle';
+      submissionRecovery = 'none';
       stage = 'active';
       resetRecorder();
     } catch (error) {
@@ -138,36 +145,35 @@
   }
 
   async function submitRecording(): Promise<void> {
-    if (!pendingAudio || !pendingResponseId || !currentTurn) return;
+    if (!pendingRecording || !currentTurn) return;
     submissionState = 'processing';
+    submissionRecovery = 'none';
     errorMessage = '';
 
     const form = new FormData();
     form.set('userId', userId);
     form.set('attemptId', attemptId);
     form.set('turnNumber', String(currentTurn.turnNumber));
-    form.set('clientResponseId', pendingResponseId);
+    form.set('clientResponseId', pendingRecording.responseId);
     form.set('supportRevealed', String(supportRevealed));
-    const extension = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
-    form.set('audio', pendingAudio, `spoken-mission-turn.${extension}`);
+    const extension = pendingRecording.mimeType.includes('mp4') ? 'mp4' : 'webm';
+    form.set('audio', pendingRecording.audio, `spoken-mission-turn.${extension}`);
 
     try {
-      const response = await fetch(`/api/missions/${missionId}/spoken/turn`, {
-        method: 'POST',
-        body: form,
-      });
-      const payload = (await response.json()) as SpokenMissionTurnResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? 'Could not assess this response.');
+      const payload = await requestSpokenMissionTurn({ missionId, form });
 
       assessment = payload.assessment;
       pendingNextTurn = payload.nextTurn;
       result = payload.result;
-      pendingAudio = null;
-      pendingResponseId = '';
+      pendingRecording = null;
       submissionState = 'feedback';
       if (payload.isComplete && payload.result) stage = 'complete';
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Could not assess this response.';
+      submissionRecovery = error instanceof SpokenMissionTurnRequestError ? error.recovery : 'none';
+      if (submissionRecovery === 'record_again') {
+        pendingRecording = null;
+      }
       submissionState = 'error';
     }
   }
@@ -175,9 +181,9 @@
   function retryGoal(): void {
     assessment = null;
     errorMessage = '';
-    pendingAudio = null;
-    pendingResponseId = '';
+    pendingRecording = null;
     submissionState = 'idle';
+    submissionRecovery = 'none';
     recorder?.retry();
   }
 
@@ -190,6 +196,7 @@
     supportDisclosureState = 'idle';
     assessment = null;
     submissionState = 'idle';
+    submissionRecovery = 'none';
     recorder?.retry();
   }
 
@@ -290,11 +297,12 @@
     {recorderStatus}
     {recordingSeconds}
     {submissionState}
+    {submissionRecovery}
     {canRecord}
     {audioPlaying}
     {recorderError}
     {errorMessage}
-    hasPendingAudio={pendingAudio !== null}
+    hasPendingAudio={pendingRecording !== null}
     onPlayServerLine={playServerLine}
     onRevealSupport={revealSupport}
     onContinue={continueToNextGoal}
