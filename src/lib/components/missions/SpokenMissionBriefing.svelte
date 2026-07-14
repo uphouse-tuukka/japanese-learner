@@ -4,7 +4,7 @@
   type Props = {
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
-    resumable: { currentTurn: number } | null;
+    resumable: { currentTurn: number; completedGoalCount: number } | null;
     errorMessage: string;
     onStart: (startOver: boolean) => void;
     onChooseWritten: () => void;
@@ -76,6 +76,12 @@
       >Choose Written Mission</button
     >
   </div>
+  {#if resumable}
+    <p class="resume-note">
+      {resumable.completedGoalCount} of 3 goals complete. Your saved transcript and feedback will be restored
+      when you resume.
+    </p>
+  {/if}
   <p class="permission-note">Microphone permission is requested only when you press Record.</p>
 </section>
 
@@ -196,10 +202,14 @@
     font-size: var(--text-sm);
     color: var(--text-bokashi);
   }
-  .permission-note {
+  .permission-note,
+  .resume-note {
     margin: calc(var(--space-2) * -1) 0 0;
     font-size: var(--text-xs);
     color: var(--text-usuzumi);
+  }
+  .resume-note {
+    color: var(--text-bokashi);
   }
   .message {
     margin: 0;

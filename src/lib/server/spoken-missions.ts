@@ -2,6 +2,7 @@ import type {
   SpokenMissionAttempt,
   SpokenMissionBriefing,
   SpokenMissionGoalKey,
+  SpokenMissionHistoryEntry,
   SpokenMissionResult,
   SpokenMissionServerTurn,
 } from '$lib/types';
@@ -188,6 +189,36 @@ export function getSpokenMissionServerTurn(
     },
     englishSupport: line.english,
   };
+}
+
+export function toSpokenMissionHistory(
+  definition: SpokenMissionDefinition,
+  attempt: SpokenMissionAttempt,
+): SpokenMissionHistoryEntry[] {
+  return attempt.conversationLog.map((entry) => {
+    const goal = definition.goals.find((candidate) => candidate.key === entry.goalKey);
+    if (!goal) {
+      throw new Error(`[spoken-missions] saved attempt has unknown goal: ${entry.goalKey}`);
+    }
+
+    return {
+      goalKey: entry.goalKey,
+      goalTitle: goal.title,
+      turnNumber: entry.turnNumber,
+      npcDialogue: {
+        japanese: entry.npcJapanese,
+        romaji: entry.npcRomaji,
+      },
+      assessment: {
+        transcript: entry.transcript,
+        outcome: entry.outcome,
+        confidence: entry.confidence,
+        feedback: entry.feedback,
+      },
+      supportUsed: entry.supportUsed,
+      assessedAt: entry.assessedAt,
+    };
+  });
 }
 
 export function toSpokenMissionResult(

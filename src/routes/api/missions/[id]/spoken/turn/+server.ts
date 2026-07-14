@@ -104,15 +104,14 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       return jsonError('Spoken Mission definition changed. Start over to continue.', 409);
     }
 
+    if (attempt.status !== 'in_progress') {
+      return jsonError('Spoken Mission attempt is not in progress.', 400);
+    }
     const duplicate = attempt.conversationLog.find(
       (entry) => entry.clientResponseId === clientResponseId,
     );
     if (duplicate) {
       return json(serializeTurnResponse(definition, attempt, duplicate, true));
-    }
-
-    if (attempt.status !== 'in_progress') {
-      return jsonError('Spoken Mission attempt is not in progress.', 400);
     }
     if (turnNumber < 1 || turnNumber > 3 || attempt.currentTurn !== turnNumber) {
       return jsonError('Turn does not match current attempt progress.', 409);

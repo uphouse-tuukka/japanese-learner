@@ -197,6 +197,55 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
     expect(mocks.record).not.toHaveBeenCalled();
   });
 
+  it.each(['completed', 'abandoned'] as const)(
+    'rejects a new turn submission for a %s attempt',
+    async (status) => {
+      mocks.getAttempt.mockResolvedValue({ ...attempt, status });
+
+      const response = await turn();
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'Spoken Mission attempt is not in progress.',
+      });
+      expect(mocks.budget).not.toHaveBeenCalled();
+      expect(mocks.assess).not.toHaveBeenCalled();
+      expect(mocks.record).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['completed', 'abandoned'] as const)(
+    'rejects a replayed turn submission for a %s attempt',
+    async (status) => {
+      mocks.getAttempt.mockResolvedValue({
+        ...attempt,
+        status,
+        conversationLog: [
+          {
+            goalKey: 'order',
+            turnNumber: 1,
+            npcJapanese: 'ご注文はお決まりですか。',
+            npcRomaji: 'go-chuumon wa okimari desu ka.',
+            transcript: 'ラーメンをください。',
+            outcome: 'accepted',
+            confidence: 'high',
+            feedback: 'Accepted.',
+            supportUsed: false,
+            clientResponseId: 'client-response-1',
+            assessedAt: '2026-07-13T12:00:00.000Z',
+          },
+        ],
+      });
+
+      const response = await turn();
+
+      expect(response.status).toBe(400);
+      expect(mocks.budget).not.toHaveBeenCalled();
+      expect(mocks.assess).not.toHaveBeenCalled();
+      expect(mocks.record).not.toHaveBeenCalled();
+    },
+  );
+
   it('validates audio bounds before checking budget', async () => {
     const response = await turn({
       audio: new File(['not audio'], 'answer.txt', { type: 'text/plain' }),

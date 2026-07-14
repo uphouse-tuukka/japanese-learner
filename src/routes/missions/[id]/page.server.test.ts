@@ -90,7 +90,12 @@ describe('mission detail loader Spoken Mission availability', () => {
     mocks.categoryCount.mockResolvedValue(2);
     mocks.completedMode.mockResolvedValue(false);
     mocks.bestEvidence.mockResolvedValue('independent');
-    mocks.resumable.mockResolvedValue({ currentTurn: 2, supportUsed: false });
+    mocks.resumable.mockResolvedValue({
+      currentTurn: 2,
+      successfulTurnCount: 1,
+      supportUsed: false,
+      conversationLog: [{ transcript: 'private transcript' }],
+    });
     mocks.getDefinition.mockReturnValue(definition);
   });
 
@@ -105,12 +110,14 @@ describe('mission detail loader Spoken Mission availability', () => {
       writtenProgress: { completedPractice: false, completedImmersion: false },
       spokenMission: {
         bestEvidence: 'independent',
-        resumable: { currentTurn: 2 },
+        resumable: { currentTurn: 2, completedGoalCount: 1 },
         briefing: {
           goals: [{ key: 'order' }, { key: 'respond' }, { key: 'repair' }],
         },
       },
     });
+    expect(mocks.resumable).toHaveBeenCalledWith('user-1', 'mission-order-restaurant');
+    expect(JSON.stringify(data)).not.toContain('private transcript');
   });
 
   it('returns no Spoken Mission data for a non-enabled scenario so Written Mission opens directly', async () => {

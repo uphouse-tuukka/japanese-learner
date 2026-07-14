@@ -9,12 +9,14 @@ import {
   getSpokenMissionServerTurn,
   selectSpokenMissionVariant,
   toSpokenMissionBriefing,
+  toSpokenMissionHistory,
 } from '$lib/server/spoken-missions';
 import {
-  abandonResumableSpokenMissionAttempts,
   createSpokenMissionAttempt,
   getMostRecentSpokenMissionVariant,
   getResumableSpokenMissionAttempt,
+  restartSpokenMissionAttempt,
+  SpokenMissionProgressConflictError,
 } from '$lib/server/spoken-missions-db';
 import { getUser } from '$lib/server/users';
 import type { SpokenMissionAttempt, SpokenMissionStartResponse } from '$lib/types';
@@ -66,19 +68,28 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     }
 
     const previousVariant = await getMostRecentSpokenMissionVariant(userId, mission.id);
-    if (body.startOver) {
-      await abandonResumableSpokenMissionAttempts(userId, mission.id);
-    }
     const wordingVariant = selectSpokenMissionVariant(definition, previousVariant);
-    const attempt = await createSpokenMissionAttempt({
-      userId,
-      missionId: mission.id,
-      definitionVersion: definition.version,
-      wordingVariant,
-    });
+    const attempt =
+      body.startOver && resumable
+        ? await restartSpokenMissionAttempt({
+            attemptId: resumable.id,
+            userId,
+            missionId: mission.id,
+            definitionVersion: definition.version,
+            wordingVariant,
+          })
+        : await createSpokenMissionAttempt({
+            userId,
+            missionId: mission.id,
+            definitionVersion: definition.version,
+            wordingVariant,
+          });
 
     return json(serializeStartResponse(definition, attempt, false));
   } catch (error) {
+    if (error instanceof SpokenMissionProgressConflictError) {
+      return jsonError('Spoken Mission progress changed. Reload and try again.', 409);
+    }
     console.error('[api/missions/[id]/spoken/start] failed', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
       missionId: params.id,
@@ -96,6 +107,7 @@ function serializeStartResponse(
     attemptId: attempt.id,
     briefing: toSpokenMissionBriefing(definition),
     turn: getSpokenMissionServerTurn(definition, attempt.wordingVariant, attempt.currentTurn),
+    history: toSpokenMissionHistory(definition, attempt),
     totalTurns: 3,
     resumed,
     supportUsed: attempt.supportUsed,

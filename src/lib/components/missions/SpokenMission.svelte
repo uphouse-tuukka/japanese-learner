@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import SpokenMissionBriefingView from './SpokenMissionBriefing.svelte';
+  import SpokenMissionHistoryView from './SpokenMissionHistory.svelte';
   import SpokenMissionResultView from './SpokenMissionResult.svelte';
   import SpokenMissionTurnView from './SpokenMissionTurn.svelte';
+  import { requestSpokenMissionStart } from './spoken-mission-client';
   import {
     createAudioRecorder,
     type AudioRecorderController,
@@ -12,9 +14,9 @@
   import type {
     SpokenMissionBriefing,
     SpokenMissionEvidenceState,
+    SpokenMissionHistoryEntry,
     SpokenMissionResult,
     SpokenMissionServerTurn,
-    SpokenMissionStartResponse,
     SpokenMissionSupportResponse,
     SpokenMissionTurnResponse,
   } from '$lib/types';
@@ -24,7 +26,7 @@
     userId: string;
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
-    resumable: { currentTurn: number } | null;
+    resumable: { currentTurn: number; completedGoalCount: number } | null;
     onChooseWritten: () => void;
   };
 
@@ -43,6 +45,7 @@
   let revealedEnglishSupport = $state<string | null>(null);
   let supportDisclosureState = $state<SupportDisclosureState>('idle');
   let attemptSupportUsed = $state(false);
+  let history = $state<SpokenMissionHistoryEntry[]>([]);
   let assessment = $state<SpokenMissionTurnResponse['assessment'] | null>(null);
   let result = $state<SpokenMissionResult | null>(null);
   let errorMessage = $state('');
@@ -95,16 +98,15 @@
     stage = 'starting';
     errorMessage = '';
     try {
-      const response = await fetch(`/api/missions/${missionId}/spoken/start`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId, startOver }),
+      const payload = await requestSpokenMissionStart({
+        missionId,
+        userId,
+        startOver,
       });
-      const payload = (await response.json()) as SpokenMissionStartResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? 'Could not start Spoken Mission.');
 
       attemptId = payload.attemptId;
       currentTurn = payload.turn;
+      history = payload.history;
       attemptSupportUsed = payload.supportUsed;
       supportRevealed = false;
       revealedEnglishSupport = null;
@@ -273,6 +275,9 @@
     <p>Preparing the restaurant conversation…</p>
   </section>
 {:else if stage === 'active' && currentTurn}
+  {#if history.length > 0}
+    <SpokenMissionHistoryView {history} />
+  {/if}
   <SpokenMissionTurnView
     {currentTurn}
     maxRecordingSeconds={briefing.maxRecordingSeconds}

@@ -35,6 +35,7 @@ async function loadRepositories() {
 
 describe('Spoken Mission persistence', () => {
   afterEach(() => {
+    vi.useRealTimers();
     dbHarness.client = null;
     dbHarness.runDatabaseMigrations.mockReset();
     dbHarness.seedMissions.mockReset();
@@ -70,6 +71,90 @@ describe('Spoken Mission persistence', () => {
     await expect(
       spoken.getResumableSpokenMissionAttempt('user-2', 'mission-order-restaurant'),
     ).resolves.toBeNull();
+  });
+
+  it('atomically replaces only the exact current in-progress attempt', async () => {
+    const spoken = await loadRepositories();
+    const olderAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 0,
+    });
+    const currentAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 1,
+    });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-13T13:00:00.000Z'));
+
+    const replacement = await spoken.restartSpokenMissionAttempt({
+      attemptId: currentAttempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 0,
+    });
+
+    await expect(spoken.getSpokenMissionAttempt(currentAttempt.id)).resolves.toMatchObject({
+      status: 'abandoned',
+    });
+    await expect(spoken.getSpokenMissionAttempt(olderAttempt.id)).resolves.toMatchObject({
+      status: 'in_progress',
+    });
+    expect(replacement).toMatchObject({
+      id: expect.not.stringMatching(currentAttempt.id),
+      status: 'in_progress',
+      wordingVariant: 0,
+    });
+
+    await expect(
+      spoken.restartSpokenMissionAttempt({
+        attemptId: currentAttempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        wordingVariant: 1,
+      }),
+    ).rejects.toBeInstanceOf(spoken.SpokenMissionProgressConflictError);
+    const inProgress = await dbHarness.client!.execute(
+      `SELECT COUNT(*) AS total FROM user_spoken_missions WHERE status = 'in_progress'`,
+    );
+    expect(Number(inProgress.rows[0]?.total ?? 0)).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('rolls back abandonment when the replacement insert fails', async () => {
+    const spoken = await loadRepositories();
+    const currentAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 1,
+    });
+    await dbHarness.client!.execute(`
+      CREATE TRIGGER fail_spoken_restart
+      BEFORE INSERT ON user_spoken_missions
+      BEGIN
+        SELECT RAISE(ABORT, 'replacement failed');
+      END
+    `);
+
+    await expect(
+      spoken.restartSpokenMissionAttempt({
+        attemptId: currentAttempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        wordingVariant: 0,
+      }),
+    ).rejects.toThrow('replacement failed');
+    await expect(spoken.getSpokenMissionAttempt(currentAttempt.id)).resolves.toMatchObject({
+      status: 'in_progress',
+    });
   });
 
   it('records idempotent goal evidence and completes the third accepted goal atomically', async () => {
