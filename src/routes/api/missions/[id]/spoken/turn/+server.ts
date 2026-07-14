@@ -40,9 +40,13 @@ function isAudioFile(value: FormDataEntryValue | null): value is File {
 
 function audioValidationError(error: VoiceAssessmentError): Response {
   if (error.code === 'audio_too_large') {
-    return jsonError('Audio file is too large. Please record a shorter answer.', 400);
+    return jsonError('Audio file is too large. Please record a shorter answer.', 400, {
+      recovery: 'record_again',
+    });
   }
-  return jsonError('Unsupported audio format. Please try recording again.', 400);
+  return jsonError('Unsupported audio format. Please try recording again.', 400, {
+    recovery: 'record_again',
+  });
 }
 
 export const POST: RequestHandler = async ({ params, request, cookies }) => {
@@ -104,12 +108,17 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       return jsonError('Spoken Mission definition changed. Start over to continue.', 409);
     }
 
-    if (attempt.status !== 'in_progress') {
-      return jsonError('Spoken Mission attempt is not in progress.', 400);
-    }
     const duplicate = attempt.conversationLog.find(
       (entry) => entry.clientResponseId === clientResponseId,
     );
+    if (attempt.status === 'completed') {
+      return duplicate
+        ? json(serializeTurnResponse(definition, attempt, duplicate, true))
+        : jsonError('Spoken Mission attempt is not in progress.', 400);
+    }
+    if (attempt.status !== 'in_progress') {
+      return jsonError('Spoken Mission attempt is not in progress.', 400);
+    }
     if (duplicate) {
       return json(serializeTurnResponse(definition, attempt, duplicate, true));
     }
@@ -127,7 +136,9 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
 
     const budget = await checkBudget(selectedUser.userId);
     if (!budget.allowed) {
-      return jsonError('Daily AI budget exhausted. Your attempt is saved.', 429);
+      return jsonError('Daily AI budget exhausted. Your attempt is saved.', 429, {
+        recovery: 'retry_upload',
+      });
     }
 
     const goal = definition.goals[turnNumber - 1];
@@ -184,7 +195,9 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       attemptId,
       turnNumber,
     });
-    return jsonError('Failed to assess Spoken Mission response. Your attempt is saved.', 500);
+    return jsonError('Failed to assess Spoken Mission response. Your attempt is saved.', 500, {
+      recovery: 'retry_upload',
+    });
   }
 };
 

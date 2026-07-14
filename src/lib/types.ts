@@ -355,6 +355,7 @@ export interface MissionWithProgress extends Mission {
 export type SpokenMissionAttemptStatus = 'in_progress' | 'completed' | 'abandoned';
 export type SpokenMissionEvidenceState = 'supported' | 'independent';
 export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_assess';
+export type SpokenMissionTurnRecovery = 'retry_upload' | 'record_again' | 'none';
 export type SpokenMissionGoalKey = 'order' | 'respond' | 'repair';
 
 export interface SpokenMissionAssessment {

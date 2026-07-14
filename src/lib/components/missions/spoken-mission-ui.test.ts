@@ -95,7 +95,22 @@ const history: SpokenMissionHistoryEntry[] = [
   },
 ];
 
-function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boolean }): string {
+function renderTurn(input: {
+  supportRevealed: boolean;
+  attemptSupportUsed: boolean;
+  submissionState?: 'idle' | 'processing' | 'feedback' | 'error';
+  submissionRecovery?: 'retry_upload' | 'record_again' | 'none';
+  hasPendingAudio?: boolean;
+  recorderStatus?:
+    | 'idle'
+    | 'requesting_permission'
+    | 'recording'
+    | 'stopping'
+    | 'error'
+    | 'unsupported';
+  recorderError?: string;
+  errorMessage?: string;
+}): string {
   return render(SpokenMissionTurn, {
     props: {
       currentTurn: serverTurn,
@@ -106,14 +121,15 @@ function renderTurn(input: { supportRevealed: boolean; attemptSupportUsed: boole
       attemptSupportUsed: input.attemptSupportUsed,
       assessment: null,
       pendingNextTurn: null,
-      recorderStatus: 'idle',
+      recorderStatus: input.recorderStatus ?? 'idle',
       recordingSeconds: 0,
-      submissionState: 'idle',
+      submissionState: input.submissionState ?? 'idle',
+      submissionRecovery: input.submissionRecovery ?? 'none',
       canRecord: true,
       audioPlaying: false,
-      recorderError: '',
-      errorMessage: '',
-      hasPendingAudio: false,
+      recorderError: input.recorderError ?? '',
+      errorMessage: input.errorMessage ?? '',
+      hasPendingAudio: input.hasPendingAudio ?? false,
       onPlayServerLine: vi.fn(),
       onRevealSupport: vi.fn(),
       onContinue: vi.fn(),
@@ -184,6 +200,53 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(laterTurn).toContain(
       'English support was used earlier in this attempt. Completion will be Supported.',
     );
+  });
+
+  it('offers the recovery that matches the failure and always keeps Written Mission available', () => {
+    const invalidAudio = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      submissionState: 'error',
+      submissionRecovery: 'record_again',
+      errorMessage: 'Unsupported audio format. Please try recording again.',
+    });
+    expect(invalidAudio).toContain('Record again');
+    expect(invalidAudio).not.toContain('Retry upload');
+    expect(invalidAudio).toContain('Use Written Mission');
+
+    const networkFailure = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      submissionState: 'error',
+      submissionRecovery: 'retry_upload',
+      hasPendingAudio: true,
+      errorMessage: 'Could not reach the assessment service. Your attempt is saved.',
+    });
+    expect(networkFailure).toContain('Retry upload');
+    expect(networkFailure).not.toContain('Record again');
+    expect(networkFailure).toContain('Use Written Mission');
+  });
+
+  it('offers Written Mission after microphone denial or unsupported recording', () => {
+    const permissionDenied = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      recorderStatus: 'error',
+      recorderError: 'Microphone permission was denied. Retry recording or use Written Mission.',
+    });
+    expect(permissionDenied).toContain('Microphone permission was denied');
+    expect(permissionDenied).toContain('Record response');
+    expect(permissionDenied).toContain('Use Written Mission');
+
+    const unsupported = renderTurn({
+      supportRevealed: false,
+      attemptSupportUsed: false,
+      recorderStatus: 'unsupported',
+      recorderError: 'This browser cannot record a supported WebM or MP4 audio format.',
+    });
+    expect(unsupported).toContain('cannot record a supported WebM or MP4 audio format');
+    expect(unsupported).not.toContain('Record response');
+    expect(unsupported).toContain('Use Written Mission');
   });
 
   it('explains Supported evidence while retaining every goal and the fresh-practice phrase', () => {

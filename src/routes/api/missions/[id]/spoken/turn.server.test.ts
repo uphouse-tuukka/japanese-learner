@@ -193,6 +193,7 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
       const response = await turn();
       expect([400, 403, 409]).toContain(response.status);
     }
+    expect(mocks.budget).not.toHaveBeenCalled();
     expect(mocks.assess).not.toHaveBeenCalled();
     expect(mocks.record).not.toHaveBeenCalled();
   });
@@ -214,37 +215,98 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
     },
   );
 
-  it.each(['completed', 'abandoned'] as const)(
-    'rejects a replayed turn submission for a %s attempt',
-    async (status) => {
-      mocks.getAttempt.mockResolvedValue({
-        ...attempt,
-        status,
-        conversationLog: [
-          {
-            goalKey: 'order',
-            turnNumber: 1,
-            npcJapanese: 'ご注文はお決まりですか。',
-            npcRomaji: 'go-chuumon wa okimari desu ka.',
-            transcript: 'ラーメンをください。',
-            outcome: 'accepted',
-            confidence: 'high',
-            feedback: 'Accepted.',
-            supportUsed: false,
-            clientResponseId: 'client-response-1',
-            assessedAt: '2026-07-13T12:00:00.000Z',
-          },
-        ],
-      });
+  it('returns the stored result when the completed final turn response is retried', async () => {
+    mocks.getAttempt.mockResolvedValue({
+      ...attempt,
+      status: 'completed',
+      currentTurn: 3,
+      successfulTurnCount: 3,
+      evidenceState: 'independent',
+      conversationLog: [
+        {
+          goalKey: 'order',
+          turnNumber: 1,
+          npcJapanese: 'ご注文はお決まりですか。',
+          npcRomaji: 'go-chuumon wa okimari desu ka.',
+          transcript: 'ラーメンをください。',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: 'client-response-1',
+          assessedAt: '2026-07-13T12:00:00.000Z',
+        },
+        {
+          goalKey: 'respond',
+          turnNumber: 2,
+          npcJapanese: 'お飲み物はいかがですか。',
+          npcRomaji: 'o-nomimono wa ikaga desu ka.',
+          transcript: 'お水をお願いします。',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: 'client-response-2',
+          assessedAt: '2026-07-13T12:01:00.000Z',
+        },
+        {
+          goalKey: 'repair',
+          turnNumber: 3,
+          npcJapanese: '二つですね。',
+          npcRomaji: 'futatsu desu ne.',
+          transcript: 'いいえ、一つです。',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: 'client-response-3',
+          assessedAt: '2026-07-13T12:02:00.000Z',
+        },
+      ],
+    });
 
-      const response = await turn();
+    const response = await turn({ clientResponseId: 'client-response-3', turnNumber: '3' });
 
-      expect(response.status).toBe(400);
-      expect(mocks.budget).not.toHaveBeenCalled();
-      expect(mocks.assess).not.toHaveBeenCalled();
-      expect(mocks.record).not.toHaveBeenCalled();
-    },
-  );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      duplicate: true,
+      assessment: { outcome: 'accepted', transcript: 'いいえ、一つです。' },
+      isComplete: true,
+      result: { evidenceState: 'independent' },
+    });
+    expect(mocks.budget).not.toHaveBeenCalled();
+    expect(mocks.assess).not.toHaveBeenCalled();
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replayed turn submission for an abandoned attempt', async () => {
+    mocks.getAttempt.mockResolvedValue({
+      ...attempt,
+      status: 'abandoned',
+      conversationLog: [
+        {
+          goalKey: 'order',
+          turnNumber: 1,
+          npcJapanese: 'ご注文はお決まりですか。',
+          npcRomaji: 'go-chuumon wa okimari desu ka.',
+          transcript: 'ラーメンをください。',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: 'client-response-1',
+          assessedAt: '2026-07-13T12:00:00.000Z',
+        },
+      ],
+    });
+
+    const response = await turn();
+
+    expect(response.status).toBe(400);
+    expect(mocks.budget).not.toHaveBeenCalled();
+    expect(mocks.assess).not.toHaveBeenCalled();
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
 
   it('validates audio bounds before checking budget', async () => {
     const response = await turn({
@@ -252,8 +314,26 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
     });
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ recovery: 'record_again' });
     expect(mocks.budget).not.toHaveBeenCalled();
     expect(mocks.assess).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized audio before checking budget or writing evidence', async () => {
+    const response = await turn({
+      audio: new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'answer.webm', {
+        type: 'audio/webm',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Audio file is too large. Please record a shorter answer.',
+      recovery: 'record_again',
+    });
+    expect(mocks.budget).not.toHaveBeenCalled();
+    expect(mocks.assess).not.toHaveBeenCalled();
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('preserves the attempt when the AI budget is exhausted', async () => {
@@ -263,8 +343,107 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({
       error: 'Daily AI budget exhausted. Your attempt is saved.',
+      recovery: 'retry_upload',
     });
     expect(mocks.assess).not.toHaveBeenCalled();
     expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'missing speech',
+      {
+        outcome: 'could_not_assess',
+        reason: 'missing_speech',
+        feedback: 'No speech was detected. Please try recording again.',
+      },
+    ],
+    [
+      'transcription failure',
+      {
+        outcome: 'could_not_assess',
+        reason: 'transcription_failed',
+        feedback: 'The recording could not be transcribed. Please try again.',
+      },
+    ],
+    [
+      'ambiguous assessment',
+      {
+        outcome: 'could_not_assess',
+        reason: 'low_confidence',
+        transcript: 'ラーメン',
+        feedback: 'The result was too ambiguous to assess. Please try again.',
+      },
+    ],
+    [
+      'grader failure',
+      {
+        outcome: 'could_not_assess',
+        reason: 'assessment_failed',
+        transcript: 'ラーメンをお願いします',
+        feedback: 'The response could not be assessed reliably. Please try again.',
+      },
+    ],
+  ] as const)('keeps the current goal resumable after %s', async (_case, result) => {
+    mocks.assess.mockResolvedValue(result);
+
+    const response = await turn();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      assessment: {
+        outcome: 'could_not_assess',
+        feedback: result.feedback,
+      },
+      nextTurn: null,
+      isComplete: false,
+      result: null,
+    });
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnNumber: 1,
+        evidence: expect.objectContaining({
+          outcome: 'could_not_assess',
+          confidence: null,
+        }),
+      }),
+    );
+  });
+
+  it('withholds evidence and returns a safe response after an unexpected assessment failure', async () => {
+    mocks.assess.mockRejectedValue(new Error('provider payload containing learner audio'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const response = await turn();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Failed to assess Spoken Mission response. Your attempt is saved.',
+      recovery: 'retry_upload',
+    });
+    expect(mocks.record).not.toHaveBeenCalled();
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('learner audio');
+    consoleError.mockRestore();
+  });
+
+  it('serializes only transcript and structured assessment evidence, never raw audio', async () => {
+    mocks.assess.mockResolvedValue({
+      outcome: 'retry',
+      transcript: 'お水をください',
+      confidence: 'high',
+      feedback: 'Try ordering ramen.',
+    });
+
+    const response = await turn({
+      audio: new File(['private-raw-audio-marker'], 'answer.webm', { type: 'audio/webm' }),
+    });
+    const body = await response.text();
+
+    expect(body).toContain('お水をください');
+    expect(body).not.toContain('private-raw-audio-marker');
+    const recordedEvidence = mocks.record.mock.calls[0]?.[0].evidence;
+    expect(recordedEvidence).not.toHaveProperty('audio');
+    expect(JSON.stringify(recordedEvidence)).not.toContain('private-raw-audio-marker');
   });
 });
