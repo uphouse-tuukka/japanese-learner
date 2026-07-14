@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { getSpokenMissionEvidenceLabel } from '$lib/utils/spoken-mission';
   import type { SpokenMissionBriefing, SpokenMissionEvidenceState } from '$lib/types';
 
   type Props = {
@@ -20,13 +21,7 @@
     void tick().then(() => headingElement.focus());
   });
 
-  const evidenceLabel = $derived(
-    bestEvidence === 'untried'
-      ? 'Untried'
-      : bestEvidence === 'independent'
-        ? 'Independent'
-        : 'Supported',
-  );
+  const evidenceLabel = $derived(getSpokenMissionEvidenceLabel(bestEvidence));
 </script>
 
 <section class="spoken-shell" aria-labelledby="spoken-heading">

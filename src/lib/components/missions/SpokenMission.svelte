@@ -253,7 +253,7 @@
       }
     }, 80);
     try {
-      await speak(currentTurn.npcDialogue.japanese);
+      await speak(currentTurn.npcDialogue.japanese, { preferBrowser: false });
     } finally {
       audioPlaying = false;
       clearAudioPoll();

@@ -175,10 +175,7 @@ export function getSpokenMissionServerTurn(
   wordingVariant: number,
   turnNumber: number,
 ): SpokenMissionServerTurn {
-  const goal = definition.goals[turnNumber - 1];
-  if (!goal) throw new Error(`[spoken-missions] invalid turn number: ${turnNumber}`);
-  const line = goal.serverLines[wordingVariant] ?? goal.serverLines[0];
-  if (!line) throw new Error(`[spoken-missions] missing server line for turn: ${turnNumber}`);
+  const { goal, line } = getSpokenMissionServerLine(definition, wordingVariant, turnNumber);
   return {
     turnNumber,
     goalKey: goal.key,
@@ -195,11 +192,19 @@ export function getSpokenMissionEnglishSupport(
   wordingVariant: number,
   turnNumber: number,
 ): string {
+  return getSpokenMissionServerLine(definition, wordingVariant, turnNumber).line.english;
+}
+
+function getSpokenMissionServerLine(
+  definition: SpokenMissionDefinition,
+  wordingVariant: number,
+  turnNumber: number,
+): { goal: SpokenMissionGoal; line: SpokenMissionServerLine } {
   const goal = definition.goals[turnNumber - 1];
   if (!goal) throw new Error(`[spoken-missions] invalid turn number: ${turnNumber}`);
   const line = goal.serverLines[wordingVariant] ?? goal.serverLines[0];
   if (!line) throw new Error(`[spoken-missions] missing server line for turn: ${turnNumber}`);
-  return line.english;
+  return { goal, line };
 }
 
 export function toSpokenMissionHistory(

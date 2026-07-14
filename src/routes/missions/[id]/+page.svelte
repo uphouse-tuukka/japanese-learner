@@ -7,6 +7,7 @@
   import { beforeNavigate } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
   import { canCompleteMission, shouldShowMissionResponseControls } from '$lib/utils/mission-state';
+  import { getSpokenMissionEvidenceLabel } from '$lib/utils/spoken-mission';
   import type {
     MissionChoice,
     MissionCompleteResponse,
@@ -433,11 +434,7 @@
           <span class="type-status spoken-status" data-evidence={data.spokenMission.bestEvidence}>
             {data.spokenMission.resumable
               ? `Resume goal ${data.spokenMission.resumable.currentTurn}`
-              : data.spokenMission.bestEvidence === 'untried'
-                ? 'Untried'
-                : data.spokenMission.bestEvidence === 'independent'
-                  ? 'Independent'
-                  : 'Supported'}
+              : getSpokenMissionEvidenceLabel(data.spokenMission.bestEvidence)}
           </span>
         </button>
       </div>

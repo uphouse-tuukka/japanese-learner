@@ -1,19 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
-import { isMissionUnlocked } from '$lib/server/mission-access';
-import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db';
 import { matchSelectedUser } from '$lib/server/selected-user';
-import {
-  getSpokenMissionDefinition,
-  getSpokenMissionEnglishSupport,
-} from '$lib/server/spoken-missions';
+import { loadSpokenMissionAttemptAccess } from '$lib/server/spoken-mission-access';
+import { getSpokenMissionEnglishSupport } from '$lib/server/spoken-missions';
 import {
   SpokenMissionProgressConflictError,
-  getSpokenMissionAttempt,
   markSpokenMissionSupportUsed,
 } from '$lib/server/spoken-missions-db';
-import { getUser } from '$lib/server/users';
 import type { SpokenMissionSupportResponse } from '$lib/types';
 
 type RevealSpokenMissionSupportRequest = {
@@ -39,32 +33,13 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
   if (!selectedUser.ok) return jsonError(selectedUser.error, selectedUser.status);
 
   try {
-    const user = await getUser(selectedUser.userId);
-    if (!user) return jsonError('User not found.', 404);
-
-    const mission = await getMissionById(missionId);
-    if (!mission) return jsonError('Mission not found.', 404);
-
-    const categorySessionCount = await getCategorySessionCount(
-      selectedUser.userId,
-      mission.category,
-    );
-    if (!isMissionUnlocked(mission, categorySessionCount)) {
-      return jsonError('Mission is locked.', 403);
-    }
-
-    const definition = getSpokenMissionDefinition(mission.id);
-    if (!definition) {
-      return jsonError('Spoken Mission is not available for this scenario.', 404);
-    }
-
-    const attempt = await getSpokenMissionAttempt(attemptIdResult.value);
-    if (!attempt) return jsonError('Spoken Mission attempt not found.', 404);
-    if (attempt.userId !== selectedUser.userId) return jsonError('Forbidden.', 403);
-    if (attempt.missionId !== mission.id) return jsonError('Mission mismatch for attempt.', 400);
-    if (attempt.definitionVersion !== definition.version) {
-      return jsonError('Spoken Mission definition changed. Start over to continue.', 409);
-    }
+    const access = await loadSpokenMissionAttemptAccess({
+      userId: selectedUser.userId,
+      missionId,
+      attemptId: attemptIdResult.value,
+    });
+    if (!access.ok) return jsonError(access.error, access.status);
+    const { attempt, definition, mission } = access;
     if (attempt.status !== 'in_progress') {
       return jsonError('Spoken Mission attempt is not in progress.', 400);
     }
