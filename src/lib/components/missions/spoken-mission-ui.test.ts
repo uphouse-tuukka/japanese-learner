@@ -18,8 +18,8 @@ const serverTurn: SpokenMissionServerTurn = {
     japanese: 'ご注文はお決まりですか。',
     romaji: 'go-chuumon wa okimari desu ka.',
   },
-  englishSupport: 'Are you ready to order?',
 };
+const englishSupport = 'Are you ready to order?';
 
 const result: SpokenMissionResultData = {
   evidenceState: 'supported',
@@ -116,7 +116,7 @@ function renderTurn(input: {
       currentTurn: serverTurn,
       maxRecordingSeconds: 12,
       supportRevealed: input.supportRevealed,
-      englishSupport: input.supportRevealed ? serverTurn.englishSupport : null,
+      englishSupport: input.supportRevealed ? englishSupport : null,
       supportDisclosureState: 'idle',
       attemptSupportUsed: input.attemptSupportUsed,
       assessment:

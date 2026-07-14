@@ -27,6 +27,7 @@ They enforce the selected-user boundary, user and mission existence, the existin
 Without `startOver`, the endpoint resumes the newest matching in-progress attempt when one exists.
 With `startOver`, it atomically abandons the current in-progress attempt and creates a replacement without deleting completed evidence.
 The response contains the attempt id, learner-safe briefing, current authored server turn, restored transcript and assessment history, support-used state, and total turn count.
+English listening-support text is omitted unless support was already revealed for the current goal, in which case the response restores that disclosure after refresh.
 
 ### Reveal listening support
 
@@ -47,12 +48,12 @@ Recoverable failures include a `recovery` value that tells the client whether it
 ## Persistence and resume
 
 Spoken attempts are stored separately from Written Missions in `user_spoken_missions`.
-Each row records the attempt id, user id, existing mission id, definition version, status, current turn, support-used flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
+Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide support-used flag, current-goal support-used flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
 Attempt status is `in_progress`, `completed`, or `abandoned`.
 The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, support usage, client response id, and assessment time.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.
-The start response restores the full learner-safe conversation history for that attempt.
+The start response restores the full learner-safe conversation history and any English support already revealed for the current goal.
 Raw audio is not part of database state, API responses, or browser resume storage.
 
 ## Evidence semantics

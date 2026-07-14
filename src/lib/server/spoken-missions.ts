@@ -187,8 +187,19 @@ export function getSpokenMissionServerTurn(
       japanese: line.japanese,
       romaji: line.romaji,
     },
-    englishSupport: line.english,
   };
+}
+
+export function getSpokenMissionEnglishSupport(
+  definition: SpokenMissionDefinition,
+  wordingVariant: number,
+  turnNumber: number,
+): string {
+  const goal = definition.goals[turnNumber - 1];
+  if (!goal) throw new Error(`[spoken-missions] invalid turn number: ${turnNumber}`);
+  const line = goal.serverLines[wordingVariant] ?? goal.serverLines[0];
+  if (!line) throw new Error(`[spoken-missions] missing server line for turn: ${turnNumber}`);
+  return line.english;
 }
 
 export function toSpokenMissionHistory(

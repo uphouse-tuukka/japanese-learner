@@ -6,6 +6,7 @@ import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db
 import { matchSelectedUser } from '$lib/server/selected-user';
 import {
   getSpokenMissionDefinition,
+  getSpokenMissionEnglishSupport,
   getSpokenMissionServerTurn,
   selectSpokenMissionVariant,
   toSpokenMissionBriefing,
@@ -111,5 +112,9 @@ function serializeStartResponse(
     totalTurns: 3,
     resumed,
     supportUsed: attempt.supportUsed,
+    currentTurnSupportRevealed: attempt.currentTurnSupportUsed,
+    currentTurnEnglishSupport: attempt.currentTurnSupportUsed
+      ? getSpokenMissionEnglishSupport(definition, attempt.wordingVariant, attempt.currentTurn)
+      : null,
   };
 }

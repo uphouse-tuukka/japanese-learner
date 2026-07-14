@@ -94,6 +94,7 @@ const attempt = {
   status: 'in_progress',
   currentTurn: 1,
   supportUsed: false,
+  currentTurnSupportUsed: false,
   successfulTurnCount: 0,
   wordingVariant: 0,
   conversationLog: [],
@@ -162,12 +163,14 @@ describe('POST /api/missions/[id]/spoken/start', () => {
         turnNumber: 1,
         goalKey: 'order',
         npcDialogue: { japanese: 'ご注文は？', romaji: 'go-chuumon wa?' },
-        englishSupport: 'Your order?',
       },
       totalTurns: 3,
       resumed: false,
       supportUsed: false,
+      currentTurnSupportRevealed: false,
+      currentTurnEnglishSupport: null,
     });
+    expect(payload.turn).not.toHaveProperty('englishSupport');
     expect(JSON.stringify(payload)).not.toContain('rubric');
     expect(JSON.stringify(payload)).not.toContain('alternatives');
     expect(mocks.create).toHaveBeenCalledWith({
@@ -182,6 +185,8 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     mocks.getResumable.mockResolvedValue({
       ...attempt,
       currentTurn: 2,
+      supportUsed: true,
+      currentTurnSupportUsed: true,
       successfulTurnCount: 1,
       conversationLog: [
         {
@@ -208,6 +213,9 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       attemptId: 'spokenmission-1',
       resumed: true,
       turn: { turnNumber: 2, goalKey: 'respond' },
+      supportUsed: true,
+      currentTurnSupportRevealed: true,
+      currentTurnEnglishSupport: 'Water?',
       history: [
         {
           goalKey: 'order',
@@ -225,6 +233,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
         },
       ],
     });
+    expect(payload.turn).not.toHaveProperty('englishSupport');
     expect(JSON.stringify(payload)).not.toContain('private-response-id');
     expect(JSON.stringify(payload)).not.toContain('"audio":');
     expect(mocks.restart).not.toHaveBeenCalled();

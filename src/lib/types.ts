@@ -383,6 +383,7 @@ export interface SpokenMissionAttempt {
   status: SpokenMissionAttemptStatus;
   currentTurn: number;
   supportUsed: boolean;
+  currentTurnSupportUsed: boolean;
   successfulTurnCount: number;
   wordingVariant: number;
   conversationLog: SpokenMissionTurnEvidence[];
@@ -414,7 +415,6 @@ export interface SpokenMissionServerTurn {
     japanese: string;
     romaji: string;
   };
-  englishSupport: string;
 }
 
 export interface SpokenMissionHistoryEntry {
@@ -449,6 +449,8 @@ export interface SpokenMissionStartResponse {
   totalTurns: 3;
   resumed: boolean;
   supportUsed: boolean;
+  currentTurnSupportRevealed: boolean;
+  currentTurnEnglishSupport: string | null;
 }
 
 export interface SpokenMissionSupportResponse {

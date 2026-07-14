@@ -114,8 +114,8 @@
       currentTurn = payload.turn;
       history = payload.history;
       attemptSupportUsed = payload.supportUsed;
-      supportRevealed = false;
-      revealedEnglishSupport = null;
+      supportRevealed = payload.currentTurnSupportRevealed;
+      revealedEnglishSupport = payload.currentTurnEnglishSupport;
       supportDisclosureState = 'idle';
       submissionState = 'idle';
       submissionRecovery = 'none';

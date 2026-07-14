@@ -164,7 +164,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
         (assessment.outcome === 'accepted'
           ? 'You accomplished this goal.'
           : 'Try the same goal again.'),
-      supportUsed: supportValue === 'true',
+      supportUsed: attempt.currentTurnSupportUsed || supportValue === 'true',
       clientResponseId,
       assessedAt: new Date().toISOString(),
     };

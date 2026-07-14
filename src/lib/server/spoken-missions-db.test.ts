@@ -59,6 +59,7 @@ describe('Spoken Mission persistence', () => {
       status: 'in_progress',
       currentTurn: 1,
       supportUsed: false,
+      currentTurnSupportUsed: false,
       successfulTurnCount: 0,
       wordingVariant: 1,
       conversationLog: [],
@@ -302,6 +303,7 @@ describe('Spoken Mission persistence', () => {
       currentTurn: 1,
       successfulTurnCount: 0,
       supportUsed: true,
+      currentTurnSupportUsed: true,
       evidenceState: null,
     });
 
@@ -325,10 +327,11 @@ describe('Spoken Mission persistence', () => {
       currentTurn: 1,
       successfulTurnCount: 0,
       supportUsed: true,
+      currentTurnSupportUsed: true,
       evidenceState: null,
       conversationLog: [
         { outcome: 'retry', supportUsed: true },
-        { outcome: 'could_not_assess', supportUsed: false },
+        { outcome: 'could_not_assess', supportUsed: true },
       ],
     });
     await expect(

@@ -6,7 +6,7 @@ import { getCategorySessionCount, getMissionById } from '$lib/server/missions-db
 import { matchSelectedUser } from '$lib/server/selected-user';
 import {
   getSpokenMissionDefinition,
-  getSpokenMissionServerTurn,
+  getSpokenMissionEnglishSupport,
 } from '$lib/server/spoken-missions';
 import {
   SpokenMissionProgressConflictError,
@@ -72,7 +72,11 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
       return jsonError('Turn does not match current attempt progress.', 409);
     }
 
-    const turn = getSpokenMissionServerTurn(definition, attempt.wordingVariant, body.turnNumber!);
+    const englishSupport = getSpokenMissionEnglishSupport(
+      definition,
+      attempt.wordingVariant,
+      body.turnNumber!,
+    );
     await markSpokenMissionSupportUsed({
       attemptId: attempt.id,
       userId: selectedUser.userId,
@@ -82,7 +86,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     });
 
     return json({
-      englishSupport: turn.englishSupport,
+      englishSupport,
       supportUsed: true,
     } satisfies SpokenMissionSupportResponse);
   } catch (error) {

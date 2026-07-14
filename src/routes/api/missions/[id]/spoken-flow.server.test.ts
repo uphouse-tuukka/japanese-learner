@@ -135,6 +135,8 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     } as never);
     expect(startResponse.status).toBe(200);
     const started = await startResponse.json();
+    expect(started.turn).not.toHaveProperty('englishSupport');
+    expect(JSON.stringify(started)).not.toContain('Are you ready to order?');
 
     const firstRequest = {
       attemptId: String(started.attemptId),
@@ -425,6 +427,20 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
       currentTurn: 1,
       supportUsed: true,
+      currentTurnSupportUsed: true,
+    });
+
+    const resumeResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    await expect(resumeResponse.json()).resolves.toMatchObject({
+      resumed: true,
+      supportUsed: true,
+      currentTurnSupportRevealed: true,
+      currentTurnEnglishSupport: expect.any(String),
+      turn: { turnNumber: 1 },
     });
 
     const supportedRetry = await turnRoute.POST({
@@ -446,6 +462,8 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
       currentTurn: 1,
       supportUsed: true,
+      currentTurnSupportUsed: true,
+      conversationLog: [{ supportUsed: true }],
     });
 
     for (const turnNumber of [1, 2, 3]) {
@@ -467,7 +485,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
           result: {
             evidenceState: 'supported',
             goals: [
-              { goalKey: 'order', supportUsed: false },
+              { goalKey: 'order', supportUsed: true },
               { goalKey: 'respond', supportUsed: false },
               { goalKey: 'repair', supportUsed: false },
             ],
@@ -484,6 +502,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     await expect(spoken.getSpokenMissionAttempt(started.attemptId)).resolves.toMatchObject({
       status: 'completed',
       supportUsed: true,
+      currentTurnSupportUsed: false,
       evidenceState: 'supported',
     });
     await expect(

@@ -184,7 +184,7 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 
 - All server-only code in `src/lib/server/`
 - Learning Session generation and summary interactions live in `src/lib/server/ai.ts`; focused AI capabilities such as missions, answer checking, and voice assessment live in dedicated modules under `src/lib/server/` and use the shared OpenAI client, token accounting, and sanitized logging boundaries.
-- Database operations in `src/lib/server/db.ts`
+- Database initialization and shared core operations live in `src/lib/server/db.ts`; focused domain operations may live in dedicated server repositories such as `src/lib/server/missions-db.ts` and `src/lib/server/spoken-missions-db.ts`.
 - API routes under `src/routes/api/`
 
 ### AI Prompts

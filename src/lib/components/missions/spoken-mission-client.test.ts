@@ -31,7 +31,6 @@ function startResponse(resumed: boolean): Response {
       goalKey: resumed ? 'respond' : 'order',
       goalTitle: resumed ? 'Respond' : 'Order',
       npcDialogue: { japanese: 'お水は？', romaji: 'o-mizu wa?' },
-      englishSupport: 'Water?',
     },
     history: resumed
       ? [
@@ -54,6 +53,8 @@ function startResponse(resumed: boolean): Response {
     totalTurns: 3,
     resumed,
     supportUsed: false,
+    currentTurnSupportRevealed: resumed,
+    currentTurnEnglishSupport: resumed ? 'Water?' : null,
   });
 }
 

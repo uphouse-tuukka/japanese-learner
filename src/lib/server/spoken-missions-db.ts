@@ -47,6 +47,7 @@ function mapSpokenMissionAttempt(row: Record<string, unknown>): SpokenMissionAtt
     status: asString(row.status) as SpokenMissionAttemptStatus,
     currentTurn: asNumber(row.current_turn, 1),
     supportUsed: asNumber(row.support_used) === 1,
+    currentTurnSupportUsed: asNumber(row.current_turn_support_used) === 1,
     successfulTurnCount: asNumber(row.successful_turn_count),
     wordingVariant: asNumber(row.wording_variant),
     conversationLog: parseConversationLog(row.conversation_log),
@@ -67,6 +68,7 @@ const SPOKEN_ATTEMPT_COLUMNS = `
   status,
   current_turn,
   support_used,
+  current_turn_support_used,
   successful_turn_count,
   wording_variant,
   conversation_log,
@@ -180,7 +182,7 @@ export async function markSpokenMissionSupportUsed(input: {
   const result = await db.execute({
     sql: `
 UPDATE user_spoken_missions
-SET support_used = 1, updated_at = ?
+SET support_used = 1, current_turn_support_used = 1, updated_at = ?
 WHERE id = ?
   AND user_id = ?
   AND mission_id = ?
@@ -239,10 +241,14 @@ export async function recordSpokenMissionAssessment(input: {
   }
 
   const accepted = input.evidence.outcome === 'accepted';
+  const storedEvidence = {
+    ...input.evidence,
+    supportUsed: existing.currentTurnSupportUsed || input.evidence.supportUsed,
+  };
   const successfulTurnCount = existing.successfulTurnCount + (accepted ? 1 : 0);
   const completed = accepted && successfulTurnCount === 3;
   const timestamp = new Date().toISOString();
-  const conversationLog = [...existing.conversationLog, input.evidence];
+  const conversationLog = [...existing.conversationLog, storedEvidence];
   const currentTurn = completed
     ? 3
     : accepted
@@ -257,6 +263,11 @@ SET
   status = ?,
   current_turn = ?,
   support_used = CASE WHEN support_used = 1 OR ? = 1 THEN 1 ELSE 0 END,
+  current_turn_support_used = CASE
+    WHEN ? = 1 THEN 0
+    WHEN current_turn_support_used = 1 OR ? = 1 THEN 1
+    ELSE 0
+  END,
   successful_turn_count = ?,
   conversation_log = ?,
   evidence_state = CASE
@@ -281,11 +292,13 @@ WHERE id = ?
     args: [
       completed ? 'completed' : 'in_progress',
       currentTurn,
-      input.evidence.supportUsed ? 1 : 0,
+      storedEvidence.supportUsed ? 1 : 0,
+      accepted ? 1 : 0,
+      storedEvidence.supportUsed ? 1 : 0,
       successfulTurnCount,
       JSON.stringify(conversationLog),
       completed ? 1 : 0,
-      input.evidence.supportUsed ? 1 : 0,
+      storedEvidence.supportUsed ? 1 : 0,
       completed ? timestamp : null,
       timestamp,
       input.attemptId,
@@ -310,7 +323,7 @@ WHERE id = ?
 
   const updated = await getSpokenMissionAttempt(input.attemptId);
   if (!updated) throw new SpokenMissionProgressConflictError();
-  return { status: 'recorded', attempt: updated, evidence: input.evidence };
+  return { status: 'recorded', attempt: updated, evidence: storedEvidence };
 }
 
 export async function getBestSpokenMissionEvidence(
