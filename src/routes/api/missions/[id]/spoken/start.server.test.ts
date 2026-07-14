@@ -53,7 +53,10 @@ const definition = {
   briefing: {
     situation: 'At a restaurant.',
     assessment: 'Intent is assessed, not accent.',
-    privacy: 'Raw audio is discarded.',
+    evidence:
+      'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
+    privacy:
+      'Transcripts and semantic assessments are retained. Raw audio is discarded after assessment.',
   },
   approximateMinutes: 2,
   maxRecordingSeconds: 12,
@@ -150,8 +153,16 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     const payload = await response.json();
     expect(payload).toMatchObject({
       attemptId: 'spokenmission-1',
+      definitionVersion: 'restaurant-order-v1',
+      supportPolicy: {
+        englishListeningSupport: 'optional',
+        evidenceWithoutEnglishSupport: 'independent',
+        evidenceWithEnglishSupport: 'supported',
+      },
       briefing: {
         canDo: definition.canDo,
+        evidence: definition.briefing.evidence,
+        privacy: definition.briefing.privacy,
         maxRecordingSeconds: 12,
         goals: [
           { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },

@@ -17,10 +17,18 @@ function restoreSessionStorage(): void {
 function startResponse(resumed: boolean): Response {
   return Response.json({
     attemptId: resumed ? 'spokenmission-resumed' : 'spokenmission-fresh',
+    definitionVersion: 'restaurant-order-v1',
+    supportPolicy: {
+      englishListeningSupport: 'optional',
+      evidenceWithoutEnglishSupport: 'independent',
+      evidenceWithEnglishSupport: 'supported',
+    },
     briefing: {
       canDo: 'I can complete the restaurant task.',
       situation: 'At a restaurant.',
       assessment: 'Intent is assessed, not accent.',
+      evidence:
+        'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
       privacy: 'Raw audio is discarded.',
       approximateMinutes: 2,
       maxRecordingSeconds: 12,

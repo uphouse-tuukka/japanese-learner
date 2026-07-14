@@ -3,6 +3,7 @@ import {
   getSpokenMissionDefinition,
   listSpokenMissionIds,
   selectSpokenMissionVariant,
+  toSpokenMissionBriefing,
 } from './spoken-missions';
 
 describe('spoken mission definitions', () => {
@@ -20,6 +21,7 @@ describe('spoken mission definitions', () => {
     expect(definition?.briefing).toMatchObject({
       situation: expect.stringContaining('restaurant'),
       assessment: expect.stringContaining('accent'),
+      evidence: expect.stringContaining('Independent'),
       privacy: expect.stringContaining('discarded'),
     });
     expect(definition?.goals.map((goal) => goal.key)).toEqual(['order', 'respond', 'repair']);
@@ -27,6 +29,18 @@ describe('spoken mission definitions', () => {
     expect(definition?.goals.every((goal) => goal.alternatives.length >= 2)).toBe(true);
     expect(definition?.goals.every((goal) => goal.rubric.length > 0)).toBe(true);
     expect(getSpokenMissionDefinition('mission-first-meeting')).toBeNull();
+  });
+
+  it('serializes the complete learner-safe evidence explanation from the production definition', () => {
+    const definition = getSpokenMissionDefinition('mission-order-restaurant');
+    if (!definition) throw new Error('Expected restaurant Spoken Mission definition.');
+
+    const briefing = toSpokenMissionBriefing(definition);
+
+    expect(briefing.evidence).toContain('Independent evidence');
+    expect(briefing.evidence).toContain('Supported evidence');
+    expect(briefing.privacy).toContain('Transcripts and semantic assessments are retained');
+    expect(briefing.privacy).toContain('Raw audio is discarded');
   });
 
   it('avoids the immediately previous authored wording when another variant exists', () => {

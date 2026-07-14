@@ -402,6 +402,7 @@ export interface SpokenMissionBriefing {
   canDo: string;
   situation: string;
   assessment: string;
+  evidence: string;
   privacy: string;
   approximateMinutes: number;
   maxRecordingSeconds: number;
@@ -410,6 +411,12 @@ export interface SpokenMissionBriefing {
     title: string;
     learnerGoal: string;
   }>;
+}
+
+export interface SpokenMissionSupportPolicy {
+  englishListeningSupport: 'optional';
+  evidenceWithoutEnglishSupport: 'independent';
+  evidenceWithEnglishSupport: 'supported';
 }
 
 export interface SpokenMissionServerTurn {
@@ -448,6 +455,8 @@ export interface SpokenMissionResult {
 
 export interface SpokenMissionStartResponse {
   attemptId: string;
+  definitionVersion: string;
+  supportPolicy: SpokenMissionSupportPolicy;
   briefing: SpokenMissionBriefing;
   turn: SpokenMissionServerTurn;
   history: SpokenMissionHistoryEntry[];

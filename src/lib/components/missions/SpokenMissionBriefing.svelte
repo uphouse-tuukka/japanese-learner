@@ -58,6 +58,7 @@
 
   <div class="briefing-notes">
     <p><strong>About {briefing.approximateMinutes} minutes.</strong> {briefing.assessment}</p>
+    <p><strong>Evidence.</strong> {briefing.evidence}</p>
     <p><strong>Audio privacy.</strong> {briefing.privacy}</p>
   </div>
 
