@@ -7,6 +7,7 @@ import SpokenMissionResult from './SpokenMissionResult.svelte';
 import SpokenMissionTurn from './SpokenMissionTurn.svelte';
 import type {
   SpokenMissionResult as SpokenMissionResultData,
+  SpokenMissionAssessment,
   SpokenMissionHistoryEntry,
   SpokenMissionServerTurn,
 } from '$lib/types';
@@ -111,6 +112,7 @@ function renderTurn(input: {
     | 'unsupported';
   recorderError?: string;
   errorMessage?: string;
+  assessment?: SpokenMissionAssessment;
 }): string {
   return render(SpokenMissionTurn, {
     props: {
@@ -122,12 +124,12 @@ function renderTurn(input: {
       attemptSupportUsed: input.attemptSupportUsed,
       assessment:
         input.submissionState === 'feedback'
-          ? {
+          ? (input.assessment ?? {
               transcript: 'ラーメンを一つお願いします。',
               outcome: 'accepted',
               confidence: 'high',
               feedback: 'You ordered one ramen.',
-            }
+            })
           : null,
       pendingNextTurn: null,
       recorderStatus: input.recorderStatus ?? 'idle',
@@ -394,4 +396,53 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(independentHtml).toContain('One phrase to keep fresh');
     expect(independentHtml).toContain('すみません、ラーメンは一つです。');
   });
+
+  it('shows the transcript and semantic feedback for every completed goal', () => {
+    const html = render(SpokenMissionResult, {
+      props: { result, onTryAgain: vi.fn() },
+    }).body;
+
+    for (const goal of result.goals) {
+      expect(html).toContain(goal.transcript);
+      expect(html).toContain(goal.feedback);
+    }
+    expect(html).toContain('You repaired the misunderstanding.');
+  });
+
+  it.each([
+    [
+      'retry',
+      {
+        transcript: 'ラーメンですか。',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'Try ordering one item.',
+      },
+      'Try this goal again',
+    ],
+    [
+      'could not assess',
+      {
+        transcript: null,
+        outcome: 'could_not_assess',
+        confidence: null,
+        feedback: 'No speech was detected. Please try recording again.',
+      },
+      'Could not assess',
+    ],
+  ] satisfies Array<[string, SpokenMissionAssessment, string]>)(
+    'keeps %s feedback and the recording retry action unchanged',
+    (_case, assessment, heading) => {
+      const html = renderTurn({
+        supportRevealed: false,
+        attemptSupportUsed: false,
+        submissionState: 'feedback',
+        assessment,
+      });
+
+      expect(html).toContain(heading);
+      expect(html).toContain(assessment.feedback);
+      expect(html).toContain('Record again');
+    },
+  );
 });

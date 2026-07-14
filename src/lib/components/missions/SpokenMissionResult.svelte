@@ -33,7 +33,14 @@
     {#each result.goals as goal}
       <article>
         <span>✓ {goal.title}</span>
-        <p lang="ja">{goal.transcript}</p>
+        <div class="goal-detail">
+          <small>Transcript</small>
+          <p lang="ja">{goal.transcript}</p>
+        </div>
+        <div class="goal-detail">
+          <small>Feedback</small>
+          <p class="goal-feedback">{goal.feedback}</p>
+        </div>
       </article>
     {/each}
   </div>
@@ -120,15 +127,32 @@
     padding: var(--space-4);
     border: 1px solid var(--border-light);
     background: var(--bg-shoji);
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
   }
   .evidence-list span {
     color: var(--accent-matcha);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
   }
-  .evidence-list p {
-    margin-top: var(--space-2);
+  .goal-detail {
+    min-width: 0;
+    display: grid;
+    gap: var(--space-1);
+  }
+  .goal-detail small {
+    color: var(--text-usuzumi);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+  .goal-detail p {
     overflow-wrap: anywhere;
+  }
+  .goal-feedback {
+    color: var(--text-bokashi);
+    font-size: var(--text-sm);
   }
   .practice-phrase {
     width: 100%;
