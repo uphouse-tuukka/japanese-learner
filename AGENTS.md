@@ -13,23 +13,6 @@ Before editing, read:
 - the current task or plan in `documents/plans/*`
 - relevant architecture/tooling decisions in `documents/decisions/*`
 
-## Agent skills
-
-### Issue tracker
-
-Work items, specifications, and PRDs are tracked in GitHub Issues for `uphouse-tuukka/japanese-learner`.
-See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The repository uses the standard five-role triage vocabulary.
-See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-This is a single-context repository using root `CONTEXT.md` and `documents/decisions/`.
-See `docs/agents/domain.md`.
-
 ## Boot sequence
 
 1. Run `git status --short --branch` and note existing user or agent changes.

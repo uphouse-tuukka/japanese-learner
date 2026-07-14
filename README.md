@@ -44,20 +44,6 @@ Minimal full-stack Japanese learning app with:
    npm run dev
    ```
 
-### Private Tailscale development server
-
-To expose the normal development server privately over your tailnet with HTTPS, run:
-
-```bash
-npm run dev:tailscale
-```
-
-The command uses the existing project environment and database configuration.
-It requires Tailscale to be installed, connected, and enabled for Serve on the current tailnet.
-Vite remains bound to localhost, and the temporary Tailscale Serve endpoint is removed when the command stops.
-The command refuses to replace an existing Tailscale Serve configuration.
-Set `TAILSCALE_DEV_PORT` to override the default local port `5173`.
-
 ## Optional CodeGraph navigation
 
 Agents may use the repo-local CodeGraph workflow to map Svelte components, SvelteKit routes, server utilities, callers, callees, and likely impact surfaces. It is optional and local-only: no global install, Hermes/MCP config, app dependency, CI, or production integration.

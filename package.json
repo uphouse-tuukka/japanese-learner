@@ -9,7 +9,6 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "dev:tailscale": "node scripts/dev-tailscale.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
