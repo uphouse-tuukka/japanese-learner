@@ -455,6 +455,14 @@
     />
   {:else if showContinuePrompt}
     <section class="card ready-card">
+      {#if data.spokenMission}
+        <h2 class="written-heading" tabindex="-1" bind:this={writtenMissionHeading}>
+          Written Mission
+        </h2>
+        <button class="choice-back" type="button" onclick={returnToMissionChoice}>
+          ← Choose mission type
+        </button>
+      {/if}
       <p>You have an ongoing mission session. Would you like to continue?</p>
       <div class="continue-actions">
         <button class="btn btn-primary" onclick={continueMission}>Continue mission</button>
@@ -781,12 +789,14 @@
   .back-link,
   .choice-back {
     justify-self: start;
+    min-height: 2.75rem;
+    padding: var(--space-2) 0;
+    display: inline-flex;
+    align-items: center;
     font-size: var(--text-sm);
   }
 
   .choice-back {
-    min-height: auto;
-    padding: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
