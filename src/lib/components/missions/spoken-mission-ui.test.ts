@@ -1,6 +1,7 @@
 import { render } from 'svelte/server';
 import { describe, expect, it, vi } from 'vitest';
 import SpokenMissionBriefing from './SpokenMissionBriefing.svelte';
+import SpokenMissionChoiceStatus from './SpokenMissionChoiceStatus.svelte';
 import SpokenMissionHistory from './SpokenMissionHistory.svelte';
 import SpokenMissionResult from './SpokenMissionResult.svelte';
 import SpokenMissionTurn from './SpokenMissionTurn.svelte';
@@ -152,6 +153,26 @@ function renderTurn(input: {
 }
 
 describe('Spoken Mission learner-visible support UI', () => {
+  it.each([
+    ['untried', 'Untried'],
+    ['supported', 'Supported'],
+    ['independent', 'Independent'],
+  ] as const)(
+    'shows %s evidence alongside resumable progress on the mission chooser',
+    (bestEvidence, evidenceLabel) => {
+      const html = render(SpokenMissionChoiceStatus, {
+        props: {
+          bestEvidence,
+          resumable: { currentTurn: 2, completedGoalCount: 1 },
+        },
+      }).body;
+
+      expect(html).toContain(`>${evidenceLabel}</span>`);
+      expect(html).toContain('Resume goal 2');
+      expect(html).toContain(`${evidenceLabel} evidence. Resume at goal 2 of 3.`);
+    },
+  );
+
   it('exposes programmatic focus destinations for each changing mission stage', () => {
     const briefingHtml = render(SpokenMissionBriefing, {
       props: {

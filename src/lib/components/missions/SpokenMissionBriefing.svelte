@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { getSpokenMissionEvidenceLabel } from '$lib/utils/spoken-mission';
-  import type { SpokenMissionBriefing, SpokenMissionEvidenceState } from '$lib/types';
+  import type {
+    SpokenMissionBriefing,
+    SpokenMissionEvidenceState,
+    SpokenMissionResumeProgress,
+  } from '$lib/types';
 
   type Props = {
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
-    resumable: { currentTurn: number; completedGoalCount: number } | null;
+    resumable: SpokenMissionResumeProgress | null;
     errorMessage: string;
     onStart: (startOver: boolean) => void;
     onChooseWritten: () => void;
