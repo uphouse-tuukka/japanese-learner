@@ -196,7 +196,11 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     const completed = await thirdResponse.json();
     expect(completed).toMatchObject({
       duplicate: false,
-      assessment: { outcome: 'accepted' },
+      assessment: {
+        outcome: 'accepted',
+        transcript: 'いいえ、ラーメン一つです。',
+        feedback: 'You repaired the misunderstanding.',
+      },
       nextTurn: null,
       isComplete: true,
       result: {
