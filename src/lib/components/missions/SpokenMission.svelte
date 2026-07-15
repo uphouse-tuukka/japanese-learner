@@ -4,6 +4,12 @@
   import SpokenMissionHistoryView from './SpokenMissionHistory.svelte';
   import SpokenMissionResultView from './SpokenMissionResult.svelte';
   import SpokenMissionTurnView from './SpokenMissionTurn.svelte';
+  import type {
+    SpokenMissionSubmissionState,
+    SpokenMissionSupportDisclosureState,
+    SpokenMissionTurnActions,
+    SpokenMissionTurnViewState,
+  } from './spoken-mission-turn-contract';
   import {
     requestSpokenMissionStart,
     requestSpokenMissionTurn,
@@ -37,8 +43,6 @@
   };
 
   type Stage = 'briefing' | 'starting' | 'active' | 'complete';
-  type SubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
-  type SupportDisclosureState = 'idle' | 'processing';
   type PendingRecording = {
     audio: Blob;
     responseId: string;
@@ -48,14 +52,14 @@
   let { missionId, userId, briefing, bestEvidence, resumable, onChooseWritten }: Props = $props();
 
   let stage = $state<Stage>('briefing');
-  let submissionState = $state<SubmissionState>('idle');
+  let submissionState = $state<SpokenMissionSubmissionState>('idle');
   let submissionRecovery = $state<SpokenMissionTurnRecovery>('none');
   let attemptId = $state('');
   let currentTurn = $state<SpokenMissionServerTurn | null>(null);
   let pendingNextTurn = $state<SpokenMissionServerTurn | null>(null);
   let supportRevealed = $state(false);
   let revealedEnglishSupport = $state<string | null>(null);
-  let supportDisclosureState = $state<SupportDisclosureState>('idle');
+  let supportDisclosureState = $state<SpokenMissionSupportDisclosureState>('idle');
   let attemptSupportUsed = $state(false);
   let history = $state<SpokenMissionHistoryEntry[]>([]);
   let assessment = $state<SpokenMissionTurnResponse['assessment'] | null>(null);
@@ -72,6 +76,39 @@
   const canRecord = $derived(
     submissionState === 'idle' && (recorderStatus === 'idle' || recorderStatus === 'error'),
   );
+
+  let activeTurnState = $derived.by((): SpokenMissionTurnViewState | null => {
+    if (!currentTurn) return null;
+    return {
+      turn: currentTurn,
+      recorder: {
+        maxRecordingSeconds: briefing.maxRecordingSeconds,
+        status: recorderStatus,
+        recordingSeconds,
+        canRecord,
+        errorMessage: recorderError,
+      },
+      support: {
+        revealed: supportRevealed,
+        englishText: revealedEnglishSupport,
+        disclosureState: supportDisclosureState,
+        usedDuringAttempt: attemptSupportUsed,
+      },
+      assessment: {
+        submissionState,
+        result: assessment,
+        pendingNextTurn,
+      },
+      recovery: {
+        submissionRecovery,
+        hasPendingAudio: pendingRecording !== null,
+        errorMessage,
+      },
+      audio: {
+        playing: audioPlaying,
+      },
+    };
+  });
 
   function createResponseId(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -266,6 +303,29 @@
     stop();
     clearAudioPoll();
   });
+
+  const turnActions: SpokenMissionTurnActions = {
+    recorder: {
+      start: startRecording,
+      stop: stopRecording,
+      cancel: cancelRecording,
+    },
+    support: {
+      reveal: revealSupport,
+    },
+    assessment: {
+      continue: continueToNextGoal,
+      retryGoal,
+    },
+    recovery: {
+      retryUpload: submitRecording,
+      recordAgain: retryGoal,
+      chooseWritten: () => onChooseWritten(),
+    },
+    audio: {
+      toggleServerLine: playServerLine,
+    },
+  };
 </script>
 
 {#if stage === 'briefing'}
@@ -282,38 +342,11 @@
     <span class="ink-pulse" aria-hidden="true">話</span>
     <p>Preparing the restaurant conversation…</p>
   </section>
-{:else if stage === 'active' && currentTurn}
+{:else if stage === 'active' && activeTurnState}
   {#if history.length > 0}
     <SpokenMissionHistoryView {history} />
   {/if}
-  <SpokenMissionTurnView
-    {currentTurn}
-    maxRecordingSeconds={briefing.maxRecordingSeconds}
-    {supportRevealed}
-    englishSupport={revealedEnglishSupport}
-    {supportDisclosureState}
-    {attemptSupportUsed}
-    {assessment}
-    {pendingNextTurn}
-    {recorderStatus}
-    {recordingSeconds}
-    {submissionState}
-    {submissionRecovery}
-    {canRecord}
-    {audioPlaying}
-    {recorderError}
-    {errorMessage}
-    hasPendingAudio={pendingRecording !== null}
-    onPlayServerLine={playServerLine}
-    onRevealSupport={revealSupport}
-    onContinue={continueToNextGoal}
-    onRetryGoal={retryGoal}
-    onStartRecording={startRecording}
-    onStopRecording={stopRecording}
-    onCancelRecording={cancelRecording}
-    onRetryUpload={submitRecording}
-    {onChooseWritten}
-  />
+  <SpokenMissionTurnView viewState={activeTurnState} actions={turnActions} />
 {:else if stage === 'complete' && result}
   <SpokenMissionResultView {result} onTryAgain={() => startMission(true)} />
 {/if}
