@@ -262,9 +262,8 @@ export async function transcribeJapaneseAudio(input: JapaneseTranscriptionInput)
       response_format: 'json',
       prompt: buildTranscriptionPrompt(input),
     });
-  } catch (error) {
+  } catch {
     logWarn('voice-assessment', 'transcription failed', {
-      error,
       userId: input.userId,
       mimeType: input.audio.type,
       byteSize: input.audio.size,
@@ -315,9 +314,8 @@ export async function assessJapaneseTranscript(
       ],
       text: { format: { type: 'json_object' } },
     });
-  } catch (error) {
+  } catch {
     logWarn('voice-assessment', 'semantic assessment failed', {
-      error,
       userId: input.userId,
       model: ASSESSMENT_MODEL,
     });
@@ -344,9 +342,8 @@ export async function assessJapaneseTranscript(
       confidence: parsed.confidence,
       feedback: parseFeedback(parsed.feedback),
     };
-  } catch (error) {
+  } catch {
     logWarn('voice-assessment', 'semantic assessment response was invalid', {
-      error,
       userId: input.userId,
       model: ASSESSMENT_MODEL,
     });

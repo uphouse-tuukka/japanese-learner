@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-07-14
+**Last updated:** 2026-07-15
 
 Use this index before following older plans or decisions. Status labels are conservative:
 

@@ -152,7 +152,9 @@ describe('assessMissionVoiceTurn', () => {
   });
 
   it('returns could not assess when transcription fails', async () => {
-    mockClient.audio.transcriptions.create.mockRejectedValue(new Error('provider failed'));
+    mockClient.audio.transcriptions.create.mockRejectedValue(
+      new Error('provider echoed learner transcript: ラーメンをお願いします'),
+    );
 
     await expect(assessMissionVoiceTurn(validMissionInput())).resolves.toEqual({
       outcome: 'could_not_assess',
@@ -160,6 +162,12 @@ describe('assessMissionVoiceTurn', () => {
       feedback: 'The recording could not be transcribed. Please try again.',
     });
     expect(mockClient.responses.create).not.toHaveBeenCalled();
+    expect(mockLogWarn).toHaveBeenCalledWith('voice-assessment', 'transcription failed', {
+      userId: 'user-1',
+      mimeType: 'audio/webm',
+      byteSize: 10,
+      model: 'gpt-4o-mini-transcribe',
+    });
   });
 
   it('rejects unsupported audio before any provider call', async () => {
@@ -175,13 +183,19 @@ describe('assessMissionVoiceTurn', () => {
   });
 
   it('returns could not assess when semantic assessment fails', async () => {
-    mockClient.responses.create.mockRejectedValue(new Error('provider failed'));
+    mockClient.responses.create.mockRejectedValue(
+      new Error('provider echoed assessment prompt: Order one item politely in Japanese.'),
+    );
 
     await expect(assessMissionVoiceTurn(validMissionInput())).resolves.toEqual({
       outcome: 'could_not_assess',
       reason: 'assessment_failed',
       transcript: 'ラーメンをお願いします',
       feedback: 'The response could not be assessed reliably. Please try again.',
+    });
+    expect(mockLogWarn).toHaveBeenCalledWith('voice-assessment', 'semantic assessment failed', {
+      userId: 'user-1',
+      model: 'gpt-4.1',
     });
   });
 
@@ -200,5 +214,13 @@ describe('assessMissionVoiceTurn', () => {
       transcript: 'ラーメンをお願いします',
       feedback: 'The response could not be assessed reliably. Please try again.',
     });
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      'voice-assessment',
+      'semantic assessment response was invalid',
+      {
+        userId: 'user-1',
+        model: 'gpt-4.1',
+      },
+    );
   });
 });

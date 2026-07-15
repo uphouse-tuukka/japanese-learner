@@ -58,17 +58,18 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
       completedPractice,
       completedImmersion,
     },
-    spokenMission: definition
-      ? {
-          briefing: toSpokenMissionBriefing(definition),
-          bestEvidence: bestSpokenEvidence ?? 'untried',
-          resumable: resumableSpokenAttempt
-            ? {
-                currentTurn: resumableSpokenAttempt.currentTurn,
-                completedGoalCount: resumableSpokenAttempt.successfulTurnCount,
-              }
-            : null,
-        }
-      : null,
+    spokenMission:
+      definition && unlocked
+        ? {
+            briefing: toSpokenMissionBriefing(definition),
+            bestEvidence: bestSpokenEvidence ?? 'untried',
+            resumable: resumableSpokenAttempt
+              ? {
+                  currentTurn: resumableSpokenAttempt.currentTurn,
+                  completedGoalCount: resumableSpokenAttempt.successfulTurnCount,
+                }
+              : null,
+          }
+        : null,
   };
 };

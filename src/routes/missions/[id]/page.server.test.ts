@@ -140,4 +140,15 @@ describe('mission detail loader Spoken Mission availability', () => {
     expect(mocks.bestEvidence).not.toHaveBeenCalled();
     expect(mocks.resumable).not.toHaveBeenCalled();
   });
+
+  it('returns no Spoken Mission data while the scenario is locked', async () => {
+    mocks.categoryCount.mockResolvedValue(1);
+
+    const data = await load({
+      params: { id: 'mission-order-restaurant' },
+      cookies: cookies(),
+    } as never);
+
+    expect(data).toMatchObject({ unlocked: false, spokenMission: null });
+  });
 });
