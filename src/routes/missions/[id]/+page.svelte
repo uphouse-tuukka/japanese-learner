@@ -3,6 +3,8 @@
   import MissionChoices from '$lib/components/missions/MissionChoices.svelte';
   import MissionCompletion from '$lib/components/missions/MissionCompletion.svelte';
   import MissionModeBanner from '$lib/components/missions/MissionModeBanner.svelte';
+  import SpokenMission from '$lib/components/missions/SpokenMission.svelte';
+  import SpokenMissionChoiceStatus from '$lib/components/missions/SpokenMissionChoiceStatus.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { onDestroy, tick } from 'svelte';
   import { canCompleteMission, shouldShowMissionResponseControls } from '$lib/utils/mission-state';
@@ -32,6 +34,7 @@
     | 'evaluating'
     | 'complete'
     | 'error';
+  type MissionExperience = 'choice' | 'written' | 'spoken';
 
   const CATEGORY_LABELS: Record<string, string> = {
     greetings_basics: 'Greetings & Basics',
@@ -46,6 +49,7 @@
   let { data } = $props<{ data: PageData }>();
 
   let uiState = $state<MissionUiState>('ready');
+  let missionExperience = $state<MissionExperience>('choice');
 
   let mode = $state<MissionMode>('practice');
   let userMissionId = $state<string>('');
@@ -67,6 +71,8 @@
 
   let showContinuePrompt = $state(false);
   let threadContainer = $state<HTMLDivElement | null>(null);
+  let missionChoiceHeading = $state<HTMLHeadingElement | null>(null);
+  let writtenMissionHeading = $state<HTMLHeadingElement | null>(null);
 
   async function scrollToLatestTurn(): Promise<void> {
     if (uiState !== 'active') return;
@@ -191,6 +197,22 @@
   function toggleMode(): void {
     if (uiState !== 'ready') return;
     mode = mode === 'practice' ? 'immersion' : 'practice';
+  }
+
+  async function chooseWrittenMission(): Promise<void> {
+    missionExperience = 'written';
+    await tick();
+    writtenMissionHeading?.focus();
+  }
+
+  function chooseSpokenMission(): void {
+    missionExperience = 'spoken';
+  }
+
+  async function returnToMissionChoice(): Promise<void> {
+    missionExperience = 'choice';
+    await tick();
+    missionChoiceHeading?.focus();
   }
 
   async function startMission(): Promise<void> {
@@ -359,12 +381,84 @@
         Category: {CATEGORY_LABELS[data.mission.category] ?? 'General'} · Scenario difficulty:
         {data.mission.difficulty.charAt(0).toUpperCase() + data.mission.difficulty.slice(1)}
       </p>
-      <MissionModeBanner {mode} onToggle={toggleMode} canToggle={uiState === 'ready'} />
+      {#if missionExperience === 'written' || !data.spokenMission}
+        <MissionModeBanner {mode} onToggle={toggleMode} canToggle={uiState === 'ready'} />
+      {/if}
     </header>
   {/if}
 
-  {#if showContinuePrompt}
+  {#if data.spokenMission && missionExperience === 'choice'}
+    <section class="card mission-choice" aria-labelledby="mission-choice-heading">
+      <div class="choice-heading">
+        <p class="choice-kicker">Choose how to practice</p>
+        <h2 id="mission-choice-heading" tabindex="-1" bind:this={missionChoiceHeading}>
+          One situation, two real ways to prepare.
+        </h2>
+        <p>Written and spoken work stay separate, so you can choose the evidence you want today.</p>
+      </div>
+
+      <div class="mission-type-grid">
+        <button class="mission-type-card" type="button" onclick={chooseWrittenMission}>
+          <span class="type-icon written-icon" aria-hidden="true">文</span>
+          <span class="type-copy">
+            <span class="type-label">Written Mission</span>
+            <strong>Practice or immerse in writing</strong>
+            <small
+              >Keep the current hints, free-type flow, XP, badges, replay, and resume behavior.</small
+            >
+          </span>
+          <span class="type-status">
+            {data.writtenProgress.completedImmersion
+              ? 'Immersion complete'
+              : data.writtenProgress.completedPractice
+                ? 'Practice complete'
+                : 'Ready'}
+          </span>
+        </button>
+
+        <button class="mission-type-card spoken" type="button" onclick={chooseSpokenMission}>
+          <span class="type-icon spoken-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"
+              ><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" /><path
+                d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6"
+              /></svg
+            >
+          </span>
+          <span class="type-copy">
+            <span class="type-label">Spoken Mission</span>
+            <strong>Complete the Can-do by voice</strong>
+            <small
+              >Order, respond, and repair in three short push-to-talk turns. Accent is not scored.</small
+            >
+          </span>
+          <SpokenMissionChoiceStatus
+            bestEvidence={data.spokenMission.bestEvidence}
+            resumable={data.spokenMission.resumable}
+          />
+        </button>
+      </div>
+
+      <a class="back-link" href="/missions">← Back to Travel Missions</a>
+    </section>
+  {:else if data.spokenMission && missionExperience === 'spoken'}
+    <SpokenMission
+      missionId={data.mission.id}
+      userId={data.selectedUserId}
+      briefing={data.spokenMission.briefing}
+      bestEvidence={data.spokenMission.bestEvidence}
+      resumable={data.spokenMission.resumable}
+      onChooseWritten={chooseWrittenMission}
+    />
+  {:else if showContinuePrompt}
     <section class="card ready-card">
+      {#if data.spokenMission}
+        <h2 class="written-heading" tabindex="-1" bind:this={writtenMissionHeading}>
+          Written Mission
+        </h2>
+        <button class="choice-back" type="button" onclick={returnToMissionChoice}>
+          ← Choose mission type
+        </button>
+      {/if}
       <p>You have an ongoing mission session. Would you like to continue?</p>
       <div class="continue-actions">
         <button class="btn btn-primary" onclick={continueMission}>Continue mission</button>
@@ -373,6 +467,16 @@
     </section>
   {:else if uiState === 'ready'}
     <section class="card ready-card">
+      {#if data.spokenMission}
+        <h2 class="written-heading" tabindex="-1" bind:this={writtenMissionHeading}>
+          Written Mission
+        </h2>
+      {/if}
+      {#if data.spokenMission}
+        <button class="choice-back" type="button" onclick={returnToMissionChoice}>
+          ← Choose mission type
+        </button>
+      {/if}
       <p class="mission-desc">
         Ready to practice your Japanese? Start the mission to begin your conversation.
       </p>
@@ -539,6 +643,155 @@
   .mission-header h1,
   .mission-header p {
     margin: 0;
+  }
+
+  .mission-choice {
+    display: grid;
+    gap: var(--space-6);
+    padding: clamp(var(--space-5), 5vw, var(--space-8));
+    min-width: 0;
+  }
+
+  .written-heading {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-light);
+  }
+
+  .choice-heading {
+    max-width: 40rem;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .choice-heading h2,
+  .choice-heading p {
+    margin: 0;
+  }
+
+  .choice-heading h2 {
+    font-size: clamp(var(--text-xl), 4vw, var(--text-3xl));
+    font-weight: var(--weight-light);
+  }
+
+  .choice-heading > p:last-child {
+    color: var(--text-bokashi);
+  }
+
+  .choice-kicker {
+    color: var(--accent-shu);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .mission-type-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .mission-type-card {
+    min-width: 0;
+    min-height: 16rem;
+    padding: var(--space-6);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-mid);
+    background: var(--bg-shoji);
+    color: var(--text-sumi);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    justify-items: start;
+    align-items: start;
+    gap: var(--space-4);
+    text-align: left;
+    white-space: normal;
+  }
+
+  .mission-type-card:hover {
+    border-color: var(--accent-shu-soft);
+    background: var(--accent-shu-wash);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .mission-type-card.spoken {
+    border-top: 3px solid var(--accent-shu);
+  }
+
+  .type-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--bg-washi);
+    color: var(--text-bokashi);
+    font-size: var(--text-lg);
+  }
+
+  .spoken-icon {
+    background: var(--accent-shu-wash);
+    color: var(--accent-shu);
+  }
+
+  .spoken-icon svg {
+    width: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .type-copy {
+    min-width: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .type-copy strong {
+    font-size: var(--text-lg);
+  }
+
+  .type-copy small {
+    line-height: var(--leading-normal);
+  }
+
+  .type-label {
+    color: var(--accent-shu);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .type-status {
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background: var(--bg-kinu);
+    color: var(--text-bokashi);
+    font-size: var(--text-xs);
+  }
+
+  .back-link,
+  .choice-back {
+    justify-self: start;
+    min-height: 2.75rem;
+    padding: var(--space-2) 0;
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--text-sm);
+  }
+
+  .choice-back {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--accent-shu);
   }
 
   .meta {
@@ -829,5 +1082,15 @@
     display: flex;
     gap: var(--space-3);
     flex-wrap: wrap;
+  }
+
+  @media (max-width: 37.5rem) {
+    .mission-type-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .mission-type-card {
+      min-height: 13rem;
+    }
   }
 </style>

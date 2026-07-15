@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
+import { isMissionUnlocked } from '$lib/server/mission-access';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import {
   createUserMission,
@@ -70,12 +71,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     }
 
     const categorySessionCount = await getCategorySessionCount(userId, mission.category);
-    const unlocked =
-      mission.startUnlocked ||
-      config.missions.unlockAllOverride ||
-      categorySessionCount >= mission.unlockSessionsRequired;
-
-    if (!unlocked) {
+    if (!isMissionUnlocked(mission, categorySessionCount)) {
       return jsonError('Mission is locked.', 403);
     }
 

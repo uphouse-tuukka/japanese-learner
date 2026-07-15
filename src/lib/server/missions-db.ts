@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getDb } from './db';
-import { config } from './config';
+import { isMissionUnlocked } from './mission-access';
 import type {
   Mission,
   MissionMode,
@@ -10,6 +10,7 @@ import type {
   UserBadge,
   UserMission,
 } from '$lib/types';
+import { getSpokenMissionDefinition } from './spoken-missions';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -186,10 +187,14 @@ SELECT
   m.start_unlocked,
   MAX(CASE WHEN um.mode = 'practice' AND um.status = 'completed' THEN 1 ELSE 0 END) AS completed_practice,
   MAX(CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END) AS completed_immersion,
-  MAX(CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END) AS badge_earned
+  MAX(CASE WHEN ub.id IS NOT NULL THEN 1 ELSE 0 END) AS badge_earned,
+  MAX(CASE WHEN usm.status = 'completed' AND usm.evidence_state = 'independent' THEN 2
+           WHEN usm.status = 'completed' AND usm.evidence_state = 'supported' THEN 1
+           ELSE 0 END) AS spoken_evidence_rank
 FROM missions m
 LEFT JOIN user_missions um ON um.mission_id = m.id AND um.user_id = ?
 LEFT JOIN user_badges ub ON ub.mission_id = m.id AND ub.user_id = ?
+LEFT JOIN user_spoken_missions usm ON usm.mission_id = m.id AND usm.user_id = ?
 GROUP BY
   m.id,
   m.title,
@@ -204,7 +209,7 @@ GROUP BY
   m.start_unlocked
 ORDER BY m.category ASC, m.sequence ASC
 `,
-    args: [userId, userId],
+    args: [userId, userId, userId],
   });
 
   const categoryCountsResult = await db.execute({
@@ -230,16 +235,21 @@ GROUP BY JSON_EXTRACT(${sessionCategoryColumn}, '$.category')
   return (missionsResult.rows as Array<Record<string, unknown>>).map((row) => {
     const mission = mapMissionRow(row);
     const sessionsCompletedInCategory = categorySessionCounts.get(mission.category) ?? 0;
-    const unlockedByCategory = sessionsCompletedInCategory >= mission.unlockSessionsRequired;
-    const unlocked =
-      config.missions.unlockAllOverride || mission.startUnlocked || unlockedByCategory;
+    const spokenEvidenceRank = asNumber(row.spoken_evidence_rank);
 
     return {
       ...mission,
-      unlocked,
+      unlocked: isMissionUnlocked(mission, sessionsCompletedInCategory),
       completedPractice: asNumber(row.completed_practice) === 1,
       completedImmersion: asNumber(row.completed_immersion) === 1,
       badgeEarned: asNumber(row.badge_earned) === 1,
+      spokenAvailable: getSpokenMissionDefinition(mission.id) !== null,
+      spokenEvidence:
+        spokenEvidenceRank === 2
+          ? 'independent'
+          : spokenEvidenceRank === 1
+            ? 'supported'
+            : 'untried',
     } satisfies MissionWithProgress;
   });
 }

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError } from '$lib/server/api';
+import { logError } from '$lib/server/logger';
 import { readSelectedUserId } from '$lib/server/selected-user';
 import { SpeakingCheckError, checkSpeakingAnswer } from '$lib/server/speaking-checker';
 import type { SpeakingResponseKind } from '$lib/server/speaking-checker';
@@ -182,7 +183,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return jsonError(safeError.message, safeError.status);
     }
 
-    console.error('[api/speaking/check] failed', { error });
+    logError('api/speaking/check', 'speaking check failed', { error });
     return jsonError('Speaking check failed.', 500);
   }
 };

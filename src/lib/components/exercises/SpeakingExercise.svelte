@@ -2,9 +2,11 @@
   import { onDestroy } from 'svelte';
   import type { OnAnswer, SpeakingExercise as SpeakingExerciseData } from '$lib/types';
   import {
-    shouldSubmitStoppedRecording,
-    type RecordingStopIntent,
-  } from './speaking-recorder-state';
+    createAudioRecorder,
+    clampRecordingDuration,
+    type AudioRecorderController,
+    type AudioRecorderStatus,
+  } from '$lib/utils/audio-recorder';
   import ExerciseFrame from './shared/ExerciseFrame.svelte';
   import ExerciseResultPanel from './shared/ExerciseResultPanel.svelte';
   import ExerciseStatusPanel from './shared/ExerciseStatusPanel.svelte';
@@ -14,14 +16,7 @@
     onAnswer: OnAnswer;
   }
 
-  type RecordingState =
-    | 'idle'
-    | 'requesting_permission'
-    | 'recording'
-    | 'processing'
-    | 'answered'
-    | 'error'
-    | 'unsupported';
+  type RecordingState = AudioRecorderStatus | 'processing' | 'answered';
 
   type SpeakingCheckResponse =
     | {
@@ -46,66 +41,42 @@
   let recordingSeconds = $state(0);
   let selectedMimeType = $state('');
 
-  let mediaRecorder: MediaRecorder | null = null;
-  let mediaStream: MediaStream | null = null;
-  let chunks: Blob[] = [];
-  let recordingStopIntent: RecordingStopIntent = 'submit';
-  let stopTimer: ReturnType<typeof setTimeout> | null = null;
-  let tickTimer: ReturnType<typeof setInterval> | null = null;
+  let recorderController: AudioRecorderController | null = null;
 
-  const maxRecordingSeconds = $derived(
-    Math.min(Math.max(Math.round(exercise.maxRecordingSeconds ?? 12), 5), 20),
-  );
+  const maxRecordingSeconds = $derived(clampRecordingDuration(exercise.maxRecordingSeconds ?? 12));
   const canRecord = $derived(recordingState === 'idle' || recordingState === 'error');
   const canContinue = $derived(
     recordingState === 'answered' || recordingState === 'error' || recordingState === 'unsupported',
   );
   const recordingLabel = $derived(`${recordingSeconds}s / ${maxRecordingSeconds}s`);
 
-  function chooseMimeType(): string {
-    if (typeof MediaRecorder === 'undefined') return '';
-    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? '';
-  }
-
-  function stopTimers(): void {
-    if (stopTimer) {
-      clearTimeout(stopTimer);
-      stopTimer = null;
-    }
-    if (tickTimer) {
-      clearInterval(tickTimer);
-      tickTimer = null;
-    }
-  }
-
-  function releaseStream(): void {
-    mediaStream?.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
-
-  function resetRecorder(): void {
-    recordingStopIntent = 'cancel';
-    stopTimers();
-    releaseStream();
-    mediaRecorder = null;
-    chunks = [];
-  }
-
   function resetForExercise(): void {
-    resetRecorder();
-    recordingState =
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices ||
-      typeof MediaRecorder === 'undefined'
-        ? 'unsupported'
-        : 'idle';
+    recorderController?.dispose();
+    recorderController = null;
+    recordingState = 'idle';
     errorMessage = '';
     transcript = '';
     isCorrect = false;
     feedback = '';
     recordingSeconds = 0;
     selectedMimeType = '';
+    recorderController = createAudioRecorder({
+      maxDurationSeconds: maxRecordingSeconds,
+      onStateChange: (snapshot) => {
+        recordingState = snapshot.status;
+        recordingSeconds = snapshot.elapsedSeconds;
+        selectedMimeType = snapshot.mimeType;
+        if (snapshot.errorMessage) {
+          errorMessage = snapshot.errorMessage;
+        } else if (snapshot.status === 'unsupported') {
+          errorMessage = 'Microphone recording is not supported in this browser.';
+        }
+      },
+      onRecordingReady: ({ audio, mimeType }) => {
+        selectedMimeType = mimeType;
+        void submitAudio(audio);
+      },
+    });
   }
 
   function buildMetadataFormData(audio: Blob): FormData {
@@ -148,94 +119,20 @@
 
   async function startRecording(): Promise<void> {
     if (!canRecord) return;
-
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices ||
-      typeof MediaRecorder === 'undefined'
-    ) {
-      recordingState = 'unsupported';
-      errorMessage = 'Microphone recording is not supported in this browser.';
-      return;
-    }
-
-    recordingState = 'requesting_permission';
     errorMessage = '';
     transcript = '';
     isCorrect = false;
     feedback = '';
     recordingSeconds = 0;
-    chunks = [];
-    recordingStopIntent = 'submit';
-
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      selectedMimeType = chooseMimeType();
-      mediaRecorder = selectedMimeType
-        ? new MediaRecorder(mediaStream, { mimeType: selectedMimeType })
-        : new MediaRecorder(mediaStream);
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const stopIntent = recordingStopIntent;
-        stopTimers();
-        releaseStream();
-        const audio = new Blob(chunks, { type: selectedMimeType || 'audio/webm' });
-        chunks = [];
-        mediaRecorder = null;
-        recordingStopIntent = 'submit';
-
-        if (shouldSubmitStoppedRecording(stopIntent, audio.size)) {
-          void submitAudio(audio);
-          return;
-        }
-
-        recordingState = 'idle';
-        recordingSeconds = 0;
-      };
-
-      mediaRecorder.onerror = () => {
-        resetRecorder();
-        errorMessage = 'Recording failed. Please try again.';
-        recordingState = 'error';
-      };
-
-      mediaRecorder.start();
-      recordingState = 'recording';
-      tickTimer = setInterval(() => {
-        recordingSeconds = Math.min(recordingSeconds + 1, maxRecordingSeconds);
-      }, 1000);
-      stopTimer = setTimeout(() => stopRecording(), maxRecordingSeconds * 1000);
-    } catch (error) {
-      resetRecorder();
-      errorMessage =
-        error instanceof Error && error.name === 'NotAllowedError'
-          ? 'Microphone permission was denied. You can retry or continue without credit.'
-          : 'Could not start microphone recording. Please try again.';
-      recordingState = 'error';
-    }
+    await recorderController?.start();
   }
 
   function stopRecording(): void {
-    recordingStopIntent = 'submit';
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
+    recorderController?.stop();
   }
 
   function cancelRecording(): void {
-    recordingStopIntent = 'cancel';
-    stopTimers();
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    } else {
-      resetRecorder();
-    }
-    recordingState = 'idle';
-    recordingSeconds = 0;
+    recorderController?.cancel();
     errorMessage = '';
   }
 
@@ -248,7 +145,11 @@
   }
 
   function retryAnswer(): void {
-    resetForExercise();
+    transcript = '';
+    isCorrect = false;
+    feedback = '';
+    errorMessage = '';
+    recorderController?.retry();
   }
 
   $effect(() => {
@@ -257,7 +158,7 @@
   });
 
   onDestroy(() => {
-    resetRecorder();
+    recorderController?.dispose();
   });
 </script>
 
@@ -301,7 +202,7 @@
       <button class="btn btn-ghost" type="button" onclick={cancelRecording}>Cancel</button>
     {:else if recordingState === 'requesting_permission'}
       <button class="btn btn-primary" type="button" disabled>Start recording</button>
-    {:else if recordingState === 'processing'}
+    {:else if recordingState === 'processing' || recordingState === 'stopping'}
       <button class="btn btn-primary" type="button" disabled>Working…</button>
     {:else if recordingState === 'answered'}
       {#if isCorrect}
@@ -344,7 +245,7 @@
           <span>Recording {recordingLabel}</span>
         </span>
       </ExerciseStatusPanel>
-    {:else if recordingState === 'processing'}
+    {:else if recordingState === 'processing' || recordingState === 'stopping'}
       <ExerciseStatusPanel>
         <p>Transcribing and checking your answer…</p>
       </ExerciseStatusPanel>

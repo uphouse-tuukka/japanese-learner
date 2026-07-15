@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-15
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -78,6 +78,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Source files affected: documentation only
 - Last verified: 2026-05-06
 
+### `documents/spoken-missions.md`
+
+- Status: active
+- Description: Production guide for Spoken Mission product boundaries, API contracts, attempt persistence, evidence semantics, raw-audio privacy, and enabling another existing scenario.
+- Source files affected: `src/lib/server/spoken-missions.ts`, `src/lib/server/spoken-missions-db.ts`, `src/routes/api/missions/[id]/spoken/**`, `src/routes/missions/[id]/**`, `src/lib/components/missions/SpokenMission*.svelte`
+- Last verified: 2026-07-14
+
 ### `documents/templates/plan-template.md`
 
 - Status: active
@@ -98,6 +105,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Description: Reusable template for spec, quality, security/privacy, and validation reviews.
 - Source files affected: documentation only
 - Last verified: 2026-05-06
+
+### `documents/reviews/2026-07-15-spoken-mission-browser-acceptance.md`
+
+- Status: active
+- Description: Browser acceptance evidence for Spoken Missions covering desktop and mobile layout, real microphone capture, live semantic grading, evidence labels, resume, recovery, accessibility, privacy, and recorded limitations.
+- Source files affected: `src/routes/missions/[id]/**`, `src/lib/components/missions/**`, `src/lib/utils/audio-recorder.ts`, Spoken Mission APIs and persistence
+- Last verified: 2026-07-15
 
 ### `documents/design/exercise-ui-guidelines.md`
 

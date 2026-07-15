@@ -175,12 +175,11 @@ describe('exercise UI contract', () => {
     );
   });
 
-  it('prevents speaking cancel from submitting recorder output for grading', () => {
+  it('delegates speaking cancellation and media ownership to the reusable recorder seam', () => {
     const speaking = readExerciseComponent(join(exerciseDir, 'SpeakingExercise.svelte'));
 
-    expect(speaking).toContain("recordingStopIntent = 'cancel'");
-    expect(speaking).toMatch(
-      /if \(shouldSubmitStoppedRecording\(stopIntent, audio\.size\)\) \{\s*void submitAudio\(audio\);/,
-    );
+    expect(speaking).toContain('recorderController?.cancel()');
+    expect(speaking).not.toContain('getUserMedia');
+    expect(speaking).not.toContain('new MediaRecorder');
   });
 });

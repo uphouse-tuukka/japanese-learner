@@ -25,8 +25,30 @@ describe('getSchemaStatements', () => {
 
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS missions');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS user_missions');
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS user_spoken_missions');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS user_badges');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS portfolio_challenge_attempts');
+  });
+
+  it('defines constrained, indexed Spoken Mission attempts separately from Written Missions', () => {
+    const schemaSql = getSchemaStatements().map(sqlText).join('\n');
+
+    expect(schemaSql).toContain("CHECK(status IN ('in_progress', 'completed', 'abandoned'))");
+    expect(schemaSql).toContain("CHECK(evidence_state IN ('supported', 'independent'))");
+    expect(schemaSql).toContain('CHECK(current_turn BETWEEN 1 AND 3)');
+    expect(schemaSql).toContain(
+      'current_turn_support_used INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_support_used IN (0, 1))',
+    );
+    expect(schemaSql).toContain('CHECK(successful_turn_count BETWEEN 0 AND 3)');
+    expect(schemaSql).toContain(
+      "status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3",
+    );
+    expect(schemaSql).toContain(
+      'CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_user_mission ON user_spoken_missions(user_id, mission_id);',
+    );
+    expect(schemaSql).toContain(
+      'CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_resumable ON user_spoken_missions(user_id, mission_id, status, updated_at);',
+    );
   });
 
   it('keeps the current token, mission, and portfolio indexes represented', () => {
