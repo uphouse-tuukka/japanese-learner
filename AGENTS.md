@@ -80,3 +80,20 @@ For documentation-only changes, follow `documents/CONTRIBUTING.md` validation re
 - Do not allow multiple agents to edit the same large file without coordination.
 - Use spec-compliance review first, then code-quality review.
 - For maintenance or refactor tasks, do not add user-facing features. Put feature ideas in the handoff parking lot instead of code.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in this repository's GitHub Issues.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The repository uses the five default triage labels.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository with domain language in `CONTEXT.md` and decisions in `documents/decisions/`.
+See `docs/agents/domain.md`.
