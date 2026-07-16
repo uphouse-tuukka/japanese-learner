@@ -48,7 +48,10 @@ async function decodeAudio(audioData: ArrayBuffer | Blob): Promise<AudioBuffer> 
   return context.decodeAudioData(copy);
 }
 
-export async function playAudio(audioData: ArrayBuffer | Blob): Promise<void> {
+export async function playAudio(
+  audioData: ArrayBuffer | Blob,
+  onPlaybackStart?: () => void,
+): Promise<void> {
   const context = await ensureContextReady();
   const buffer = await decodeAudio(audioData);
 
@@ -66,6 +69,7 @@ export async function playAudio(audioData: ArrayBuffer | Blob): Promise<void> {
     source.onended = () => {
       markStopped(source);
     };
+    onPlaybackStart?.();
     source.start(0);
   });
 }

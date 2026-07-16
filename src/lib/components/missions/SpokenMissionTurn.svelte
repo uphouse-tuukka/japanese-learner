@@ -14,20 +14,24 @@
   let recordingSeconds = $derived(viewState.recorder.recordingSeconds);
   let canRecord = $derived(viewState.recorder.canRecord);
   let recorderError = $derived(viewState.recorder.errorMessage);
-  let supportRevealed = $derived(viewState.support.revealed);
-  let englishSupport = $derived(viewState.support.englishText);
-  let supportDisclosureState = $derived(viewState.support.disclosureState);
-  let attemptSupportUsed = $derived(viewState.support.usedDuringAttempt);
+  let writtenSupportRevealed = $derived(viewState.support.written.revealed);
+  let writtenSupport = $derived(viewState.support.written.text);
+  let writtenSupportDisclosureState = $derived(viewState.support.written.disclosureState);
+  let englishSupportRevealed = $derived(viewState.support.english.revealed);
+  let englishSupport = $derived(viewState.support.english.text);
+  let englishSupportDisclosureState = $derived(viewState.support.english.disclosureState);
+  let englishSupportUsedDuringAttempt = $derived(viewState.support.english.usedDuringAttempt);
   let submissionState = $derived(viewState.assessment.submissionState);
   let assessment = $derived(viewState.assessment.result);
   let pendingNextTurn = $derived(viewState.assessment.pendingNextTurn);
   let submissionRecovery = $derived(viewState.recovery.submissionRecovery);
   let hasPendingAudio = $derived(viewState.recovery.hasPendingAudio);
   let errorMessage = $derived(viewState.recovery.errorMessage);
-  let audioPlaying = $derived(viewState.audio.playing);
+  let audioStatus = $derived(viewState.audio.status);
 
   let headingElement = $state<HTMLHeadingElement>();
-  let supportCopyElement = $state<HTMLDivElement>();
+  let writtenCopyElement = $state<HTMLDivElement>();
+  let englishSupportCopyElement = $state<HTMLDivElement>();
   let feedbackHeadingElement = $state<HTMLHeadingElement>();
   let recordButtonElement = $state<HTMLButtonElement>();
   let stopButtonElement = $state<HTMLButtonElement>();
@@ -37,7 +41,8 @@
   let previousRecorderStatus: AudioRecorderStatus | null = null;
   let previousSubmissionState: SpokenMissionSubmissionState | null = null;
   let previousSubmissionTurnNumber: number | null = null;
-  let previousSupportRevealed: boolean | null = null;
+  let previousWrittenSupportRevealed: boolean | null = null;
+  let previousEnglishSupportRevealed: boolean | null = null;
 
   function focusAfterRender(getElement: () => HTMLElement | undefined): void {
     void tick().then(() => getElement()?.focus());
@@ -51,11 +56,19 @@
   });
 
   $effect(() => {
-    const revealed = supportRevealed;
-    if (revealed && previousSupportRevealed === false) {
-      focusAfterRender(() => supportCopyElement);
+    const revealed = writtenSupportRevealed;
+    if (revealed && previousWrittenSupportRevealed === false) {
+      focusAfterRender(() => writtenCopyElement);
     }
-    previousSupportRevealed = revealed;
+    previousWrittenSupportRevealed = revealed;
+  });
+
+  $effect(() => {
+    const revealed = englishSupportRevealed;
+    if (revealed && previousEnglishSupportRevealed === false) {
+      focusAfterRender(() => englishSupportCopyElement);
+    }
+    previousEnglishSupportRevealed = revealed;
   });
 
   $effect(() => {
@@ -112,31 +125,72 @@
     <div class="server-label">
       <span aria-hidden="true">店</span><span>Restaurant server</span>
     </div>
-    <p class="japanese">{currentTurn.npcDialogue.japanese}</p>
-    <p class="romaji">{currentTurn.npcDialogue.romaji}</p>
     <div class="line-actions">
-      <button class="line-button" type="button" onclick={actions.audio.toggleServerLine}>
-        {audioPlaying ? 'Stop audio' : 'Replay Japanese'}
+      <button
+        class="line-button"
+        type="button"
+        disabled={audioStatus === 'loading'}
+        onclick={actions.audio.toggleServerLine}
+      >
+        {audioStatus === 'idle'
+          ? 'Listen'
+          : audioStatus === 'loading'
+            ? 'Loading audio…'
+            : audioStatus === 'playing'
+              ? 'Stop audio'
+              : audioStatus === 'error'
+                ? 'Retry audio'
+                : 'Replay Japanese'}
       </button>
-      {#if !supportRevealed}
+      {#if !writtenSupportRevealed}
         <button
           class="line-button support"
           type="button"
-          disabled={supportDisclosureState === 'processing'}
-          onclick={actions.support.reveal}
+          disabled={writtenSupportDisclosureState === 'processing'}
+          onclick={actions.support.revealWritten}
         >
-          {supportDisclosureState === 'processing'
+          {writtenSupportDisclosureState === 'processing'
+            ? 'Revealing written text…'
+            : 'Reveal written text'}
+        </button>
+      {/if}
+      {#if !englishSupportRevealed}
+        <button
+          class="line-button support"
+          type="button"
+          disabled={englishSupportDisclosureState === 'processing'}
+          onclick={actions.support.revealEnglish}
+        >
+          {englishSupportDisclosureState === 'processing'
             ? 'Revealing English support…'
             : 'Reveal English support'}
         </button>
       {/if}
     </div>
-    {#if supportRevealed && englishSupport}
-      <div class="support-copy" role="status" tabindex="-1" bind:this={supportCopyElement}>
+    <div class="audio-status" role="status" aria-live="polite">
+      {#if audioStatus === 'loading'}
+        Loading audio…
+      {:else if audioStatus === 'playing'}
+        Japanese audio is playing.
+      {:else if audioStatus === 'stopped'}
+        Japanese audio stopped.
+      {:else if audioStatus === 'error'}
+        Audio unavailable. Try again.
+      {/if}
+    </div>
+    {#if writtenSupportRevealed && writtenSupport}
+      <div class="written-copy" role="status" tabindex="-1" bind:this={writtenCopyElement}>
+        <span>Written hint</span>
+        <p class="japanese">{writtenSupport.japanese}</p>
+        <p class="romaji">{writtenSupport.romaji}</p>
+      </div>
+    {/if}
+    {#if englishSupportRevealed && englishSupport}
+      <div class="support-copy" role="status" tabindex="-1" bind:this={englishSupportCopyElement}>
         <span>English support used</span>
         <p>{englishSupport}</p>
       </div>
-    {:else if attemptSupportUsed}
+    {:else if englishSupportUsedDuringAttempt}
       <p class="prior-support">
         English support was used earlier in this attempt. Completion will be Supported.
       </p>
@@ -331,6 +385,11 @@
   .line-actions {
     margin-top: var(--space-3);
   }
+  .audio-status {
+    min-height: 1.25rem;
+    color: var(--text-usuzumi);
+    font-size: var(--text-sm);
+  }
   .line-button {
     min-height: 2.75rem;
     padding: var(--space-2) 0;
@@ -343,17 +402,28 @@
   .line-button.support {
     color: var(--text-bokashi);
   }
+  .written-copy,
   .support-copy {
     margin-top: var(--space-2);
     padding: var(--space-3);
-    background: var(--accent-gold-wash);
-    border: 1px solid var(--accent-gold);
+    border: 1px solid var(--border-light);
+    background: var(--bg-washi);
   }
+  .support-copy {
+    background: var(--accent-gold-wash);
+    border-color: var(--accent-gold);
+  }
+  .written-copy span,
   .support-copy span {
-    color: var(--state-warning);
     font-size: var(--text-xs);
     font-weight: var(--weight-bold);
     text-transform: uppercase;
+  }
+  .written-copy span {
+    color: var(--text-bokashi);
+  }
+  .support-copy span {
+    color: var(--state-warning);
   }
   .support-copy p {
     margin-top: var(--space-1);

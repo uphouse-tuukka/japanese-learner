@@ -2,6 +2,7 @@ import type { InStatement } from '@libsql/client';
 
 export const USER_XP_MISSION_REASONS_MIGRATION_KEY = 'user_xp_mission_reasons';
 export const PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY = 'portfolio_v2_session_columns';
+export const SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY = 'spoken_mission_written_support';
 
 export type MigrationDatabase = {
   execute(statement: InStatement): Promise<{ rows: Array<unknown> }>;
@@ -14,6 +15,7 @@ type ColumnDefinition = {
 };
 
 const PORTFOLIO_CHALLENGE_ATTEMPTS_TABLE = 'portfolio_challenge_attempts';
+const SPOKEN_MISSION_ATTEMPTS_TABLE = 'user_spoken_missions';
 const SAFE_SQL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { name: 'scenario', definition: 'scenario TEXT DEFAULT NULL' },
@@ -24,6 +26,11 @@ const PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { name: 'summary', definition: 'summary TEXT DEFAULT NULL' },
   { name: 'supports_browser_voice', definition: 'supports_browser_voice INTEGER DEFAULT 0' },
 ];
+const SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN: ColumnDefinition = {
+  name: 'current_turn_written_support_revealed',
+  definition:
+    'current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1))',
+};
 
 export function hasUserXpMissionReasons(userXpCreateSql: unknown): boolean {
   return (
@@ -148,6 +155,21 @@ async function runPortfolioV2SessionColumnsMigration(db: MigrationDatabase): Pro
   }
 }
 
+async function runSpokenMissionWrittenSupportMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SPOKEN_MISSION_ATTEMPTS_TABLE);
+  await addColumnIfMissing(
+    db,
+    SPOKEN_MISSION_ATTEMPTS_TABLE,
+    columnNames,
+    SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN,
+  );
+  await recordMigrationKey(db, SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY);
+}
+
 export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void> {
   await db.execute({
     sql: `CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);`,
@@ -178,5 +200,14 @@ export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void
 
   if (migrationResult.rows.length === 0) {
     await runPortfolioV2SessionColumnsMigration(db);
+  }
+
+  const spokenMissionWrittenSupportMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY],
+  });
+
+  if (spokenMissionWrittenSupportMigration.rows.length === 0) {
+    await runSpokenMissionWrittenSupportMigration(db);
   }
 }

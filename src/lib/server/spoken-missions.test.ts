@@ -12,9 +12,8 @@ describe('spoken mission definitions', () => {
 
     const definition = getSpokenMissionDefinition('mission-order-restaurant');
     expect(definition).toMatchObject({
-      version: 'restaurant-order-v1',
-      canDo:
-        'I can order one item, answer a simple follow-up, and recover from one misunderstanding at a restaurant.',
+      version: 'restaurant-order-v2',
+      canDo: 'I can manage a short order conversation in a restaurant.',
       approximateMinutes: 2,
       maxRecordingSeconds: 12,
     });
@@ -37,6 +36,12 @@ describe('spoken mission definitions', () => {
 
     const briefing = toSpokenMissionBriefing(definition);
 
+    expect(briefing.canDo).toBe('I can manage a short order conversation in a restaurant.');
+    expect(briefing.goals).toEqual([
+      { key: 'order', title: 'Order' },
+      { key: 'respond', title: 'Respond' },
+      { key: 'repair', title: 'Repair' },
+    ]);
     expect(briefing.evidence).toContain('Independent evidence');
     expect(briefing.evidence).toContain('Supported evidence');
     expect(briefing.privacy).toContain('Transcripts and semantic assessments are retained');

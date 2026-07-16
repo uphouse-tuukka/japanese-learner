@@ -98,6 +98,7 @@ const attempt = {
   currentTurn: 1,
   supportUsed: false,
   currentTurnSupportUsed: false,
+  currentTurnWrittenSupportRevealed: false,
   successfulTurnCount: 0,
   wordingVariant: 0,
   conversationLog: [],
@@ -165,7 +166,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
         privacy: definition.briefing.privacy,
         maxRecordingSeconds: 12,
         goals: [
-          { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
+          { key: 'order', title: 'Order' },
           { key: 'respond', title: 'Respond' },
           { key: 'repair', title: 'Repair' },
         ],
@@ -178,8 +179,9 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       totalTurns: 3,
       resumed: false,
       supportUsed: false,
-      currentTurnSupportRevealed: false,
+      currentTurnEnglishSupportRevealed: false,
       currentTurnEnglishSupport: null,
+      currentTurnWrittenSupportRevealed: false,
     });
     expect(payload.turn).not.toHaveProperty('englishSupport');
     expect(JSON.stringify(payload)).not.toContain('rubric');
@@ -225,7 +227,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       resumed: true,
       turn: { turnNumber: 2, goalKey: 'respond' },
       supportUsed: true,
-      currentTurnSupportRevealed: true,
+      currentTurnEnglishSupportRevealed: true,
       currentTurnEnglishSupport: 'Water?',
       history: [
         {
@@ -264,6 +266,57 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       definitionVersion: 'restaurant-order-v1',
       wordingVariant: 0,
     });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('replaces an incompatible saved attempt with the current definition automatically', async () => {
+    const currentDefinition = { ...definition, version: 'restaurant-order-v2' } as const;
+    mocks.getDefinition.mockReturnValue(currentDefinition);
+    mocks.getResumable.mockResolvedValue(attempt);
+    mocks.restart.mockResolvedValue({
+      ...attempt,
+      id: 'spokenmission-v2',
+      definitionVersion: 'restaurant-order-v2',
+    });
+
+    const response = await start({ userId: 'user-1' });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      attemptId: 'spokenmission-v2',
+      definitionVersion: 'restaurant-order-v2',
+      resumed: false,
+    });
+    expect(mocks.restart).toHaveBeenCalledWith({
+      attemptId: 'spokenmission-1',
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the single current replacement when incompatible starts race', async () => {
+    const currentDefinition = { ...definition, version: 'restaurant-order-v2' } as const;
+    const replacement = {
+      ...attempt,
+      id: 'spokenmission-v2',
+      definitionVersion: 'restaurant-order-v2',
+    };
+    mocks.getDefinition.mockReturnValue(currentDefinition);
+    mocks.getResumable.mockResolvedValueOnce(attempt).mockResolvedValueOnce(replacement);
+    mocks.restart.mockRejectedValue(new SpokenMissionProgressConflictError());
+
+    const response = await start({ userId: 'user-1' });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      attemptId: 'spokenmission-v2',
+      definitionVersion: 'restaurant-order-v2',
+      resumed: true,
+    });
+    expect(mocks.getResumable).toHaveBeenCalledTimes(2);
     expect(mocks.create).not.toHaveBeenCalled();
   });
 

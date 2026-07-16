@@ -1,6 +1,6 @@
 # Spoken Missions
 
-**Last updated:** 2026-07-14
+**Last updated:** 2026-07-16
 
 Spoken Missions let a learner complete a server-authored Can-do by voice inside an existing Travel Mission scenario.
 They are additive to Written Missions and do not change Written Mission modes, completion, XP, badges, streaks, or resume storage.
@@ -13,8 +13,11 @@ A scenario with a Spoken Mission configuration gains a microphone capability mar
 Scenarios without a Spoken Mission configuration continue directly to the existing Written Mission setup.
 
 A Spoken Mission attempt has three ordered goals.
-The restaurant Can-do uses Order, Respond, and Repair.
+The restaurant Can-do is "I can manage a short order conversation in a restaurant."
+Its briefing uses only the neutral Order, Respond, and Repair stage labels, while detailed learner goals, accepted alternatives, and rubrics remain server-owned.
 Each goal advances only after an Accepted assessment, while Retry and Could not assess keep the learner on the same goal.
+Each restaurant-server turn is audio-first.
+Japanese and romaji stay hidden in the rendered interface until the learner reveals written text.
 
 ## API contracts
 
@@ -25,23 +28,31 @@ They enforce the selected-user boundary, user and mission existence, the existin
 
 `POST /api/missions/[id]/spoken/start` accepts JSON with `userId` and optional boolean `startOver`.
 Without `startOver`, the endpoint resumes the newest matching in-progress attempt when one exists.
+If that attempt uses an older immutable definition, the endpoint atomically abandons it and returns a fresh current-definition attempt instead of a version-conflict dead end.
 With `startOver`, it atomically abandons the current in-progress attempt and creates a replacement without deleting completed evidence.
-The response contains the attempt id, server-owned definition version, structured listening-support policy, learner-safe briefing, current authored server turn, restored transcript and assessment history, support-used state, and total turn count.
+The response contains the attempt id, server-owned definition version, structured listening-support policy, learner-safe briefing, current authored server turn, restored transcript and assessment history, separate current-turn written and English disclosure states, and total turn count.
 The briefing states that completing without English listening support records Independent evidence, while revealing that support records Supported evidence.
 It also states that transcripts and semantic assessments are retained for evidence and resume while raw audio is discarded after assessment.
 The structured policy exposes only learner-safe support availability and resulting evidence labels, never accepted answers, alternatives, or semantic rubrics.
 English listening-support text is omitted unless support was already revealed for the current goal, in which case the response restores that disclosure after refresh.
+
+### Reveal written text
+
+`POST /api/missions/[id]/spoken/written-support` accepts JSON with `userId`, `attemptId`, and `turnNumber`.
+The endpoint durably marks written support as revealed for the current turn and returns the authored Japanese and romaji together.
+Repeated requests are idempotent.
+Written support does not mark English listening support as used and does not change Independent evidence eligibility.
 
 ### Reveal listening support
 
 `POST /api/missions/[id]/spoken/support` accepts JSON with `userId`, `attemptId`, and `turnNumber`.
 The endpoint marks English listening support as used before returning the current turn's server-authored English text.
 The support-used flag is monotonic for the attempt.
-Replaying Japanese audio, reading Japanese or romaji, and using a Japanese repair strategy do not call this endpoint and do not count as English support.
+Replaying Japanese audio, revealing Japanese plus romaji, and using a Japanese repair strategy do not call this endpoint and do not count as English support.
 
 ### Assess a turn
 
-`POST /api/missions/[id]/spoken/turn` accepts multipart form data with `userId`, `attemptId`, `turnNumber`, `clientResponseId`, `supportRevealed`, and one `audio` file.
+`POST /api/missions/[id]/spoken/turn` accepts multipart form data with `userId`, `attemptId`, `turnNumber`, `clientResponseId`, `englishSupportRevealed`, and one `audio` file.
 The server loads the goal, alternatives, rubric, evidence rules, and authored NPC line from its own definition.
 The browser never supplies expected answers or grading rules.
 The `clientResponseId` makes a repeated submission idempotent by returning the stored assessment instead of recording or advancing twice.
@@ -51,12 +62,13 @@ Recoverable failures include a `recovery` value that tells the client whether it
 ## Persistence and resume
 
 Spoken attempts are stored separately from Written Missions in `user_spoken_missions`.
-Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide support-used flag, current-goal support-used flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
+Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide English-support flag, current-goal English-support flag, current-goal written-support flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
 Attempt status is `in_progress`, `completed`, or `abandoned`.
 The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, support usage, client response id, and assessment time.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.
-The start response restores the full learner-safe conversation history and any English support already revealed for the current goal.
+The start response restores the full learner-safe conversation history plus written and English support already revealed for the current goal.
+Restored history shows a prior server line only when written support was revealed for that goal.
 Raw audio is not part of database state, API responses, or browser resume storage.
 
 ## Evidence semantics
@@ -87,7 +99,7 @@ Do not create a duplicate mission record, catalog node, collection, track, shelf
 
 The definition must include a new immutable version, Can-do statement, briefing and privacy copy, approximate duration, maximum recording duration, exactly three ordered goals, authored Japanese and romaji server-line variants, English listening-support text, natural alternatives, semantic rubrics, and a suggested practice phrase.
 Each goal should provide a line for every supported wording variant because one variant index is selected for the whole attempt.
-Changing evidence-relevant content requires a new definition version so an incompatible saved attempt is rejected and can be restarted safely.
+Changing evidence-relevant content requires a new definition version so an incompatible saved attempt is replaced safely while completed historical evidence remains available.
 
 Add definition, route-flow, loader, privacy, resume, idempotency, evidence, and learner-visible UI coverage for the scenario.
 Run the focused Spoken Mission tests while iterating and finish with `npm run validate:ci`.

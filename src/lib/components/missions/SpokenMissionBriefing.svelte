@@ -51,7 +51,7 @@
     {#each briefing.goals as goal, index (goal.key)}
       <li>
         <span class="goal-number">{index + 1}</span>
-        <span><strong>{goal.title}</strong><small>{goal.learnerGoal}</small></span>
+        <strong>{goal.title}</strong>
       </li>
     {/each}
   </ol>
@@ -185,12 +185,8 @@
     border-top: 2px solid var(--accent-shu);
     border-radius: var(--radius-md);
   }
-  .goal-list strong,
-  .goal-list small {
-    display: block;
-  }
-  .goal-list small {
-    margin-top: var(--space-1);
+  .goal-list strong {
+    align-self: center;
   }
   .goal-number {
     color: var(--accent-shu);

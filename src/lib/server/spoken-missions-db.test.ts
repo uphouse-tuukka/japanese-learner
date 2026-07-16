@@ -74,6 +74,59 @@ describe('Spoken Mission persistence', () => {
     ).resolves.toBeNull();
   });
 
+  it('restores written support without changing English evidence eligibility and clears it on advance', async () => {
+    const spoken = await loadRepositories();
+    const attempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    });
+
+    await expect(
+      spoken.markSpokenMissionWrittenSupportRevealed({
+        attemptId: attempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v2',
+        turnNumber: 1,
+      }),
+    ).resolves.toMatchObject({
+      currentTurnWrittenSupportRevealed: true,
+      supportUsed: false,
+      currentTurnSupportUsed: false,
+    });
+
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      turnNumber: 1,
+      evidence: {
+        goalKey: 'order',
+        turnNumber: 1,
+        npcJapanese: 'ご注文はお決まりですか。',
+        npcRomaji: 'go-chuumon wa okimari desu ka.',
+        transcript: 'ラーメンを一つお願いします。',
+        outcome: 'accepted',
+        confidence: 'high',
+        feedback: 'Goal accomplished.',
+        supportUsed: false,
+        clientResponseId: 'written-support-accepted',
+        assessedAt: '2026-07-16T09:00:00.000Z',
+      },
+    });
+
+    await expect(spoken.getSpokenMissionAttempt(attempt.id)).resolves.toMatchObject({
+      currentTurn: 2,
+      currentTurnWrittenSupportRevealed: false,
+      supportUsed: false,
+      currentTurnSupportUsed: false,
+      conversationLog: [{ writtenSupportRevealed: true }],
+    });
+  });
+
   it('atomically replaces only the exact current in-progress attempt', async () => {
     const spoken = await loadRepositories();
     const olderAttempt = await spoken.createSpokenMissionAttempt({
@@ -126,6 +179,65 @@ describe('Spoken Mission persistence', () => {
     );
     expect(Number(inProgress.rows[0]?.total ?? 0)).toBe(2);
     vi.useRealTimers();
+  });
+
+  it('keeps completed historical evidence when replacing an incompatible attempt', async () => {
+    const spoken = await loadRepositories();
+    const completedAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 0,
+    });
+    for (const turnNumber of [1, 2, 3]) {
+      await spoken.recordSpokenMissionAssessment({
+        attemptId: completedAttempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        turnNumber,
+        evidence: {
+          goalKey: ['order', 'respond', 'repair'][turnNumber - 1] as 'order' | 'respond' | 'repair',
+          turnNumber,
+          npcJapanese: '日本語',
+          npcRomaji: 'nihongo',
+          transcript: '返事',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: `historical-${turnNumber}`,
+          assessedAt: '2026-07-15T09:00:00.000Z',
+        },
+      });
+    }
+    const incompatibleAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 1,
+    });
+
+    const replacement = await spoken.restartSpokenMissionAttempt({
+      attemptId: incompatibleAttempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    });
+
+    expect(replacement).toMatchObject({
+      definitionVersion: 'restaurant-order-v2',
+      status: 'in_progress',
+    });
+    await expect(spoken.getSpokenMissionAttempt(completedAttempt.id)).resolves.toMatchObject({
+      definitionVersion: 'restaurant-order-v1',
+      status: 'completed',
+      evidenceState: 'independent',
+    });
+    await expect(
+      spoken.getBestSpokenMissionEvidence('user-1', 'mission-order-restaurant'),
+    ).resolves.toBe('independent');
   });
 
   it('rolls back abandonment when the replacement insert fails', async () => {

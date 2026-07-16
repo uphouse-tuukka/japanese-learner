@@ -48,6 +48,7 @@ function mapSpokenMissionAttempt(row: Record<string, unknown>): SpokenMissionAtt
     currentTurn: asNumber(row.current_turn, 1),
     supportUsed: asNumber(row.support_used) === 1,
     currentTurnSupportUsed: asNumber(row.current_turn_support_used) === 1,
+    currentTurnWrittenSupportRevealed: asNumber(row.current_turn_written_support_revealed) === 1,
     successfulTurnCount: asNumber(row.successful_turn_count),
     wordingVariant: asNumber(row.wording_variant),
     conversationLog: parseConversationLog(row.conversation_log),
@@ -69,6 +70,7 @@ const SPOKEN_ATTEMPT_COLUMNS = `
   current_turn,
   support_used,
   current_turn_support_used,
+  current_turn_written_support_revealed,
   successful_turn_count,
   wording_variant,
   conversation_log,
@@ -171,7 +173,7 @@ export class SpokenMissionProgressConflictError extends Error {
   }
 }
 
-export async function markSpokenMissionSupportUsed(input: {
+export async function markSpokenMissionEnglishSupportUsed(input: {
   attemptId: string;
   userId: string;
   missionId: string;
@@ -183,6 +185,41 @@ export async function markSpokenMissionSupportUsed(input: {
     sql: `
 UPDATE user_spoken_missions
 SET support_used = 1, current_turn_support_used = 1, updated_at = ?
+WHERE id = ?
+  AND user_id = ?
+  AND mission_id = ?
+  AND definition_version = ?
+  AND status = 'in_progress'
+  AND current_turn = ?
+`,
+    args: [
+      new Date().toISOString(),
+      input.attemptId,
+      input.userId,
+      input.missionId,
+      input.definitionVersion,
+      input.turnNumber,
+    ],
+  });
+
+  if (result.rowsAffected === 0) throw new SpokenMissionProgressConflictError();
+  const updated = await getSpokenMissionAttempt(input.attemptId);
+  if (!updated) throw new SpokenMissionProgressConflictError();
+  return updated;
+}
+
+export async function markSpokenMissionWrittenSupportRevealed(input: {
+  attemptId: string;
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  turnNumber: number;
+}): Promise<SpokenMissionAttempt> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+UPDATE user_spoken_missions
+SET current_turn_written_support_revealed = 1, updated_at = ?
 WHERE id = ?
   AND user_id = ?
   AND mission_id = ?
@@ -244,6 +281,8 @@ export async function recordSpokenMissionAssessment(input: {
   const storedEvidence = {
     ...input.evidence,
     supportUsed: existing.currentTurnSupportUsed || input.evidence.supportUsed,
+    writtenSupportRevealed:
+      existing.currentTurnWrittenSupportRevealed || input.evidence.writtenSupportRevealed === true,
   };
   const successfulTurnCount = existing.successfulTurnCount + (accepted ? 1 : 0);
   const completed = accepted && successfulTurnCount === 3;
@@ -267,6 +306,10 @@ SET
     WHEN ? = 1 THEN 0
     WHEN current_turn_support_used = 1 OR ? = 1 THEN 1
     ELSE 0
+  END,
+  current_turn_written_support_revealed = CASE
+    WHEN ? = 1 THEN 0
+    ELSE current_turn_written_support_revealed
   END,
   successful_turn_count = ?,
   conversation_log = ?,
@@ -295,6 +338,7 @@ WHERE id = ?
       storedEvidence.supportUsed ? 1 : 0,
       accepted ? 1 : 0,
       storedEvidence.supportUsed ? 1 : 0,
+      accepted ? 1 : 0,
       successfulTurnCount,
       JSON.stringify(conversationLog),
       completed ? 1 : 0,

@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type {
   SpokenMissionSubmissionState,
+  SpokenMissionAudioStatus,
   SpokenMissionSupportDisclosureState,
   SpokenMissionTurnActions,
   SpokenMissionTurnProps,
@@ -25,9 +26,10 @@ export const spokenMissionServerTurn: SpokenMissionServerTurn = {
 export const spokenMissionEnglishSupport = 'Are you ready to order?';
 
 export type SpokenMissionTurnFixtureInput = {
-  supportRevealed?: boolean;
-  attemptSupportUsed?: boolean;
-  supportDisclosureState?: SpokenMissionSupportDisclosureState;
+  writtenSupportRevealed?: boolean;
+  englishSupportRevealed?: boolean;
+  englishSupportUsedDuringAttempt?: boolean;
+  englishSupportDisclosureState?: SpokenMissionSupportDisclosureState;
   recorderStatus?: AudioRecorderStatus;
   recorderError?: string;
   recordingSeconds?: number;
@@ -38,7 +40,7 @@ export type SpokenMissionTurnFixtureInput = {
   pendingNextTurn?: SpokenMissionServerTurn;
   hasPendingAudio?: boolean;
   errorMessage?: string;
-  audioPlaying?: boolean;
+  audioStatus?: SpokenMissionAudioStatus;
 };
 
 export function createSpokenMissionTurnActions() {
@@ -49,7 +51,8 @@ export function createSpokenMissionTurnActions() {
       cancel: vi.fn(),
     },
     support: {
-      reveal: vi.fn(),
+      revealWritten: vi.fn(),
+      revealEnglish: vi.fn(),
     },
     assessment: {
       continue: vi.fn(),
@@ -70,7 +73,7 @@ export function createSpokenMissionTurnProps(
   input: SpokenMissionTurnFixtureInput = {},
   actions: SpokenMissionTurnActions = createSpokenMissionTurnActions(),
 ): SpokenMissionTurnProps {
-  const supportRevealed = input.supportRevealed ?? false;
+  const englishSupportRevealed = input.englishSupportRevealed ?? false;
   return {
     viewState: {
       turn: spokenMissionServerTurn,
@@ -82,10 +85,17 @@ export function createSpokenMissionTurnProps(
         errorMessage: input.recorderError ?? '',
       },
       support: {
-        revealed: supportRevealed,
-        englishText: supportRevealed ? spokenMissionEnglishSupport : null,
-        disclosureState: input.supportDisclosureState ?? 'idle',
-        usedDuringAttempt: input.attemptSupportUsed ?? false,
+        written: {
+          revealed: input.writtenSupportRevealed ?? false,
+          text: input.writtenSupportRevealed ? spokenMissionServerTurn.npcDialogue : null,
+          disclosureState: input.englishSupportDisclosureState ?? 'idle',
+        },
+        english: {
+          revealed: englishSupportRevealed,
+          text: englishSupportRevealed ? spokenMissionEnglishSupport : null,
+          disclosureState: input.englishSupportDisclosureState ?? 'idle',
+          usedDuringAttempt: input.englishSupportUsedDuringAttempt ?? false,
+        },
       },
       assessment: {
         submissionState: input.submissionState ?? 'idle',
@@ -106,7 +116,7 @@ export function createSpokenMissionTurnProps(
         errorMessage: input.errorMessage ?? '',
       },
       audio: {
-        playing: input.audioPlaying ?? false,
+        status: input.audioStatus ?? 'idle',
       },
     },
     actions,

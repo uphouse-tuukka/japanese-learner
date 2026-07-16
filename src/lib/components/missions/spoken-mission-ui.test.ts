@@ -87,6 +87,7 @@ const history: SpokenMissionHistoryEntry[] = [
       feedback: 'You clearly ordered one ramen.',
     },
     supportUsed: false,
+    writtenSupportRevealed: true,
     assessedAt: '2026-07-13T12:00:00.000Z',
   },
 ];
@@ -131,9 +132,9 @@ describe('Spoken Mission learner-visible support UI', () => {
           approximateMinutes: 2,
           maxRecordingSeconds: 12,
           goals: [
-            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
-            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
-            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+            { key: 'order', title: 'Order' },
+            { key: 'respond', title: 'Respond' },
+            { key: 'repair', title: 'Repair' },
           ],
         },
         bestEvidence: 'untried',
@@ -143,16 +144,19 @@ describe('Spoken Mission learner-visible support UI', () => {
         onChooseWritten: vi.fn(),
       },
     }).body;
-    const turnHtml = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
-    const supportHtml = renderTurn({ supportRevealed: true, attemptSupportUsed: true });
+    const turnHtml = renderTurn({
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
+    });
+    const supportHtml = renderTurn({ writtenSupportRevealed: true });
     const feedbackHtml = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       submissionState: 'feedback',
     });
     const errorHtml = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       submissionState: 'error',
       errorMessage: 'The network request failed.',
     });
@@ -162,7 +166,7 @@ describe('Spoken Mission learner-visible support UI', () => {
 
     expect(briefingHtml).toMatch(/<h2[^>]*id="spoken-heading"[^>]*tabindex="-1"/);
     expect(turnHtml).toMatch(/<h2[^>]*id="turn-heading"[^>]*tabindex="-1"/);
-    expect(supportHtml).toMatch(/<div[^>]*class="support-copy[^>]*tabindex="-1"/);
+    expect(supportHtml).toMatch(/<div[^>]*class="written-copy[^>]*tabindex="-1"/);
     expect(feedbackHtml).toMatch(/<h3[^>]*class="outcome[^>]*tabindex="-1"/);
     expect(errorHtml).toMatch(/<p[^>]*role="alert"[^>]*tabindex="-1"/);
     expect(resultHtml).toMatch(/<h2[^>]*id="result-heading"[^>]*tabindex="-1"/);
@@ -182,9 +186,9 @@ describe('Spoken Mission learner-visible support UI', () => {
           approximateMinutes: 2,
           maxRecordingSeconds: 12,
           goals: [
-            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
-            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
-            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+            { key: 'order', title: 'Order' },
+            { key: 'respond', title: 'Respond' },
+            { key: 'repair', title: 'Repair' },
           ],
         },
         bestEvidence: 'untried',
@@ -214,9 +218,9 @@ describe('Spoken Mission learner-visible support UI', () => {
           approximateMinutes: 2,
           maxRecordingSeconds: 12,
           goals: [
-            { key: 'order', title: 'Order', learnerGoal: 'Order ramen.' },
-            { key: 'respond', title: 'Respond', learnerGoal: 'Answer a follow-up.' },
-            { key: 'repair', title: 'Repair', learnerGoal: 'Correct a mistake.' },
+            { key: 'order', title: 'Order' },
+            { key: 'respond', title: 'Respond' },
+            { key: 'repair', title: 'Repair' },
           ],
         },
         bestEvidence: 'independent',
@@ -243,28 +247,64 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(html).toContain('You clearly ordered one ramen.');
   });
 
-  it('offers optional English help and clearly marks the attempt after disclosure', () => {
-    const hidden = renderTurn({ supportRevealed: false, attemptSupportUsed: false });
-    expect(hidden).toContain(spokenMissionServerTurn.npcDialogue.japanese);
-    expect(hidden).toContain('go-chuumon wa okimari desu ka.');
-    expect(hidden).toContain('Replay Japanese');
+  it('keeps unrevealed server text hidden in restored history', () => {
+    const html = render(SpokenMissionHistory, {
+      props: {
+        history: [{ ...history[0], writtenSupportRevealed: false }],
+      },
+    }).body;
+
+    expect(html).not.toContain(history[0].npcDialogue.japanese);
+    expect(html).not.toContain(history[0].npcDialogue.romaji);
+    expect(html).toContain(history[0].assessment.transcript);
+  });
+
+  it('starts audio-first and reveals written and English support independently', () => {
+    const hidden = renderTurn({
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
+    });
+    expect(hidden).not.toContain(spokenMissionServerTurn.npcDialogue.japanese);
+    expect(hidden).not.toContain('go-chuumon wa okimari desu ka.');
+    expect(hidden).toContain('Listen');
+    expect(hidden).toContain('Reveal written text');
     expect(hidden).toContain('Reveal English support');
     expect(hidden).not.toContain('Are you ready to order?');
 
-    const revealed = renderTurn({ supportRevealed: true, attemptSupportUsed: true });
-    expect(revealed).toContain('English support used');
-    expect(revealed).toContain(spokenMissionEnglishSupport);
+    const written = renderTurn({ writtenSupportRevealed: true });
+    expect(written).toContain(spokenMissionServerTurn.npcDialogue.japanese);
+    expect(written).toContain(spokenMissionServerTurn.npcDialogue.romaji);
+    expect(written).toContain('Written hint');
 
-    const laterTurn = renderTurn({ supportRevealed: false, attemptSupportUsed: true });
+    const english = renderTurn({
+      englishSupportRevealed: true,
+      englishSupportUsedDuringAttempt: true,
+    });
+    expect(english).toContain('English support used');
+    expect(english).toContain(spokenMissionEnglishSupport);
+
+    const laterTurn = renderTurn({
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: true,
+    });
     expect(laterTurn).toContain(
       'English support was used earlier in this attempt. Completion will be Supported.',
     );
   });
 
+  it.each([
+    ['loading', 'Loading audio…'],
+    ['playing', 'Stop audio'],
+    ['stopped', 'Replay Japanese'],
+    ['error', 'Audio unavailable. Try again.'],
+  ] as const)('announces the %s server-audio state', (audioStatus, visibleText) => {
+    expect(renderTurn({ audioStatus })).toContain(visibleText);
+  });
+
   it('offers the recovery that matches the failure and always keeps Written Mission available', () => {
     const invalidAudio = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       submissionState: 'error',
       submissionRecovery: 'record_again',
       errorMessage: 'Unsupported audio format. Please try recording again.',
@@ -274,8 +314,8 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(invalidAudio).toContain('Use Written Mission');
 
     const networkFailure = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       submissionState: 'error',
       submissionRecovery: 'retry_upload',
       hasPendingAudio: true,
@@ -288,8 +328,8 @@ describe('Spoken Mission learner-visible support UI', () => {
 
   it('offers Written Mission after microphone denial or unsupported recording', () => {
     const permissionDenied = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       recorderStatus: 'error',
       recorderError: 'Microphone permission was denied. Retry recording or use Written Mission.',
     });
@@ -298,8 +338,8 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(permissionDenied).toContain('Use Written Mission');
 
     const unsupported = renderTurn({
-      supportRevealed: false,
-      attemptSupportUsed: false,
+      englishSupportRevealed: false,
+      englishSupportUsedDuringAttempt: false,
       recorderStatus: 'unsupported',
       recorderError: 'This browser cannot record a supported WebM or MP4 audio format.',
     });
@@ -377,8 +417,8 @@ describe('Spoken Mission learner-visible support UI', () => {
     'keeps %s feedback and the recording retry action unchanged',
     (_case, assessment, heading) => {
       const html = renderTurn({
-        supportRevealed: false,
-        attemptSupportUsed: false,
+        englishSupportRevealed: false,
+        englishSupportUsedDuringAttempt: false,
         submissionState: 'feedback',
         assessment,
       });

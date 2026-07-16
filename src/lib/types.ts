@@ -376,6 +376,7 @@ export interface SpokenMissionTurnEvidence extends SpokenMissionAssessment {
   npcJapanese: string;
   npcRomaji: string;
   supportUsed: boolean;
+  writtenSupportRevealed?: boolean;
   clientResponseId: string;
   assessedAt: string;
 }
@@ -389,6 +390,7 @@ export interface SpokenMissionAttempt {
   currentTurn: number;
   supportUsed: boolean;
   currentTurnSupportUsed: boolean;
+  currentTurnWrittenSupportRevealed: boolean;
   successfulTurnCount: number;
   wordingVariant: number;
   conversationLog: SpokenMissionTurnEvidence[];
@@ -409,7 +411,6 @@ export interface SpokenMissionBriefing {
   goals: Array<{
     key: SpokenMissionGoalKey;
     title: string;
-    learnerGoal: string;
   }>;
 }
 
@@ -439,6 +440,7 @@ export interface SpokenMissionHistoryEntry {
   };
   assessment: SpokenMissionAssessment;
   supportUsed: boolean;
+  writtenSupportRevealed: boolean;
   assessedAt: string;
 }
 
@@ -463,13 +465,22 @@ export interface SpokenMissionStartResponse {
   totalTurns: 3;
   resumed: boolean;
   supportUsed: boolean;
-  currentTurnSupportRevealed: boolean;
+  currentTurnEnglishSupportRevealed: boolean;
   currentTurnEnglishSupport: string | null;
+  currentTurnWrittenSupportRevealed: boolean;
 }
 
 export interface SpokenMissionSupportResponse {
   englishSupport: string;
   supportUsed: true;
+}
+
+export interface SpokenMissionWrittenSupportResponse {
+  writtenText: {
+    japanese: string;
+    romaji: string;
+  };
+  writtenSupportRevealed: true;
 }
 
 export interface SpokenMissionTurnResponse {

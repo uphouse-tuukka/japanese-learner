@@ -31,12 +31,14 @@
                   : 'Could not assess'}
             </span>
           </div>
-          <div class="exchange">
-            <div>
-              <small>Restaurant server</small>
-              <p lang="ja">{entry.npcDialogue.japanese}</p>
-              <p class="romaji">{entry.npcDialogue.romaji}</p>
-            </div>
+          <div class="exchange" class:with-server-line={entry.writtenSupportRevealed}>
+            {#if entry.writtenSupportRevealed}
+              <div>
+                <small>Restaurant server</small>
+                <p lang="ja">{entry.npcDialogue.japanese}</p>
+                <p class="romaji">{entry.npcDialogue.romaji}</p>
+              </div>
+            {/if}
             <div class="learner-line">
               <small>Your transcript</small>
               <p lang="ja">{entry.assessment.transcript ?? 'No speech was detected.'}</p>
@@ -139,8 +141,11 @@
   .exchange {
     min-width: 0;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
+  }
+  .exchange.with-server-line {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .exchange > div {
     min-width: 0;
@@ -170,7 +175,7 @@
     color: var(--state-warning);
   }
   @media (max-width: 37.5rem) {
-    .exchange {
+    .exchange.with-server-line {
       grid-template-columns: 1fr;
     }
   }

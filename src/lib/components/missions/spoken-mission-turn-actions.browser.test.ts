@@ -36,13 +36,20 @@ async function withMountedTurn(
 
 it('routes visible controls through their focused action contracts', async () => {
   await withMountedTurn({}, (actions) => {
-    clickButton('Replay Japanese');
+    clickButton('Listen');
+    clickButton('Reveal written text');
     clickButton('Reveal English support');
     clickButton('Record response');
 
     expect(actions.audio.toggleServerLine).toHaveBeenCalledOnce();
-    expect(actions.support.reveal).toHaveBeenCalledOnce();
+    expect(actions.support.revealWritten).toHaveBeenCalledOnce();
+    expect(actions.support.revealEnglish).toHaveBeenCalledOnce();
     expect(actions.recorder.start).toHaveBeenCalledOnce();
+  });
+
+  await withMountedTurn({ audioStatus: 'playing' }, (actions) => {
+    clickButton('Stop audio');
+    expect(actions.audio.toggleServerLine).toHaveBeenCalledOnce();
   });
 
   await withMountedTurn({ recorderStatus: 'recording' }, (actions) => {

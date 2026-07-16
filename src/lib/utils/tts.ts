@@ -8,6 +8,8 @@ export interface SpeakOptions {
   voice?: string;
   fallbackVoice?: string;
   preferBrowser?: boolean;
+  onPlaybackStart?: () => void;
+  onPlaybackError?: () => void;
 }
 
 let cachedJapaneseVoice: SpeechSynthesisVoice | null | undefined;
@@ -174,9 +176,14 @@ async function fetchServerAudio(text: string, voice: string, speed: number): Pro
   return request;
 }
 
-async function speakViaServer(text: string, voice: string, speed: number): Promise<void> {
+async function speakViaServer(
+  text: string,
+  voice: string,
+  speed: number,
+  onPlaybackStart?: () => void,
+): Promise<void> {
   const data = await fetchServerAudio(text, voice, speed);
-  await playAudio(data.slice(0));
+  await playAudio(data.slice(0), onPlaybackStart);
 }
 
 async function speakViaBrowser(
@@ -185,6 +192,7 @@ async function speakViaBrowser(
   pitch: number,
   volume: number,
   fallbackVoiceName?: string,
+  onPlaybackStart?: () => void,
 ): Promise<void> {
   if (!isSupported()) {
     throw new Error('Browser speech synthesis is not supported.');
@@ -207,6 +215,9 @@ async function speakViaBrowser(
     utterance.rate = rate;
     utterance.pitch = pitch;
     utterance.volume = volume;
+    utterance.onstart = () => {
+      onPlaybackStart?.();
+    };
 
     utterance.onend = () => {
       resolve();
@@ -231,6 +242,8 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
   const volume = options.volume ?? 1;
   const serverVoice = options.serverVoice ?? options.voice ?? 'nova';
   const browserFallbackVoiceName = options.fallbackVoice;
+  const onPlaybackStart = options.onPlaybackStart;
+  const onPlaybackError = options.onPlaybackError;
   const useBrowserFirst =
     options.preferBrowser === true ||
     (!useOpenAiTts && options.preferBrowser !== false) ||
@@ -241,7 +254,14 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
 
   if (useBrowserFirst || !canUseServerTts) {
     try {
-      await speakViaBrowser(trimmedText, rate, pitch, volume, browserFallbackVoiceName);
+      await speakViaBrowser(
+        trimmedText,
+        rate,
+        pitch,
+        volume,
+        browserFallbackVoiceName,
+        onPlaybackStart,
+      );
       return;
     } catch (browserError) {
       if (!canUseServerTts) {
@@ -252,6 +272,7 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
           volume,
           error: browserError,
         });
+        onPlaybackError?.();
         return;
       }
 
@@ -264,12 +285,12 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
       });
     }
 
-    await speakViaServer(trimmedText, serverVoice, rate);
+    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart);
     return;
   }
 
   try {
-    await speakViaServer(trimmedText, serverVoice, rate);
+    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart);
     return;
   } catch (serverError) {
     console.warn('[tts] server speech failed, falling back to browser synthesis', {
@@ -279,7 +300,14 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
     });
   }
 
-  await speakViaBrowser(trimmedText, rate, pitch, volume, browserFallbackVoiceName);
+  await speakViaBrowser(
+    trimmedText,
+    rate,
+    pitch,
+    volume,
+    browserFallbackVoiceName,
+    onPlaybackStart,
+  );
 }
 
 export function stop(): void {

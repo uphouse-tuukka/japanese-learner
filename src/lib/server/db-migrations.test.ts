@@ -2,6 +2,7 @@ import type { InStatement } from '@libsql/client';
 import { describe, expect, it } from 'vitest';
 import {
   PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+  SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
   USER_XP_MISSION_REASONS_MIGRATION_KEY,
   hasUserXpMissionReasons,
   runDatabaseMigrations,
@@ -35,6 +36,8 @@ class FakeMigrationDb {
   private readonly existingMigrationKeys: Set<string>;
   private readonly portfolioColumns: Set<string>;
   private readonly portfolioTableExists: boolean;
+  private readonly spokenMissionColumns: Set<string>;
+  private readonly spokenMissionTableExists: boolean;
   private readonly userXpCreateSql: string;
 
   constructor(
@@ -42,12 +45,16 @@ class FakeMigrationDb {
       existingMigrationKeys?: string[];
       portfolioColumns?: string[];
       portfolioTableExists?: boolean;
+      spokenMissionColumns?: string[];
+      spokenMissionTableExists?: boolean;
       userXpCreateSql?: string;
     } = {},
   ) {
     this.existingMigrationKeys = new Set(input.existingMigrationKeys ?? []);
     this.portfolioColumns = new Set(input.portfolioColumns ?? []);
     this.portfolioTableExists = input.portfolioTableExists ?? true;
+    this.spokenMissionColumns = new Set(input.spokenMissionColumns ?? []);
+    this.spokenMissionTableExists = input.spokenMissionTableExists ?? false;
     this.userXpCreateSql = input.userXpCreateSql ?? '';
   }
 
@@ -72,12 +79,31 @@ class FakeMigrationDb {
       return { rows: this.portfolioTableExists ? [{ found: 1 }] : [] };
     }
 
+    if (sql.includes('sqlite_master') && firstArg(statement) === 'user_spoken_missions') {
+      return { rows: this.spokenMissionTableExists ? [{ found: 1 }] : [] };
+    }
+
     if (sql.includes('PRAGMA table_info(portfolio_challenge_attempts)')) {
       return { rows: Array.from(this.portfolioColumns, (name) => ({ name })) };
     }
 
+    if (sql.includes('PRAGMA table_info(user_spoken_missions)')) {
+      return { rows: Array.from(this.spokenMissionColumns, (name) => ({ name })) };
+    }
+
     if (sql.includes('ALTER TABLE portfolio_challenge_attempts ADD COLUMN')) {
       this.addPortfolioColumn(sql);
+      return { rows: [] };
+    }
+
+    if (sql.includes('ALTER TABLE user_spoken_missions ADD COLUMN')) {
+      const columnName = sql.match(/ADD COLUMN\s+([a-z_]+)/i)?.[1];
+      if (!columnName)
+        throw new Error(`Could not parse Spoken Mission ADD COLUMN statement: ${sql}`);
+      if (this.spokenMissionColumns.has(columnName)) {
+        throw new Error(`duplicate column name: ${columnName}`);
+      }
+      this.spokenMissionColumns.add(columnName);
       return { rows: [] };
     }
 
@@ -183,6 +209,7 @@ describe('runDatabaseMigrations', () => {
       existingMigrationKeys: [
         USER_XP_MISSION_REASONS_MIGRATION_KEY,
         PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+        SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
       ],
     });
 
@@ -231,5 +258,23 @@ describe('runDatabaseMigrations', () => {
 
     expect(portfolioAlterSql(db)).toEqual([]);
     expect(db.insertedMigrationKeys).toEqual([]);
+  });
+
+  it('adds durable written-support state to existing Spoken Mission attempts', async () => {
+    const db = new FakeMigrationDb({
+      existingMigrationKeys: [
+        USER_XP_MISSION_REASONS_MIGRATION_KEY,
+        PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+      ],
+      spokenMissionColumns: ['id', 'current_turn_support_used'],
+      spokenMissionTableExists: true,
+    });
+
+    await runDatabaseMigrations(db);
+
+    expect(db.executeSql()).toContain(
+      'ALTER TABLE user_spoken_missions ADD COLUMN current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1));',
+    );
+    expect(db.insertedMigrationKeys).toEqual(['spoken_mission_written_support']);
   });
 });

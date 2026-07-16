@@ -45,7 +45,7 @@ const attempt = {
   id: 'spokenmission-1',
   userId: 'user-1',
   missionId: 'mission-order-restaurant',
-  definitionVersion: 'restaurant-order-v1',
+  definitionVersion: 'restaurant-order-v2',
   status: 'in_progress',
   currentTurn: 1,
   supportUsed: false,
@@ -65,7 +65,7 @@ function request(overrides: Record<string, string | Blob> = {}): Request {
     attemptId: 'spokenmission-1',
     turnNumber: '1',
     clientResponseId: 'client-response-1',
-    supportRevealed: 'false',
+    englishSupportRevealed: 'false',
     audio: new File(['voice'], 'answer.webm', { type: 'audio/webm' }),
     ...overrides,
   };
