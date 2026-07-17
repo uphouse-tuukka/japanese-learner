@@ -5,15 +5,18 @@
   type Props = {
     bestEvidence: SpokenMissionEvidenceState | 'untried';
     resumable: SpokenMissionResumeProgress | null;
+    definitionUpdated?: boolean;
   };
 
-  let { bestEvidence, resumable }: Props = $props();
+  let { bestEvidence, resumable, definitionUpdated = false }: Props = $props();
 
   const evidenceLabel = $derived(getSpokenMissionEvidenceLabel(bestEvidence));
   const accessibleStatus = $derived(
     resumable
       ? `${evidenceLabel} evidence. Resume at goal ${resumable.currentTurn} of 3.`
-      : `${evidenceLabel} evidence.`,
+      : definitionUpdated
+        ? `${evidenceLabel} evidence. Updated mission starts fresh.`
+        : `${evidenceLabel} evidence.`,
   );
 </script>
 
@@ -21,6 +24,8 @@
   <span class="evidence-status" data-evidence={bestEvidence}>{evidenceLabel}</span>
   {#if resumable}
     <span class="resume-progress">Resume goal {resumable.currentTurn}</span>
+  {:else if definitionUpdated}
+    <span class="resume-progress">Updated - fresh start</span>
   {/if}
 </span>
 

@@ -111,7 +111,7 @@ Important values:
 - `/api/session/*`: learn session generation/completion
 - `/api/practice/*`: practice session generation/completion
 - `/api/missions/*`: mission listing, start, response, and completion endpoints
-- `/api/missions/[id]/spoken/*`: profile-scoped Spoken Mission start and multipart voice-turn endpoints
+- `/api/missions/[id]/spoken/*`: profile-scoped Spoken Mission start, written-text disclosure, English-support disclosure, and multipart voice-turn endpoints
 - `/api/portfolio/session/*`: portfolio challenge session start/current/progress/complete endpoints
 - `/api/check-answer`: answer evaluation helper
 - `/api/speaking/check`: authenticated multipart speaking exercise transcription and evaluation helper
@@ -133,13 +133,15 @@ Stored sessions marked complete are not resumable, while legacy all-answered sav
 
 - `src/lib/server/db.ts`: DB initialization, schema setup, migrations, query helpers, and mission seed loading
 - `src/lib/server/missions-seed.ts`: current mission definition seed data
+- `src/lib/server/spoken-mission-disclosure.ts`: shared selected-profile, attempt-access, and current-turn validation for Spoken Mission support disclosures
 - `src/lib/server/voice-assessment.ts`: reusable audio validation, Japanese transcription, semantic assessment, and Spoken Mission outcome mapping
 - `src/lib/server/speaking-checker.ts`: Learn and Practice speaking compatibility adapter over the shared voice-assessment boundary
 - `src/lib/stores/session.svelte.ts`: shared Learn/Practice session state, answer collection, and resume persistence
 - `src/lib/components/SessionRenderer.svelte`: routes exercise rendering to the exercise components
 - `src/lib/components/exercises/*`: exercise UI components with consistent `onAnswer(payload)` callback
 - `src/lib/utils/audio-recorder.ts`: reusable browser recorder lifecycle with permission, MIME, duration, cancel, retry, and track-cleanup handling
-- `src/lib/utils/tts.ts`: shared TTS utility used by `ListeningExercise.svelte`
+- `src/lib/utils/audio.ts`: shared abortable Web Audio playback with explicit start and stop handling
+- `src/lib/utils/tts.ts`: shared browser/server TTS utility used by listening exercises and audio-first Spoken Mission turns
 
 ## Token limiting
 

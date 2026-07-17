@@ -2,12 +2,12 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError } from '$lib/server/api';
 import { loadSpokenMissionDisclosureRequest } from '$lib/server/spoken-mission-disclosure';
-import { getSpokenMissionEnglishSupport } from '$lib/server/spoken-missions';
+import { getSpokenMissionServerTurn } from '$lib/server/spoken-missions';
 import {
+  markSpokenMissionWrittenSupportRevealed,
   SpokenMissionProgressConflictError,
-  markSpokenMissionEnglishSupportUsed,
 } from '$lib/server/spoken-missions-db';
-import type { SpokenMissionSupportResponse } from '$lib/types';
+import type { SpokenMissionWrittenSupportResponse } from '$lib/types';
 
 export const POST: RequestHandler = async ({ params, request, cookies }) => {
   const missionId = String(params.id ?? '').trim();
@@ -20,12 +20,8 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     if (!disclosure.ok) return disclosure.response;
     const { attempt, definition, mission, turnNumber, userId } = disclosure;
 
-    const englishSupport = getSpokenMissionEnglishSupport(
-      definition,
-      attempt.wordingVariant,
-      turnNumber,
-    );
-    await markSpokenMissionEnglishSupportUsed({
+    const turn = getSpokenMissionServerTurn(definition, attempt.wordingVariant, turnNumber);
+    await markSpokenMissionWrittenSupportRevealed({
       attemptId: attempt.id,
       userId,
       missionId: mission.id,
@@ -34,17 +30,17 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     });
 
     return json({
-      englishSupport,
-      supportUsed: true,
-    } satisfies SpokenMissionSupportResponse);
+      writtenText: turn.npcDialogue,
+      writtenSupportRevealed: true,
+    } satisfies SpokenMissionWrittenSupportResponse);
   } catch (error) {
     if (error instanceof SpokenMissionProgressConflictError) {
       return jsonError('Spoken Mission progress changed. Reload and try again.', 409);
     }
-    console.error('[api/missions/[id]/spoken/support] failed', {
+    console.error('[api/missions/[id]/spoken/written-support] failed', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
       missionId,
     });
-    return jsonError('Could not reveal English support. Your attempt is saved.', 500);
+    return jsonError('Could not reveal written text. Your attempt is saved.', 500);
   }
 };

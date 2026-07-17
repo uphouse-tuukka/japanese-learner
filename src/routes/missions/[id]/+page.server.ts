@@ -49,6 +49,11 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
     hasCompletedMissionInMode(selectedUserId, mission.id, 'immersion'),
   ]);
   const unlocked = isMissionUnlocked(mission, categorySessionCount);
+  const definitionUpdated = Boolean(
+    definition &&
+    resumableSpokenAttempt &&
+    resumableSpokenAttempt.definitionVersion !== definition.version,
+  );
 
   return {
     selectedUserId,
@@ -63,12 +68,14 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
         ? {
             briefing: toSpokenMissionBriefing(definition),
             bestEvidence: bestSpokenEvidence ?? 'untried',
-            resumable: resumableSpokenAttempt
-              ? {
-                  currentTurn: resumableSpokenAttempt.currentTurn,
-                  completedGoalCount: resumableSpokenAttempt.successfulTurnCount,
-                }
-              : null,
+            resumable:
+              resumableSpokenAttempt && !definitionUpdated
+                ? {
+                    currentTurn: resumableSpokenAttempt.currentTurn,
+                    completedGoalCount: resumableSpokenAttempt.successfulTurnCount,
+                  }
+                : null,
+            definitionUpdated,
           }
         : null,
   };

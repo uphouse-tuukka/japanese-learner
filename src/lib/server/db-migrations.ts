@@ -2,6 +2,8 @@ import type { InStatement } from '@libsql/client';
 
 export const USER_XP_MISSION_REASONS_MIGRATION_KEY = 'user_xp_mission_reasons';
 export const PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY = 'portfolio_v2_session_columns';
+export const SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY = 'spoken_mission_written_support';
+export const SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY = 'spoken_mission_single_in_progress';
 
 export type MigrationDatabase = {
   execute(statement: InStatement): Promise<{ rows: Array<unknown> }>;
@@ -14,6 +16,7 @@ type ColumnDefinition = {
 };
 
 const PORTFOLIO_CHALLENGE_ATTEMPTS_TABLE = 'portfolio_challenge_attempts';
+const SPOKEN_MISSION_ATTEMPTS_TABLE = 'user_spoken_missions';
 const SAFE_SQL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { name: 'scenario', definition: 'scenario TEXT DEFAULT NULL' },
@@ -24,6 +27,17 @@ const PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { name: 'summary', definition: 'summary TEXT DEFAULT NULL' },
   { name: 'supports_browser_voice', definition: 'supports_browser_voice INTEGER DEFAULT 0' },
 ];
+const SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN: ColumnDefinition = {
+  name: 'current_turn_written_support_revealed',
+  definition:
+    'current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1))',
+};
+const SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS = [
+  'user_id',
+  'mission_id',
+  'status',
+  'updated_at',
+] as const;
 
 export function hasUserXpMissionReasons(userXpCreateSql: unknown): boolean {
   return (
@@ -115,7 +129,14 @@ async function addColumnIfMissing(
     return;
   }
 
-  await db.execute(getAddColumnStatement(tableName, column));
+  try {
+    await db.execute(getAddColumnStatement(tableName, column));
+  } catch (error) {
+    const refreshedColumnNames = await getTableColumnNames(db, tableName);
+    if (!hasTableColumn(refreshedColumnNames, column.name)) {
+      throw error;
+    }
+  }
   columnNames.add(column.name);
 }
 
@@ -128,7 +149,7 @@ function hasAllColumns(
 
 async function recordMigrationKey(db: MigrationDatabase, key: string): Promise<void> {
   await db.execute({
-    sql: `INSERT INTO _migrations (key) VALUES (?);`,
+    sql: `INSERT INTO _migrations (key) VALUES (?) ON CONFLICT(key) DO NOTHING;`,
     args: [key],
   });
 }
@@ -146,6 +167,62 @@ async function runPortfolioV2SessionColumnsMigration(db: MigrationDatabase): Pro
   if (hasAllColumns(columnNames, PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS)) {
     await recordMigrationKey(db, PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY);
   }
+}
+
+async function runSpokenMissionWrittenSupportMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SPOKEN_MISSION_ATTEMPTS_TABLE);
+  await addColumnIfMissing(
+    db,
+    SPOKEN_MISSION_ATTEMPTS_TABLE,
+    columnNames,
+    SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN,
+  );
+  await recordMigrationKey(db, SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY);
+}
+
+async function runSpokenMissionSingleInProgressMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SPOKEN_MISSION_ATTEMPTS_TABLE);
+  if (
+    !SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS.every((columnName) =>
+      columnNames.has(columnName),
+    )
+  ) {
+    return;
+  }
+
+  await db.batch([
+    `UPDATE user_spoken_missions
+SET status = 'abandoned', updated_at = datetime('now')
+WHERE rowid IN (
+  SELECT rowid
+  FROM (
+    SELECT
+      rowid,
+      ROW_NUMBER() OVER (
+        PARTITION BY user_id, mission_id
+        ORDER BY datetime(updated_at) DESC, rowid DESC
+      ) AS active_position
+    FROM user_spoken_missions
+    WHERE status = 'in_progress'
+  )
+  WHERE active_position > 1
+);`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_spoken_missions_single_in_progress
+ON user_spoken_missions(user_id, mission_id)
+WHERE status = 'in_progress';`,
+    {
+      sql: `INSERT INTO _migrations (key) VALUES (?) ON CONFLICT(key) DO NOTHING;`,
+      args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+    },
+  ]);
 }
 
 export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void> {
@@ -178,5 +255,23 @@ export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void
 
   if (migrationResult.rows.length === 0) {
     await runPortfolioV2SessionColumnsMigration(db);
+  }
+
+  const spokenMissionWrittenSupportMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY],
+  });
+
+  if (spokenMissionWrittenSupportMigration.rows.length === 0) {
+    await runSpokenMissionWrittenSupportMigration(db);
+  }
+
+  const spokenMissionSingleInProgressMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+  });
+
+  if (spokenMissionSingleInProgressMigration.rows.length === 0) {
+    await runSpokenMissionSingleInProgressMigration(db);
   }
 }

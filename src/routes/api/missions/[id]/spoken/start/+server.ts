@@ -14,7 +14,7 @@ import {
   toSpokenMissionHistory,
 } from '$lib/server/spoken-missions';
 import {
-  createSpokenMissionAttempt,
+  getOrCreateSpokenMissionAttempt,
   getMostRecentSpokenMissionVariant,
   getResumableSpokenMissionAttempt,
   restartSpokenMissionAttempt,
@@ -63,29 +63,47 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
 
     const resumable = await getResumableSpokenMissionAttempt(userId, mission.id);
     if (resumable && !body.startOver) {
-      if (resumable.definitionVersion !== definition.version) {
-        return jsonError('This saved attempt needs to be started over.', 409);
+      if (resumable.definitionVersion === definition.version) {
+        return json(serializeStartResponse(definition, resumable, true));
       }
-      return json(serializeStartResponse(definition, resumable, true));
     }
 
     const previousVariant = await getMostRecentSpokenMissionVariant(userId, mission.id);
     const wordingVariant = selectSpokenMissionVariant(definition, previousVariant);
-    const attempt =
-      body.startOver && resumable
-        ? await restartSpokenMissionAttempt({
-            attemptId: resumable.id,
-            userId,
-            missionId: mission.id,
-            definitionVersion: definition.version,
-            wordingVariant,
-          })
-        : await createSpokenMissionAttempt({
-            userId,
-            missionId: mission.id,
-            definitionVersion: definition.version,
-            wordingVariant,
-          });
+    let attempt: SpokenMissionAttempt;
+    if (resumable) {
+      try {
+        attempt = await restartSpokenMissionAttempt({
+          attemptId: resumable.id,
+          userId,
+          missionId: mission.id,
+          definitionVersion: definition.version,
+          supersededDefinitionVersions: definition.supersededVersions,
+          wordingVariant,
+        });
+      } catch (error) {
+        if (error instanceof SpokenMissionProgressConflictError) {
+          const concurrentReplacement = await getResumableSpokenMissionAttempt(userId, mission.id);
+          if (
+            concurrentReplacement &&
+            concurrentReplacement.id !== resumable.id &&
+            concurrentReplacement.definitionVersion === definition.version
+          ) {
+            return json(serializeStartResponse(definition, concurrentReplacement, true));
+          }
+        }
+        throw error;
+      }
+    } else {
+      const freshAttempt = await getOrCreateSpokenMissionAttempt({
+        userId,
+        missionId: mission.id,
+        definitionVersion: definition.version,
+        supersededDefinitionVersions: definition.supersededVersions,
+        wordingVariant,
+      });
+      return json(serializeStartResponse(definition, freshAttempt.attempt, !freshAttempt.created));
+    }
 
     return json(serializeStartResponse(definition, attempt, false));
   } catch (error) {
@@ -115,9 +133,10 @@ function serializeStartResponse(
     totalTurns: 3,
     resumed,
     supportUsed: attempt.supportUsed,
-    currentTurnSupportRevealed: attempt.currentTurnSupportUsed,
+    currentTurnEnglishSupportRevealed: attempt.currentTurnSupportUsed,
     currentTurnEnglishSupport: attempt.currentTurnSupportUsed
       ? getSpokenMissionEnglishSupport(definition, attempt.wordingVariant, attempt.currentTurn)
       : null,
+    currentTurnWrittenSupportRevealed: attempt.currentTurnWrittenSupportRevealed,
   };
 }

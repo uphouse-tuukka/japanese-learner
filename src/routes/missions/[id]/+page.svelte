@@ -434,6 +434,7 @@
           <SpokenMissionChoiceStatus
             bestEvidence={data.spokenMission.bestEvidence}
             resumable={data.spokenMission.resumable}
+            definitionUpdated={data.spokenMission.definitionUpdated}
           />
         </button>
       </div>
@@ -447,6 +448,7 @@
       briefing={data.spokenMission.briefing}
       bestEvidence={data.spokenMission.bestEvidence}
       resumable={data.spokenMission.resumable}
+      definitionUpdated={data.spokenMission.definitionUpdated}
       onChooseWritten={chooseWrittenMission}
     />
   {:else if showContinuePrompt}

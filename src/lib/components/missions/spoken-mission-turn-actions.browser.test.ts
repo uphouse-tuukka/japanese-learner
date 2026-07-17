@@ -8,12 +8,16 @@ import {
   type SpokenMissionTurnFixtureInput,
 } from './spoken-mission-turn.test-fixtures';
 
-function clickButton(label: string): void {
+function findButton(label: string): HTMLButtonElement {
   const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.replace(/\s+/g, ' ').trim() === label,
   );
   expect(button, `Expected a visible "${label}" button`).toBeDefined();
-  button?.click();
+  return button!;
+}
+
+function clickButton(label: string): void {
+  findButton(label).click();
 }
 
 async function withMountedTurn(
@@ -36,13 +40,20 @@ async function withMountedTurn(
 
 it('routes visible controls through their focused action contracts', async () => {
   await withMountedTurn({}, (actions) => {
-    clickButton('Replay Japanese');
+    clickButton('Listen');
+    clickButton('Reveal written text');
     clickButton('Reveal English support');
     clickButton('Record response');
 
     expect(actions.audio.toggleServerLine).toHaveBeenCalledOnce();
-    expect(actions.support.reveal).toHaveBeenCalledOnce();
+    expect(actions.support.revealWritten).toHaveBeenCalledOnce();
+    expect(actions.support.revealEnglish).toHaveBeenCalledOnce();
     expect(actions.recorder.start).toHaveBeenCalledOnce();
+  });
+
+  await withMountedTurn({ audioStatus: 'playing' }, (actions) => {
+    clickButton('Stop audio');
+    expect(actions.audio.toggleServerLine).toHaveBeenCalledOnce();
   });
 
   await withMountedTurn({ recorderStatus: 'recording' }, (actions) => {
@@ -119,3 +130,62 @@ it('routes visible controls through their focused action contracts', async () =>
     },
   );
 });
+
+it.each([
+  ['assessment processing', { submissionState: 'processing' as const }],
+  [
+    'accepted feedback',
+    {
+      submissionState: 'feedback' as const,
+      assessment: {
+        transcript: 'ラーメンを一つお願いします。',
+        outcome: 'accepted' as const,
+        confidence: 'high' as const,
+        feedback: 'You ordered one ramen.',
+      },
+      pendingNextTurn: {
+        ...spokenMissionServerTurn,
+        turnNumber: 2,
+        goalKey: 'respond' as const,
+        goalTitle: 'Respond',
+      },
+    },
+  ],
+])('disables disclosure actions during %s', async (_case, input) => {
+  await withMountedTurn(input, (actions) => {
+    const writtenButton = findButton('Reveal written text');
+    const englishButton = findButton('Reveal English support');
+
+    expect(writtenButton.disabled).toBe(true);
+    expect(englishButton.disabled).toBe(true);
+    writtenButton.click();
+    englishButton.click();
+    expect(actions.support.revealWritten).not.toHaveBeenCalled();
+    expect(actions.support.revealEnglish).not.toHaveBeenCalled();
+  });
+});
+
+it.each(['retry', 'could_not_assess'] as const)(
+  'keeps disclosure actions available after %s feedback',
+  async (outcome) => {
+    await withMountedTurn(
+      {
+        submissionState: 'feedback',
+        assessment: {
+          transcript: outcome === 'retry' ? 'ラーメンですか。' : null,
+          outcome,
+          confidence: outcome === 'retry' ? 'high' : null,
+          feedback: outcome === 'retry' ? 'Try ordering one item.' : 'No speech was detected.',
+        },
+      },
+      (actions) => {
+        expect(findButton('Reveal written text').disabled).toBe(false);
+        expect(findButton('Reveal English support').disabled).toBe(false);
+        clickButton('Reveal written text');
+        clickButton('Reveal English support');
+        expect(actions.support.revealWritten).toHaveBeenCalledOnce();
+        expect(actions.support.revealEnglish).toHaveBeenCalledOnce();
+      },
+    );
+  },
+);

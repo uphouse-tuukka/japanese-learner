@@ -26,6 +26,7 @@ export type SpokenMissionGoal = {
 export type SpokenMissionDefinition = {
   missionId: string;
   version: string;
+  supersededVersions: readonly string[];
   canDo: string;
   briefing: {
     situation: string;
@@ -45,12 +46,12 @@ export type SpokenMissionDefinition = {
 
 const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
   missionId: 'mission-order-restaurant',
-  version: 'restaurant-order-v1',
-  canDo:
-    'I can order one item, answer a simple follow-up, and recover from one misunderstanding at a restaurant.',
+  version: 'restaurant-order-v2',
+  supersededVersions: ['restaurant-order-v1'],
+  canDo: 'I can manage a short order conversation in a restaurant.',
   briefing: {
     situation:
-      'You are ordering at a busy ramen restaurant. Complete all three goals in a short conversation with the server.',
+      'You are ordering at a busy ramen restaurant. Listen and respond as the conversation unfolds.',
     assessment:
       'Your communicative intent is assessed, not your pronunciation or accent. Natural wording and small particle or formality differences are welcome.',
     evidence:
@@ -177,7 +178,7 @@ export function toSpokenMissionBriefing(
     privacy: definition.briefing.privacy,
     approximateMinutes: definition.approximateMinutes,
     maxRecordingSeconds: definition.maxRecordingSeconds,
-    goals: definition.goals.map(({ key, title, learnerGoal }) => ({ key, title, learnerGoal })),
+    goals: definition.goals.map(({ key, title }) => ({ key, title })),
   };
 }
 
@@ -243,6 +244,7 @@ export function toSpokenMissionHistory(
         feedback: entry.feedback,
       },
       supportUsed: entry.supportUsed,
+      writtenSupportRevealed: entry.writtenSupportRevealed === true,
       assessedAt: entry.assessedAt,
     };
   });

@@ -5,7 +5,6 @@ const harness = vi.hoisted(() => ({
   client: null as Client | null,
   assess: vi.fn(),
   checkBudget: vi.fn(),
-  runDatabaseMigrations: vi.fn(),
   seedMissions: vi.fn(),
 }));
 
@@ -14,10 +13,6 @@ vi.mock('$lib/server/db-client', () => ({
     if (!harness.client) throw new Error('Test database client was not initialized.');
     return harness.client;
   },
-}));
-
-vi.mock('$lib/server/db-migrations', () => ({
-  runDatabaseMigrations: harness.runDatabaseMigrations,
 }));
 
 vi.mock('$lib/server/missions-seed', () => ({ seedMissions: harness.seedMissions }));
@@ -60,14 +55,14 @@ function turnRequest(input: {
   attemptId: string;
   turnNumber: number;
   clientResponseId: string;
-  supportRevealed?: boolean;
+  englishSupportRevealed?: boolean;
 }): Request {
   const form = new FormData();
   form.set('userId', 'user-1');
   form.set('attemptId', input.attemptId);
   form.set('turnNumber', String(input.turnNumber));
   form.set('clientResponseId', input.clientResponseId);
-  form.set('supportRevealed', String(input.supportRevealed ?? false));
+  form.set('englishSupportRevealed', String(input.englishSupportRevealed ?? false));
   form.set('audio', new File(['voice'], `turn-${input.turnNumber}.webm`, { type: 'audio/webm' }));
   return new Request('http://localhost/api/missions/mission-order-restaurant/spoken/turn', {
     method: 'POST',
@@ -83,11 +78,21 @@ function supportRequest(attemptId: string, turnNumber: number): Request {
   });
 }
 
+function writtenSupportRequest(attemptId: string, turnNumber: number): Request {
+  return new Request(
+    'http://localhost/api/missions/mission-order-restaurant/spoken/written-support',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userId: 'user-1', attemptId, turnNumber }),
+    },
+  );
+}
+
 describe('unlocked restaurant Spoken Mission route flow', () => {
   beforeEach(async () => {
     vi.resetModules();
     harness.client = createClient({ url: 'file::memory:' });
-    harness.runDatabaseMigrations.mockReset().mockResolvedValue(undefined);
     harness.seedMissions.mockReset().mockResolvedValue(undefined);
     harness.checkBudget.mockReset().mockResolvedValue({ allowed: true });
     harness.assess.mockReset();
@@ -103,6 +108,34 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
 
   afterEach(() => {
     harness.client = null;
+  });
+
+  it('returns one current attempt when simultaneous fresh starts race', async () => {
+    const startRoute = await import('./spoken/start/+server');
+
+    const responses = await Promise.all([
+      startRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: startRequest(),
+        cookies: cookies(),
+      } as never),
+      startRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: startRequest(),
+        cookies: cookies(),
+      } as never),
+    ]);
+    const starts = await Promise.all(responses.map((response) => response.json()));
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(new Set(starts.map((start) => start.attemptId))).toHaveLength(1);
+    expect(starts.filter((start) => start.resumed)).toHaveLength(1);
+    const activeAttempts = await harness.client!.execute({
+      sql: `SELECT id FROM user_spoken_missions
+        WHERE user_id = ? AND mission_id = ? AND status = 'in_progress'`,
+      args: ['user-1', 'mission-order-restaurant'],
+    });
+    expect(activeAttempts.rows).toHaveLength(1);
   });
 
   it('completes Order, Respond, and Repair independently and persists evidence idempotently', async () => {
@@ -250,6 +283,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
         'title',
         'transcript',
         'turnNumber',
+        'writtenSupportRevealed',
       ].sort(),
     );
 
@@ -379,6 +413,74 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     expect(harness.assess).toHaveBeenCalledTimes(1);
   });
 
+  it('restores written Japanese and romaji independently without downgrading evidence', async () => {
+    harness.assess.mockResolvedValue({
+      outcome: 'accepted',
+      transcript: '返事',
+      confidence: 'high',
+      feedback: 'Goal accomplished.',
+    });
+
+    const startRoute = await import('./spoken/start/+server');
+    const writtenSupportRoute = await import('./spoken/written-support/+server');
+    const turnRoute = await import('./spoken/turn/+server');
+    const startedResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    const started = await startedResponse.json();
+
+    for (let requestNumber = 0; requestNumber < 2; requestNumber += 1) {
+      const revealResponse = await writtenSupportRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: writtenSupportRequest(started.attemptId, 1),
+        cookies: cookies(),
+      } as never);
+      expect(revealResponse.status).toBe(200);
+      await expect(revealResponse.json()).resolves.toEqual({
+        writtenText: {
+          japanese: expect.any(String),
+          romaji: expect.any(String),
+        },
+        writtenSupportRevealed: true,
+      });
+    }
+
+    const refreshedResponse = await startRoute.POST({
+      params: { id: 'mission-order-restaurant' },
+      request: startRequest(),
+      cookies: cookies(),
+    } as never);
+    await expect(refreshedResponse.json()).resolves.toMatchObject({
+      resumed: true,
+      supportUsed: false,
+      currentTurnEnglishSupportRevealed: false,
+      currentTurnEnglishSupport: null,
+      currentTurnWrittenSupportRevealed: true,
+    });
+
+    let finalPayload: Record<string, unknown> | null = null;
+    for (const turnNumber of [1, 2, 3]) {
+      const response = await turnRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: turnRequest({
+          attemptId: started.attemptId,
+          turnNumber,
+          clientResponseId: `written-support-${turnNumber}`,
+        }),
+        cookies: cookies(),
+      } as never);
+      expect(response.status).toBe(200);
+      finalPayload = await response.json();
+    }
+
+    expect(finalPayload).toMatchObject({
+      isComplete: true,
+      result: { evidenceState: 'independent' },
+    });
+  });
+
   it('completes with Supported evidence after English help and keeps support use monotonic', async () => {
     harness.assess
       .mockResolvedValueOnce({
@@ -442,7 +544,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     await expect(resumeResponse.json()).resolves.toMatchObject({
       resumed: true,
       supportUsed: true,
-      currentTurnSupportRevealed: true,
+      currentTurnEnglishSupportRevealed: true,
       currentTurnEnglishSupport: expect.any(String),
       turn: { turnNumber: 1 },
     });
@@ -453,7 +555,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
         attemptId: started.attemptId,
         turnNumber: 1,
         clientResponseId: 'supported-retry',
-        supportRevealed: false,
+        englishSupportRevealed: false,
       }),
       cookies: cookies(),
     } as never);
@@ -477,7 +579,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
           attemptId: started.attemptId,
           turnNumber,
           clientResponseId: `supported-accepted-${turnNumber}`,
-          supportRevealed: false,
+          englishSupportRevealed: false,
         }),
         cookies: cookies(),
       } as never);
@@ -635,7 +737,7 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
             attemptId: started.attemptId,
             turnNumber,
             clientResponseId: `${prefix}-${turnNumber}`,
-            supportRevealed: false,
+            englishSupportRevealed: false,
           }),
           cookies: cookies(),
         } as never);

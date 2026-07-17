@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { requestSpokenMissionStart, requestSpokenMissionTurn } from './spoken-mission-client';
+import {
+  requestSpokenMissionEnglishSupport,
+  requestSpokenMissionStart,
+  requestSpokenMissionTurn,
+  requestSpokenMissionWrittenSupport,
+} from './spoken-mission-client';
 
 const originalSessionStorageDescriptor = Object.getOwnPropertyDescriptor(
   globalThis,
@@ -17,7 +22,7 @@ function restoreSessionStorage(): void {
 function startResponse(resumed: boolean): Response {
   return Response.json({
     attemptId: resumed ? 'spokenmission-resumed' : 'spokenmission-fresh',
-    definitionVersion: 'restaurant-order-v1',
+    definitionVersion: 'restaurant-order-v2',
     supportPolicy: {
       englishListeningSupport: 'optional',
       evidenceWithoutEnglishSupport: 'independent',
@@ -61,8 +66,9 @@ function startResponse(resumed: boolean): Response {
     totalTurns: 3,
     resumed,
     supportUsed: false,
-    currentTurnSupportRevealed: resumed,
+    currentTurnEnglishSupportRevealed: resumed,
     currentTurnEnglishSupport: resumed ? 'Water?' : null,
+    currentTurnWrittenSupportRevealed: resumed,
   });
 }
 
@@ -173,5 +179,89 @@ describe('Spoken Mission browser turn boundary', () => {
           .mockResolvedValue(Response.json({ ok: false, error, recovery }, { status })),
       }),
     ).rejects.toMatchObject({ message: error, recovery });
+  });
+});
+
+describe('Spoken Mission browser support boundaries', () => {
+  const input = {
+    missionId: 'mission-order-restaurant',
+    userId: 'user-1',
+    attemptId: 'spokenmission-v2',
+    turnNumber: 1,
+  };
+
+  it('requests paired written support from the dedicated endpoint', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        writtenText: { japanese: 'ご注文は？', romaji: 'go-chuumon wa?' },
+        writtenSupportRevealed: true,
+      }),
+    );
+
+    await expect(requestSpokenMissionWrittenSupport({ ...input, fetcher })).resolves.toEqual({
+      writtenText: { japanese: 'ご注文は？', romaji: 'go-chuumon wa?' },
+      writtenSupportRevealed: true,
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/missions/mission-order-restaurant/spoken/written-support',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          userId: 'user-1',
+          attemptId: 'spokenmission-v2',
+          turnNumber: 1,
+        }),
+      }),
+    );
+  });
+
+  it('keeps English support on its separate endpoint and contract', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ englishSupport: 'Are you ready to order?', supportUsed: true }),
+      );
+
+    await expect(requestSpokenMissionEnglishSupport({ ...input, fetcher })).resolves.toEqual({
+      englishSupport: 'Are you ready to order?',
+      supportUsed: true,
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/missions/mission-order-restaurant/spoken/support',
+      expect.any(Object),
+    );
+  });
+
+  it('uses the English support fallback when the request cannot reach the server', async () => {
+    await expect(
+      requestSpokenMissionEnglishSupport({
+        ...input,
+        fetcher: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      }),
+    ).rejects.toThrow('Could not reveal English support.');
+  });
+
+  it('uses the written support fallback when the response is not JSON', async () => {
+    await expect(
+      requestSpokenMissionWrittenSupport({
+        ...input,
+        fetcher: vi
+          .fn()
+          .mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 })),
+      }),
+    ).rejects.toThrow('Could not reveal written text.');
+  });
+
+  it('preserves a structured support API error', async () => {
+    await expect(
+      requestSpokenMissionEnglishSupport({
+        ...input,
+        fetcher: vi
+          .fn()
+          .mockResolvedValue(
+            Response.json({ error: 'Attempt is no longer active.' }, { status: 409 }),
+          ),
+      }),
+    ).rejects.toThrow('Attempt is no longer active.');
   });
 });

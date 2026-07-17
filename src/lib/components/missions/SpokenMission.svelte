@@ -5,14 +5,17 @@
   import SpokenMissionResultView from './SpokenMissionResult.svelte';
   import SpokenMissionTurnView from './SpokenMissionTurn.svelte';
   import type {
+    SpokenMissionAudioStatus,
     SpokenMissionSubmissionState,
     SpokenMissionSupportDisclosureState,
     SpokenMissionTurnActions,
     SpokenMissionTurnViewState,
   } from './spoken-mission-turn-contract';
   import {
+    requestSpokenMissionEnglishSupport,
     requestSpokenMissionStart,
     requestSpokenMissionTurn,
+    requestSpokenMissionWrittenSupport,
     SpokenMissionTurnRequestError,
   } from './spoken-mission-client';
   import {
@@ -20,7 +23,7 @@
     type AudioRecorderController,
     type AudioRecorderStatus,
   } from '$lib/utils/audio-recorder';
-  import { isSpeaking, speak, stop } from '$lib/utils/tts';
+  import { speak, stop } from '$lib/utils/tts';
   import type {
     SpokenMissionBriefing,
     SpokenMissionEvidenceState,
@@ -28,7 +31,6 @@
     SpokenMissionResult,
     SpokenMissionResumeProgress,
     SpokenMissionServerTurn,
-    SpokenMissionSupportResponse,
     SpokenMissionTurnRecovery,
     SpokenMissionTurnResponse,
   } from '$lib/types';
@@ -39,6 +41,7 @@
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
     resumable: SpokenMissionResumeProgress | null;
+    definitionUpdated?: boolean;
     onChooseWritten: () => void;
   };
 
@@ -49,7 +52,15 @@
     mimeType: string;
   };
 
-  let { missionId, userId, briefing, bestEvidence, resumable, onChooseWritten }: Props = $props();
+  let {
+    missionId,
+    userId,
+    briefing,
+    bestEvidence,
+    resumable,
+    definitionUpdated = false,
+    onChooseWritten,
+  }: Props = $props();
 
   let stage = $state<Stage>('briefing');
   let submissionState = $state<SpokenMissionSubmissionState>('idle');
@@ -57,10 +68,13 @@
   let attemptId = $state('');
   let currentTurn = $state<SpokenMissionServerTurn | null>(null);
   let pendingNextTurn = $state<SpokenMissionServerTurn | null>(null);
-  let supportRevealed = $state(false);
+  let englishSupportRevealed = $state(false);
   let revealedEnglishSupport = $state<string | null>(null);
-  let supportDisclosureState = $state<SpokenMissionSupportDisclosureState>('idle');
-  let attemptSupportUsed = $state(false);
+  let englishSupportDisclosureState = $state<SpokenMissionSupportDisclosureState>('idle');
+  let writtenSupportRevealed = $state(false);
+  let revealedWrittenSupport = $state<SpokenMissionServerTurn['npcDialogue'] | null>(null);
+  let writtenSupportDisclosureState = $state<SpokenMissionSupportDisclosureState>('idle');
+  let englishSupportUsedDuringAttempt = $state(false);
   let history = $state<SpokenMissionHistoryEntry[]>([]);
   let assessment = $state<SpokenMissionTurnResponse['assessment'] | null>(null);
   let result = $state<SpokenMissionResult | null>(null);
@@ -69,12 +83,17 @@
   let recorderStatus = $state<AudioRecorderStatus>('idle');
   let recordingSeconds = $state(0);
   let recorderError = $state('');
-  let audioPlaying = $state(false);
-  let audioPoll: ReturnType<typeof setInterval> | null = null;
+  let audioStatus = $state<SpokenMissionAudioStatus>('idle');
   let recorder: AudioRecorderController | null = null;
+  let audioPlaybackController: AbortController | null = null;
+  let supportRequestGeneration = 0;
 
   const canRecord = $derived(
     submissionState === 'idle' && (recorderStatus === 'idle' || recorderStatus === 'error'),
+  );
+  const supportActionsEnabled = $derived(
+    submissionState !== 'processing' &&
+      !(submissionState === 'feedback' && assessment?.outcome === 'accepted'),
   );
 
   let activeTurnState = $derived.by((): SpokenMissionTurnViewState | null => {
@@ -89,10 +108,18 @@
         errorMessage: recorderError,
       },
       support: {
-        revealed: supportRevealed,
-        englishText: revealedEnglishSupport,
-        disclosureState: supportDisclosureState,
-        usedDuringAttempt: attemptSupportUsed,
+        actionsEnabled: supportActionsEnabled,
+        written: {
+          revealed: writtenSupportRevealed,
+          text: revealedWrittenSupport,
+          disclosureState: writtenSupportDisclosureState,
+        },
+        english: {
+          revealed: englishSupportRevealed,
+          text: revealedEnglishSupport,
+          disclosureState: englishSupportDisclosureState,
+          usedDuringAttempt: englishSupportUsedDuringAttempt,
+        },
       },
       assessment: {
         submissionState,
@@ -105,7 +132,7 @@
         errorMessage,
       },
       audio: {
-        playing: audioPlaying,
+        status: audioStatus,
       },
     };
   });
@@ -138,7 +165,36 @@
     });
   }
 
+  function stopServerLinePlayback(nextStatus?: SpokenMissionAudioStatus): void {
+    audioPlaybackController?.abort();
+    audioPlaybackController = null;
+    stop();
+    if (nextStatus) audioStatus = nextStatus;
+  }
+
+  function ownsServerLinePlayback(controller: AbortController): boolean {
+    return !controller.signal.aborted && audioPlaybackController === controller;
+  }
+
+  function ownsSupportRequest(
+    generation: number,
+    requestAttemptId: string,
+    turnNumber: number,
+  ): boolean {
+    return (
+      generation === supportRequestGeneration &&
+      ownsSupportAttempt(requestAttemptId) &&
+      currentTurn?.turnNumber === turnNumber
+    );
+  }
+
+  function ownsSupportAttempt(requestAttemptId: string): boolean {
+    return stage === 'active' && attemptId === requestAttemptId;
+  }
+
   async function startMission(startOver: boolean): Promise<void> {
+    supportRequestGeneration += 1;
+    stopServerLinePlayback('idle');
     stage = 'starting';
     errorMessage = '';
     try {
@@ -151,10 +207,15 @@
       attemptId = payload.attemptId;
       currentTurn = payload.turn;
       history = payload.history;
-      attemptSupportUsed = payload.supportUsed;
-      supportRevealed = payload.currentTurnSupportRevealed;
+      englishSupportUsedDuringAttempt = payload.supportUsed;
+      englishSupportRevealed = payload.currentTurnEnglishSupportRevealed;
       revealedEnglishSupport = payload.currentTurnEnglishSupport;
-      supportDisclosureState = 'idle';
+      englishSupportDisclosureState = 'idle';
+      writtenSupportRevealed = payload.currentTurnWrittenSupportRevealed;
+      revealedWrittenSupport = payload.currentTurnWrittenSupportRevealed
+        ? payload.turn.npcDialogue
+        : null;
+      writtenSupportDisclosureState = 'idle';
       submissionState = 'idle';
       submissionRecovery = 'none';
       stage = 'active';
@@ -193,7 +254,7 @@
     form.set('attemptId', attemptId);
     form.set('turnNumber', String(currentTurn.turnNumber));
     form.set('clientResponseId', pendingRecording.responseId);
-    form.set('supportRevealed', String(supportRevealed));
+    form.set('englishSupportRevealed', String(englishSupportRevealed));
     const extension = pendingRecording.mimeType.includes('mp4') ? 'mp4' : 'webm';
     form.set('audio', pendingRecording.audio, `spoken-mission-turn.${extension}`);
 
@@ -205,7 +266,10 @@
       result = payload.result;
       pendingRecording = null;
       submissionState = 'feedback';
-      if (payload.isComplete && payload.result) stage = 'complete';
+      if (payload.isComplete && payload.result) {
+        stopServerLinePlayback('idle');
+        stage = 'complete';
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Could not assess this response.';
       submissionRecovery = error instanceof SpokenMissionTurnRequestError ? error.recovery : 'none';
@@ -227,81 +291,131 @@
 
   function continueToNextGoal(): void {
     if (!pendingNextTurn) return;
+    supportRequestGeneration += 1;
     currentTurn = pendingNextTurn;
     pendingNextTurn = null;
-    supportRevealed = false;
+    englishSupportRevealed = false;
     revealedEnglishSupport = null;
-    supportDisclosureState = 'idle';
+    englishSupportDisclosureState = 'idle';
+    writtenSupportRevealed = false;
+    revealedWrittenSupport = null;
+    writtenSupportDisclosureState = 'idle';
+    stopServerLinePlayback('idle');
     assessment = null;
     submissionState = 'idle';
     submissionRecovery = 'none';
     recorder?.retry();
   }
 
-  async function revealSupport(): Promise<void> {
-    if (!currentTurn || supportDisclosureState === 'processing') return;
-    supportDisclosureState = 'processing';
+  async function revealEnglishSupport(): Promise<void> {
+    if (!currentTurn || !supportActionsEnabled || englishSupportDisclosureState === 'processing')
+      return;
+    const generation = supportRequestGeneration;
+    const requestAttemptId = attemptId;
+    const turnNumber = currentTurn.turnNumber;
+    englishSupportDisclosureState = 'processing';
     errorMessage = '';
     try {
-      const response = await fetch(`/api/missions/${missionId}/spoken/support`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          attemptId,
-          turnNumber: currentTurn.turnNumber,
-        }),
+      const payload = await requestSpokenMissionEnglishSupport({
+        missionId,
+        userId,
+        attemptId: requestAttemptId,
+        turnNumber,
       });
-      const payload = (await response.json()) as Partial<SpokenMissionSupportResponse> & {
-        error?: string;
-      };
-      if (!response.ok || !payload.englishSupport || payload.supportUsed !== true) {
-        throw new Error(payload.error ?? 'Could not reveal English support.');
-      }
 
+      if (!ownsSupportAttempt(requestAttemptId)) return;
+      englishSupportUsedDuringAttempt = payload.supportUsed;
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       revealedEnglishSupport = payload.englishSupport;
-      supportRevealed = true;
-      attemptSupportUsed = true;
+      englishSupportRevealed = true;
     } catch (error) {
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       errorMessage = error instanceof Error ? error.message : 'Could not reveal English support.';
     } finally {
-      supportDisclosureState = 'idle';
+      if (ownsSupportRequest(generation, requestAttemptId, turnNumber)) {
+        englishSupportDisclosureState = 'idle';
+      }
     }
   }
 
-  function clearAudioPoll(): void {
-    if (audioPoll) clearInterval(audioPoll);
-    audioPoll = null;
+  async function revealWrittenSupport(): Promise<void> {
+    if (!currentTurn || !supportActionsEnabled || writtenSupportDisclosureState === 'processing')
+      return;
+    const generation = supportRequestGeneration;
+    const requestAttemptId = attemptId;
+    const turnNumber = currentTurn.turnNumber;
+    writtenSupportDisclosureState = 'processing';
+    errorMessage = '';
+    try {
+      const payload = await requestSpokenMissionWrittenSupport({
+        missionId,
+        userId,
+        attemptId: requestAttemptId,
+        turnNumber,
+      });
+
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
+      revealedWrittenSupport = payload.writtenText;
+      writtenSupportRevealed = true;
+    } catch (error) {
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
+      errorMessage = error instanceof Error ? error.message : 'Could not reveal written text.';
+    } finally {
+      if (ownsSupportRequest(generation, requestAttemptId, turnNumber)) {
+        writtenSupportDisclosureState = 'idle';
+      }
+    }
   }
 
   async function playServerLine(): Promise<void> {
     if (!currentTurn) return;
-    if (audioPlaying || isSpeaking()) {
-      stop();
-      audioPlaying = false;
-      clearAudioPoll();
+    if (audioStatus === 'playing') {
+      stopServerLinePlayback('stopped');
       return;
     }
+    if (audioStatus === 'loading') return;
 
-    audioPlaying = true;
-    audioPoll = setInterval(() => {
-      if (!isSpeaking()) {
-        audioPlaying = false;
-        clearAudioPoll();
-      }
-    }, 80);
+    const playbackController = new AbortController();
+    audioPlaybackController = playbackController;
+    audioStatus = 'loading';
+    let playbackFailed = false;
     try {
-      await speak(currentTurn.npcDialogue.japanese, { preferBrowser: false });
-    } finally {
-      audioPlaying = false;
-      clearAudioPoll();
+      await speak(currentTurn.npcDialogue.japanese, {
+        preferBrowser: false,
+        signal: playbackController.signal,
+        onPlaybackStart: () => {
+          if (!ownsServerLinePlayback(playbackController)) {
+            stop();
+            return;
+          }
+          audioStatus = 'playing';
+        },
+        onPlaybackError: () => {
+          if (!ownsServerLinePlayback(playbackController)) {
+            return;
+          }
+          playbackFailed = true;
+          audioStatus = 'error';
+        },
+      });
+      if (!ownsServerLinePlayback(playbackController)) {
+        return;
+      }
+      audioPlaybackController = null;
+      if (!playbackFailed) audioStatus = 'stopped';
+    } catch {
+      if (!ownsServerLinePlayback(playbackController)) {
+        return;
+      }
+      audioPlaybackController = null;
+      audioStatus = 'error';
     }
   }
 
   onDestroy(() => {
+    supportRequestGeneration += 1;
     recorder?.dispose();
-    stop();
-    clearAudioPoll();
+    stopServerLinePlayback();
   });
 
   const turnActions: SpokenMissionTurnActions = {
@@ -311,7 +425,8 @@
       cancel: cancelRecording,
     },
     support: {
-      reveal: revealSupport,
+      revealWritten: revealWrittenSupport,
+      revealEnglish: revealEnglishSupport,
     },
     assessment: {
       continue: continueToNextGoal,
@@ -333,6 +448,7 @@
     {briefing}
     {bestEvidence}
     {resumable}
+    {definitionUpdated}
     {errorMessage}
     onStart={startMission}
     {onChooseWritten}

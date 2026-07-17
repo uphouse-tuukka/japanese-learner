@@ -64,15 +64,15 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
   const attemptId = requiredFormString(form, 'attemptId');
   const clientResponseId = requiredFormString(form, 'clientResponseId', 120);
   const turnNumber = Number(requiredFormString(form, 'turnNumber', 2));
-  const supportValue = requiredFormString(form, 'supportRevealed', 5);
+  const englishSupportValue = requiredFormString(form, 'englishSupportRevealed', 5);
   const audio = form.get('audio');
 
   if (!missionId) return jsonError('Missing mission id.', 400);
   if (!userId || !attemptId || !clientResponseId || !Number.isInteger(turnNumber)) {
     return jsonError('Missing required fields.', 400);
   }
-  if (supportValue !== 'true' && supportValue !== 'false') {
-    return jsonError('Invalid supportRevealed value.', 400);
+  if (englishSupportValue !== 'true' && englishSupportValue !== 'false') {
+    return jsonError('Invalid englishSupportRevealed value.', 400);
   }
 
   const selectedUser = matchSelectedUser(cookies, userId);
@@ -143,7 +143,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
         (assessment.outcome === 'accepted'
           ? 'You accomplished this goal.'
           : 'Try the same goal again.'),
-      supportUsed: attempt.currentTurnSupportUsed || supportValue === 'true',
+      supportUsed: attempt.currentTurnSupportUsed || englishSupportValue === 'true',
       clientResponseId,
       assessedAt: new Date().toISOString(),
     };

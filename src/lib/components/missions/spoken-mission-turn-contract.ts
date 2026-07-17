@@ -7,6 +7,7 @@ import type { AudioRecorderStatus } from '$lib/utils/audio-recorder';
 
 export type SpokenMissionSubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
 export type SpokenMissionSupportDisclosureState = 'idle' | 'processing';
+export type SpokenMissionAudioStatus = 'idle' | 'loading' | 'playing' | 'stopped' | 'error';
 
 export type SpokenMissionTurnViewState = {
   turn: SpokenMissionServerTurn;
@@ -18,10 +19,18 @@ export type SpokenMissionTurnViewState = {
     errorMessage: string;
   };
   support: {
-    revealed: boolean;
-    englishText: string | null;
-    disclosureState: SpokenMissionSupportDisclosureState;
-    usedDuringAttempt: boolean;
+    actionsEnabled: boolean;
+    written: {
+      revealed: boolean;
+      text: SpokenMissionServerTurn['npcDialogue'] | null;
+      disclosureState: SpokenMissionSupportDisclosureState;
+    };
+    english: {
+      revealed: boolean;
+      text: string | null;
+      disclosureState: SpokenMissionSupportDisclosureState;
+      usedDuringAttempt: boolean;
+    };
   };
   assessment: {
     submissionState: SpokenMissionSubmissionState;
@@ -34,7 +43,7 @@ export type SpokenMissionTurnViewState = {
     errorMessage: string;
   };
   audio: {
-    playing: boolean;
+    status: SpokenMissionAudioStatus;
   };
 };
 
@@ -45,7 +54,8 @@ export type SpokenMissionTurnActions = {
     cancel: () => void;
   };
   support: {
-    reveal: () => void;
+    revealWritten: () => void;
+    revealEnglish: () => void;
   };
   assessment: {
     continue: () => void;
