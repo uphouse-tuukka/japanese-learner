@@ -127,6 +127,61 @@ describe('Spoken Mission persistence', () => {
     });
   });
 
+  it('preserves written disclosure that lands concurrently with an accepted assessment', async () => {
+    const spoken = await loadRepositories();
+    const attempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    });
+    const client = dbHarness.client!;
+    const execute = client.execute.bind(client);
+    let injectedReveal = false;
+    vi.spyOn(client, 'execute').mockImplementation(async (statement) => {
+      const sql = typeof statement === 'string' ? statement : (statement as { sql: string }).sql;
+      if (!injectedReveal && sql.includes('UPDATE user_spoken_missions\nSET\n  status = ?')) {
+        injectedReveal = true;
+        await spoken.markSpokenMissionWrittenSupportRevealed({
+          attemptId: attempt.id,
+          userId: 'user-1',
+          missionId: 'mission-order-restaurant',
+          definitionVersion: 'restaurant-order-v2',
+          turnNumber: 1,
+        });
+      }
+      return execute(statement);
+    });
+
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      turnNumber: 1,
+      evidence: {
+        goalKey: 'order',
+        turnNumber: 1,
+        npcJapanese: 'ご注文はお決まりですか。',
+        npcRomaji: 'go-chuumon wa okimari desu ka.',
+        transcript: 'ラーメンを一つお願いします。',
+        outcome: 'accepted',
+        confidence: 'high',
+        feedback: 'Goal accomplished.',
+        supportUsed: false,
+        clientResponseId: 'concurrent-written-support',
+        assessedAt: '2026-07-16T09:00:00.000Z',
+      },
+    });
+
+    expect(injectedReveal).toBe(true);
+    await expect(spoken.getSpokenMissionAttempt(attempt.id)).resolves.toMatchObject({
+      currentTurn: 2,
+      currentTurnWrittenSupportRevealed: false,
+      conversationLog: [{ writtenSupportRevealed: true }],
+    });
+  });
+
   it('atomically replaces only the exact current in-progress attempt', async () => {
     const spoken = await loadRepositories();
     const olderAttempt = await spoken.createSpokenMissionAttempt({

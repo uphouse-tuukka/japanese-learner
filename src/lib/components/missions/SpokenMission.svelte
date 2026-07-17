@@ -41,6 +41,7 @@
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
     resumable: SpokenMissionResumeProgress | null;
+    definitionUpdated?: boolean;
     onChooseWritten: () => void;
   };
 
@@ -51,7 +52,15 @@
     mimeType: string;
   };
 
-  let { missionId, userId, briefing, bestEvidence, resumable, onChooseWritten }: Props = $props();
+  let {
+    missionId,
+    userId,
+    briefing,
+    bestEvidence,
+    resumable,
+    definitionUpdated = false,
+    onChooseWritten,
+  }: Props = $props();
 
   let stage = $state<Stage>('briefing');
   let submissionState = $state<SpokenMissionSubmissionState>('idle');
@@ -77,6 +86,7 @@
   let audioStatus = $state<SpokenMissionAudioStatus>('idle');
   let recorder: AudioRecorderController | null = null;
   let audioPlaybackController: AbortController | null = null;
+  let supportRequestGeneration = 0;
 
   const canRecord = $derived(
     submissionState === 'idle' && (recorderStatus === 'idle' || recorderStatus === 'error'),
@@ -161,7 +171,21 @@
     return !controller.signal.aborted && audioPlaybackController === controller;
   }
 
+  function ownsSupportRequest(
+    generation: number,
+    requestAttemptId: string,
+    turnNumber: number,
+  ): boolean {
+    return (
+      generation === supportRequestGeneration &&
+      stage === 'active' &&
+      attemptId === requestAttemptId &&
+      currentTurn?.turnNumber === turnNumber
+    );
+  }
+
   async function startMission(startOver: boolean): Promise<void> {
+    supportRequestGeneration += 1;
     stopServerLinePlayback('idle');
     stage = 'starting';
     errorMessage = '';
@@ -259,6 +283,7 @@
 
   function continueToNextGoal(): void {
     if (!pendingNextTurn) return;
+    supportRequestGeneration += 1;
     currentTurn = pendingNextTurn;
     pendingNextTurn = null;
     englishSupportRevealed = false;
@@ -276,44 +301,58 @@
 
   async function revealEnglishSupport(): Promise<void> {
     if (!currentTurn || englishSupportDisclosureState === 'processing') return;
+    const generation = supportRequestGeneration;
+    const requestAttemptId = attemptId;
+    const turnNumber = currentTurn.turnNumber;
     englishSupportDisclosureState = 'processing';
     errorMessage = '';
     try {
       const payload = await requestSpokenMissionEnglishSupport({
         missionId,
         userId,
-        attemptId,
-        turnNumber: currentTurn.turnNumber,
+        attemptId: requestAttemptId,
+        turnNumber,
       });
 
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       revealedEnglishSupport = payload.englishSupport;
       englishSupportRevealed = true;
       englishSupportUsedDuringAttempt = true;
     } catch (error) {
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       errorMessage = error instanceof Error ? error.message : 'Could not reveal English support.';
     } finally {
-      englishSupportDisclosureState = 'idle';
+      if (ownsSupportRequest(generation, requestAttemptId, turnNumber)) {
+        englishSupportDisclosureState = 'idle';
+      }
     }
   }
 
   async function revealWrittenSupport(): Promise<void> {
     if (!currentTurn || writtenSupportDisclosureState === 'processing') return;
+    const generation = supportRequestGeneration;
+    const requestAttemptId = attemptId;
+    const turnNumber = currentTurn.turnNumber;
     writtenSupportDisclosureState = 'processing';
     errorMessage = '';
     try {
       const payload = await requestSpokenMissionWrittenSupport({
         missionId,
         userId,
-        attemptId,
-        turnNumber: currentTurn.turnNumber,
+        attemptId: requestAttemptId,
+        turnNumber,
       });
 
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       revealedWrittenSupport = payload.writtenText;
       writtenSupportRevealed = true;
     } catch (error) {
+      if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       errorMessage = error instanceof Error ? error.message : 'Could not reveal written text.';
     } finally {
-      writtenSupportDisclosureState = 'idle';
+      if (ownsSupportRequest(generation, requestAttemptId, turnNumber)) {
+        writtenSupportDisclosureState = 'idle';
+      }
     }
   }
 
@@ -363,6 +402,7 @@
   }
 
   onDestroy(() => {
+    supportRequestGeneration += 1;
     recorder?.dispose();
     stopServerLinePlayback();
   });
@@ -397,6 +437,7 @@
     {briefing}
     {bestEvidence}
     {resumable}
+    {definitionUpdated}
     {errorMessage}
     onStart={startMission}
     {onChooseWritten}

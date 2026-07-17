@@ -119,6 +119,20 @@ describe('Spoken Mission learner-visible support UI', () => {
     },
   );
 
+  it('labels an incompatible saved attempt as an updated fresh start', () => {
+    const html = render(SpokenMissionChoiceStatus, {
+      props: {
+        bestEvidence: 'independent',
+        resumable: null,
+        definitionUpdated: true,
+      },
+    }).body;
+
+    expect(html).toContain('Updated - fresh start');
+    expect(html).toContain('Independent evidence. Updated mission starts fresh.');
+    expect(html).not.toContain('Resume goal');
+  });
+
   it('exposes programmatic focus destinations for each changing mission stage', () => {
     const briefingHtml = render(SpokenMissionBriefing, {
       props: {
@@ -235,6 +249,39 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(html).toContain('Start over');
     expect(html).toContain('1 of 3 goals complete');
     expect(html).toMatch(/transcript and feedback will be\s+restored/);
+  });
+
+  it('offers an honest fresh start when the saved definition was updated', () => {
+    const html = render(SpokenMissionBriefing, {
+      props: {
+        briefing: {
+          canDo: 'I can complete the restaurant task.',
+          situation: 'At a restaurant.',
+          assessment: 'Intent is assessed, not accent.',
+          evidence:
+            'Complete every goal without English listening support for Independent evidence. Using English listening support records Supported evidence.',
+          privacy: 'Raw audio is discarded.',
+          approximateMinutes: 2,
+          maxRecordingSeconds: 12,
+          goals: [
+            { key: 'order', title: 'Order' },
+            { key: 'respond', title: 'Respond' },
+            { key: 'repair', title: 'Repair' },
+          ],
+        },
+        bestEvidence: 'independent',
+        resumable: null,
+        definitionUpdated: true,
+        errorMessage: '',
+        onStart: vi.fn(),
+        onChooseWritten: vi.fn(),
+      },
+    }).body;
+
+    expect(html).toContain('Start updated Spoken Mission');
+    expect(html).not.toContain('Resume goal');
+    expect(html).toMatch(/unfinished progress from the earlier\s+version/);
+    expect(html).toContain('Completed evidence is kept');
   });
 
   it('renders the stored conversation transcript and assessment on resume', () => {

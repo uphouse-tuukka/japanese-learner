@@ -11,13 +11,21 @@
     briefing: SpokenMissionBriefing;
     bestEvidence: SpokenMissionEvidenceState | 'untried';
     resumable: SpokenMissionResumeProgress | null;
+    definitionUpdated?: boolean;
     errorMessage: string;
     onStart: (startOver: boolean) => void;
     onChooseWritten: () => void;
   };
 
-  let { briefing, bestEvidence, resumable, errorMessage, onStart, onChooseWritten }: Props =
-    $props();
+  let {
+    briefing,
+    bestEvidence,
+    resumable,
+    definitionUpdated = false,
+    errorMessage,
+    onStart,
+    onChooseWritten,
+  }: Props = $props();
 
   let headingElement: HTMLHeadingElement;
 
@@ -74,6 +82,10 @@
       <button class="btn btn-secondary" type="button" onclick={() => onStart(true)}>
         Start over
       </button>
+    {:else if definitionUpdated}
+      <button class="btn btn-primary" type="button" onclick={() => onStart(false)}>
+        Start updated Spoken Mission
+      </button>
     {:else}
       <button class="btn btn-primary" type="button" onclick={() => onStart(false)}>
         Start Spoken Mission
@@ -87,6 +99,11 @@
     <p class="resume-note">
       {resumable.completedGoalCount} of 3 goals complete. Your saved transcript and feedback will be restored
       when you resume.
+    </p>
+  {:else if definitionUpdated}
+    <p class="resume-note">
+      This Spoken Mission was updated. Starting will replace unfinished progress from the earlier
+      version with a fresh attempt. Completed evidence is kept.
     </p>
   {/if}
   <p class="permission-note">Microphone permission is requested only when you press Record.</p>

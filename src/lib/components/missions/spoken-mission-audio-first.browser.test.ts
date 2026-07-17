@@ -254,3 +254,120 @@ it('cancels a loading server line when the learner advances turns', async () => 
     await unmount(component);
   }
 });
+
+it('ignores written support that resolves after the learner advances turns', async () => {
+  const firstTurn = {
+    turnNumber: 1,
+    goalKey: 'order' as const,
+    goalTitle: 'Order',
+    npcDialogue: {
+      japanese: 'ご注文はお決まりですか。',
+      romaji: 'go-chuumon wa okimari desu ka.',
+    },
+  };
+  const secondTurn = {
+    turnNumber: 2,
+    goalKey: 'respond' as const,
+    goalTitle: 'Respond',
+    npcDialogue: {
+      japanese: 'お飲み物はいかがですか。',
+      romaji: 'o-nomimono wa ikaga desu ka.',
+    },
+  };
+  mocks.requestStart.mockResolvedValue({
+    attemptId: 'spokenmission-v2',
+    definitionVersion: 'restaurant-order-v2',
+    supportPolicy: {
+      englishListeningSupport: 'optional',
+      evidenceWithoutEnglishSupport: 'independent',
+      evidenceWithEnglishSupport: 'supported',
+    },
+    briefing,
+    turn: firstTurn,
+    history: [],
+    totalTurns: 3,
+    resumed: false,
+    supportUsed: false,
+    currentTurnEnglishSupportRevealed: false,
+    currentTurnEnglishSupport: null,
+    currentTurnWrittenSupportRevealed: false,
+  });
+  mocks.requestTurn.mockResolvedValue({
+    assessment: {
+      transcript: 'ラーメンを一つお願いします。',
+      outcome: 'accepted',
+      confidence: 'high',
+      feedback: 'You ordered one ramen.',
+    },
+    nextTurn: secondTurn,
+    isComplete: false,
+    result: null,
+  });
+
+  type WrittenSupportResponse = {
+    writtenText: { japanese: string; romaji: string };
+    writtenSupportRevealed: true;
+  };
+  let resolveFirstWrittenSupport!: (value: WrittenSupportResponse) => void;
+  let resolveSecondWrittenSupport!: (value: WrittenSupportResponse) => void;
+  mocks.requestWrittenSupport
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstWrittenSupport = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecondWrittenSupport = resolve;
+        }),
+    );
+
+  const component = mount(SpokenMission, {
+    target: document.body,
+    props: {
+      missionId: 'mission-order-restaurant',
+      userId: 'user-1',
+      briefing,
+      bestEvidence: 'untried',
+      resumable: null,
+      onChooseWritten: vi.fn(),
+    },
+  });
+
+  try {
+    button('Start Spoken Mission').click();
+    await settle();
+    button('Reveal written text').click();
+    await settle();
+    mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
+    await settle();
+    button('Continue').click();
+    await settle();
+    button('Reveal written text').click();
+    await settle();
+
+    resolveFirstWrittenSupport({
+      writtenText: firstTurn.npcDialogue,
+      writtenSupportRevealed: true,
+    });
+    await settle();
+
+    expect(document.body.textContent).toContain('Goal 2 of 3');
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.japanese);
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.romaji);
+    expect(button('Revealing written text…').disabled).toBe(true);
+
+    resolveSecondWrittenSupport({
+      writtenText: secondTurn.npcDialogue,
+      writtenSupportRevealed: true,
+    });
+    await settle();
+
+    expect(document.body.textContent).toContain(secondTurn.npcDialogue.japanese);
+    expect(document.body.textContent).toContain(secondTurn.npcDialogue.romaji);
+  } finally {
+    await unmount(component);
+  }
+});

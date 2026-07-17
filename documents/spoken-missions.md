@@ -67,6 +67,7 @@ Attempt status is `in_progress`, `completed`, or `abandoned`.
 The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, support usage, client response id, and assessment time.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.
+An incompatible in-progress attempt is exposed as an updated-definition fresh start rather than resumable progress.
 The start response restores the full learner-safe conversation history plus written and English support already revealed for the current goal.
 Restored history shows a prior server line only when written support was revealed for that goal.
 Raw audio is not part of database state, API responses, or browser resume storage.

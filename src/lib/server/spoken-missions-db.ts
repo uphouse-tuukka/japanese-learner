@@ -326,6 +326,8 @@ WHERE id = ?
   AND definition_version = ?
   AND status = 'in_progress'
   AND current_turn = ?
+  AND current_turn_support_used = ?
+  AND current_turn_written_support_revealed = ?
   AND NOT EXISTS (
     SELECT 1
     FROM json_each(user_spoken_missions.conversation_log)
@@ -350,6 +352,8 @@ WHERE id = ?
       input.missionId,
       input.definitionVersion,
       input.turnNumber,
+      existing.currentTurnSupportUsed ? 1 : 0,
+      existing.currentTurnWrittenSupportRevealed ? 1 : 0,
       input.evidence.clientResponseId,
     ],
   });
@@ -361,6 +365,18 @@ WHERE id = ?
     );
     if (latest && concurrentDuplicate) {
       return { status: 'duplicate', attempt: latest, evidence: concurrentDuplicate };
+    }
+    if (
+      latest &&
+      latest.userId === input.userId &&
+      latest.missionId === input.missionId &&
+      latest.definitionVersion === input.definitionVersion &&
+      latest.status === 'in_progress' &&
+      latest.currentTurn === input.turnNumber &&
+      (latest.currentTurnSupportUsed !== existing.currentTurnSupportUsed ||
+        latest.currentTurnWrittenSupportRevealed !== existing.currentTurnWrittenSupportRevealed)
+    ) {
+      return recordSpokenMissionAssessment(input);
     }
     throw new SpokenMissionProgressConflictError();
   }

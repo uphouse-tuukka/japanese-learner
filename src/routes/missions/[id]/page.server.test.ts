@@ -93,6 +93,7 @@ describe('mission detail loader Spoken Mission availability', () => {
     mocks.completedMode.mockResolvedValue(false);
     mocks.bestEvidence.mockResolvedValue('independent');
     mocks.resumable.mockResolvedValue({
+      definitionVersion: 'restaurant-order-v1',
       currentTurn: 2,
       successfulTurnCount: 1,
       supportUsed: false,
@@ -113,12 +114,36 @@ describe('mission detail loader Spoken Mission availability', () => {
       spokenMission: {
         bestEvidence: 'independent',
         resumable: { currentTurn: 2, completedGoalCount: 1 },
+        definitionUpdated: false,
         briefing: {
           goals: [{ key: 'order' }, { key: 'respond' }, { key: 'repair' }],
         },
       },
     });
     expect(mocks.resumable).toHaveBeenCalledWith('user-1', 'mission-order-restaurant');
+    expect(JSON.stringify(data)).not.toContain('private transcript');
+  });
+
+  it('presents an incompatible attempt as an updated-definition fresh start', async () => {
+    mocks.resumable.mockResolvedValue({
+      definitionVersion: 'restaurant-order-v0',
+      currentTurn: 2,
+      successfulTurnCount: 1,
+      supportUsed: false,
+      conversationLog: [{ transcript: 'private transcript' }],
+    });
+
+    const data = await load({
+      params: { id: 'mission-order-restaurant' },
+      cookies: cookies(),
+    } as never);
+
+    expect(data).toMatchObject({
+      spokenMission: {
+        resumable: null,
+        definitionUpdated: true,
+      },
+    });
     expect(JSON.stringify(data)).not.toContain('private transcript');
   });
 
