@@ -23,6 +23,7 @@
   let englishSupportDisclosureState = $derived(viewState.support.english.disclosureState);
   let englishSupportUsedDuringAttempt = $derived(viewState.support.english.usedDuringAttempt);
   let submissionState = $derived(viewState.assessment.submissionState);
+  let skipState = $derived(viewState.assessment.skipState);
   let assessment = $derived(viewState.assessment.result);
   let pendingNextTurn = $derived(viewState.assessment.pendingNextTurn);
   let submissionRecovery = $derived(viewState.recovery.submissionRecovery);
@@ -214,10 +215,45 @@
         </div>
       {/if}
       <p class="feedback">{assessment.feedback}</p>
+      {#if assessment.outcome === 'retry' && assessment.retrySuggestion}
+        <div class="retry-suggestion">
+          <span>Try saying</span>
+          <p class="japanese" lang="ja">{assessment.retrySuggestion.japanese}</p>
+          <p class="romaji">{assessment.retrySuggestion.romaji}</p>
+        </div>
+      {/if}
       {#if assessment.outcome === 'accepted' && pendingNextTurn}
         <button class="btn btn-primary" type="button" onclick={actions.assessment.continue}
           >Continue</button
         >
+      {:else if assessment.outcome === 'retry' && assessment.retrySuggestion}
+        <div class="retry-actions">
+          <button
+            class="btn btn-primary"
+            type="button"
+            onclick={actions.assessment.retryGoal}
+            disabled={skipState === 'processing'}>Record again</button
+          >
+          <button
+            class="btn btn-ghost"
+            type="button"
+            disabled={skipState === 'processing'}
+            aria-busy={skipState === 'processing'}
+            onclick={actions.assessment.skipGoal}
+          >
+            {skipState === 'processing' ? 'Skipping goal…' : 'Skip goal'}
+          </button>
+          >
+        </div>
+        <p class="skip-warning">
+          Continuing after a skip means this attempt will not earn Independent or Supported
+          evidence.
+        </p>
+        {#if skipState === 'processing'}
+          <p class="skip-status" role="status" aria-live="polite">
+            Saving the skip and preparing the next goal…
+          </p>
+        {/if}
       {:else}
         <button class="btn btn-primary" type="button" onclick={actions.assessment.retryGoal}
           >Record again</button
@@ -491,6 +527,36 @@
   .feedback {
     color: var(--text-bokashi);
   }
+  .retry-suggestion {
+    min-width: 0;
+    padding: var(--space-4);
+    border-left: 3px solid var(--accent-shu);
+    background: var(--bg-washi);
+    display: grid;
+    gap: var(--space-1);
+  }
+  .retry-suggestion span {
+    color: var(--text-usuzumi);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+  .retry-actions {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .skip-warning {
+    color: var(--state-warning);
+    font-size: var(--text-sm);
+  }
+  .skip-status {
+    color: var(--text-usuzumi);
+    font-size: var(--text-sm);
+  }
   .message {
     margin: 0;
     padding: var(--space-3);
@@ -507,10 +573,12 @@
     }
   }
   @media (max-width: 37.5rem) {
-    .record-actions {
+    .record-actions,
+    .retry-actions {
       align-items: stretch;
     }
-    .record-actions :global(.btn) {
+    .record-actions :global(.btn),
+    .retry-actions :global(.btn) {
       width: 100%;
     }
   }

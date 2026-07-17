@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type {
   SpokenMissionSubmissionState,
+  SpokenMissionSkipState,
   SpokenMissionAudioStatus,
   SpokenMissionSupportDisclosureState,
   SpokenMissionTurnActions,
@@ -8,6 +9,7 @@ import type {
 } from './spoken-mission-turn-contract';
 import type {
   SpokenMissionAssessment,
+  SpokenMissionRetrySuggestion,
   SpokenMissionServerTurn,
   SpokenMissionTurnRecovery,
 } from '$lib/types';
@@ -35,8 +37,9 @@ export type SpokenMissionTurnFixtureInput = {
   recordingSeconds?: number;
   canRecord?: boolean;
   submissionState?: SpokenMissionSubmissionState;
+  skipState?: SpokenMissionSkipState;
   submissionRecovery?: SpokenMissionTurnRecovery;
-  assessment?: SpokenMissionAssessment;
+  assessment?: SpokenMissionAssessment & { retrySuggestion?: SpokenMissionRetrySuggestion | null };
   pendingNextTurn?: SpokenMissionServerTurn;
   hasPendingAudio?: boolean;
   errorMessage?: string;
@@ -57,6 +60,7 @@ export function createSpokenMissionTurnActions() {
     assessment: {
       continue: vi.fn(),
       retryGoal: vi.fn(),
+      skipGoal: vi.fn(),
     },
     recovery: {
       retryUpload: vi.fn(),
@@ -74,7 +78,7 @@ export function createSpokenMissionTurnProps(
   actions: SpokenMissionTurnActions = createSpokenMissionTurnActions(),
 ): SpokenMissionTurnProps {
   const englishSupportRevealed = input.englishSupportRevealed ?? false;
-  const assessment =
+  const baseAssessment =
     input.submissionState === 'feedback'
       ? (input.assessment ?? {
           transcript: 'ラーメンを一つお願いします。',
@@ -83,6 +87,19 @@ export function createSpokenMissionTurnProps(
           feedback: 'You ordered one ramen.',
         })
       : null;
+  const assessment = baseAssessment
+    ? {
+        ...baseAssessment,
+        retrySuggestion:
+          baseAssessment.retrySuggestion ??
+          (baseAssessment.outcome === 'retry'
+            ? {
+                japanese: 'ラーメンを一つお願いします。',
+                romaji: 'raamen o hitotsu onegaishimasu.',
+              }
+            : null),
+      }
+    : null;
   return {
     viewState: {
       turn: spokenMissionServerTurn,
@@ -111,6 +128,7 @@ export function createSpokenMissionTurnProps(
       },
       assessment: {
         submissionState: input.submissionState ?? 'idle',
+        skipState: input.skipState ?? 'idle',
         result: assessment,
         pendingNextTurn: input.pendingNextTurn ?? null,
       },

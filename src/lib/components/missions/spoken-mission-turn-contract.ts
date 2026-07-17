@@ -7,6 +7,7 @@ import type { AudioRecorderStatus } from '$lib/utils/audio-recorder';
 
 export type SpokenMissionSubmissionState = 'idle' | 'processing' | 'feedback' | 'error';
 export type SpokenMissionSupportDisclosureState = 'idle' | 'processing';
+export type SpokenMissionSkipState = 'idle' | 'processing';
 export type SpokenMissionAudioStatus = 'idle' | 'loading' | 'playing' | 'stopped' | 'error';
 
 export type SpokenMissionTurnViewState = {
@@ -34,6 +35,7 @@ export type SpokenMissionTurnViewState = {
   };
   assessment: {
     submissionState: SpokenMissionSubmissionState;
+    skipState: SpokenMissionSkipState;
     result: SpokenMissionTurnResponse['assessment'] | null;
     pendingNextTurn: SpokenMissionServerTurn | null;
   };
@@ -60,6 +62,7 @@ export type SpokenMissionTurnActions = {
   assessment: {
     continue: () => void;
     retryGoal: () => void;
+    skipGoal: () => void;
   };
   recovery: {
     retryUpload: () => void;

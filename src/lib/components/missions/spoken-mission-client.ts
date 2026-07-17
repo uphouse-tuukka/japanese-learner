@@ -1,6 +1,7 @@
 import type {
   SpokenMissionSupportResponse,
   SpokenMissionStartResponse,
+  SpokenMissionSkipResponse,
   SpokenMissionTurnRecovery,
   SpokenMissionTurnResponse,
   SpokenMissionWrittenSupportResponse,
@@ -26,6 +27,15 @@ export class SpokenMissionTurnRequestError extends Error {
 type RequestSpokenMissionTurnInput = {
   missionId: string;
   form: FormData;
+  fetcher?: typeof fetch;
+};
+
+type RequestSpokenMissionSkipInput = {
+  missionId: string;
+  userId: string;
+  attemptId: string;
+  turnNumber: number;
+  clientSkipId: string;
   fetcher?: typeof fetch;
 };
 
@@ -159,6 +169,31 @@ export async function requestSpokenMissionTurn({
       'Could not read the assessment response. Your attempt is saved.',
       'retry_upload',
     );
+  }
+  return payload;
+}
+
+export async function requestSpokenMissionSkip({
+  missionId,
+  userId,
+  attemptId,
+  turnNumber,
+  clientSkipId,
+  fetcher = fetch,
+}: RequestSpokenMissionSkipInput): Promise<SpokenMissionSkipResponse> {
+  let response: Response;
+  try {
+    response = await fetcher(`/api/missions/${missionId}/spoken/skip`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userId, attemptId, turnNumber, clientSkipId }),
+    });
+  } catch {
+    throw new Error('Could not skip this goal. Your attempt is saved.');
+  }
+  const payload = (await response.json()) as SpokenMissionSkipResponse & { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error ?? 'Could not skip this goal. Your attempt is saved.');
   }
   return payload;
 }

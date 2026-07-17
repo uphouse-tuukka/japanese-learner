@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   requestSpokenMissionEnglishSupport,
+  requestSpokenMissionSkip,
   requestSpokenMissionStart,
   requestSpokenMissionTurn,
   requestSpokenMissionWrittenSupport,
@@ -48,6 +49,7 @@ function startResponse(resumed: boolean): Response {
     history: resumed
       ? [
           {
+            kind: 'assessment',
             goalKey: 'order',
             goalTitle: 'Order',
             turnNumber: 1,
@@ -126,12 +128,51 @@ describe('Spoken Mission browser start boundary', () => {
       fetcher: vi.fn().mockResolvedValue(startResponse(true)),
     });
 
-    expect(result.history[0]?.assessment.transcript).toBe('ラーメンを一つお願いします。');
+    expect(result.history[0]).toMatchObject({
+      kind: 'assessment',
+      assessment: { transcript: 'ラーメンを一つお願いします。' },
+    });
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 });
 
 describe('Spoken Mission browser turn boundary', () => {
+  it('sends an idempotent skip request without audio', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        duplicate: false,
+        nextTurn: { turnNumber: 2, goalKey: 'respond' },
+        history: [],
+        isComplete: false,
+        result: null,
+      }),
+    );
+
+    await requestSpokenMissionSkip({
+      missionId: 'mission-order-restaurant',
+      userId: 'user-1',
+      attemptId: 'spokenmission-v3',
+      turnNumber: 1,
+      clientSkipId: 'skip-1',
+      fetcher,
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/missions/mission-order-restaurant/spoken/skip',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          attemptId: 'spokenmission-v3',
+          turnNumber: 1,
+          clientSkipId: 'skip-1',
+        }),
+      }),
+    );
+    expect(fetcher.mock.calls[0][1].body).not.toBeInstanceOf(FormData);
+  });
+
   it('preserves the recorded response for a network retry', async () => {
     const form = turnForm();
 

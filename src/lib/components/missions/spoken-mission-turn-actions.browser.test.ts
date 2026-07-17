@@ -98,7 +98,9 @@ it('routes visible controls through their focused action contracts', async () =>
     },
     (actions) => {
       clickButton('Record again');
+      clickButton('Skip goal');
       expect(actions.assessment.retryGoal).toHaveBeenCalledOnce();
+      expect(actions.assessment.skipGoal).toHaveBeenCalledOnce();
     },
   );
 

@@ -17,44 +17,76 @@
 </script>
 
 <section class="spoken-shell" aria-labelledby="result-heading">
-  <div class="result-seal" data-evidence={result.evidenceState} aria-hidden="true">話</div>
-  <p class="eyebrow">Spoken Mission complete</p>
+  <div
+    class="result-seal"
+    data-evidence={result.kind === 'evidence' ? result.evidenceState : 'incomplete'}
+    aria-hidden="true"
+  >
+    {result.kind === 'evidence' ? '話' : '続'}
+  </div>
+  <p class="eyebrow">
+    {result.kind === 'evidence' ? 'Spoken Mission complete' : 'Practice attempt complete'}
+  </p>
   <h2 id="result-heading" tabindex="-1" bind:this={headingElement}>
-    {result.evidenceState === 'independent' ? 'Independent evidence' : 'Supported evidence'}
+    {result.kind === 'incomplete'
+      ? 'Incomplete attempt'
+      : result.evidenceState === 'independent'
+        ? 'Independent evidence'
+        : 'Supported evidence'}
   </h2>
   <p class="result-can-do">{result.canDo}</p>
   <p class="evidence-explanation">
-    {result.evidenceState === 'independent'
-      ? 'You completed all three goals without English listening support.'
-      : 'You used English listening support during this attempt, so this evidence is Supported.'}
+    {result.kind === 'incomplete'
+      ? 'You continued after skipping a goal, so this attempt did not earn Independent or Supported evidence. Your previous best evidence is unchanged.'
+      : result.evidenceState === 'independent'
+        ? 'You completed all three goals without English listening support.'
+        : 'You used English listening support during this attempt, so this evidence is Supported.'}
   </p>
 
   <div class="evidence-list">
-    {#each result.goals as goal}
-      <article>
-        <span>✓ {goal.title}</span>
-        <div class="goal-detail">
-          <small>Transcript</small>
-          <p lang="ja">{goal.transcript}</p>
-        </div>
-        <div class="goal-detail">
-          <small>Feedback</small>
-          <p class="goal-feedback">{goal.feedback}</p>
-        </div>
-      </article>
-    {/each}
+    {#if result.kind === 'incomplete'}
+      {#each result.goals as goal}
+        <article>
+          <span class:skipped={goal.status === 'skipped'}>
+            {goal.status === 'skipped' ? '–' : '✓'}
+            {goal.title}
+          </span>
+          <div class="goal-detail">
+            <small>Result</small>
+            <p>{goal.status === 'accepted' ? 'Accepted' : 'Skipped'}</p>
+          </div>
+        </article>
+      {/each}
+    {:else}
+      {#each result.goals as goal}
+        <article>
+          <span>✓ {goal.title}</span>
+          <div class="goal-detail">
+            <small>Transcript</small>
+            <p lang="ja">{goal.transcript}</p>
+          </div>
+          <div class="goal-detail">
+            <small>Feedback</small>
+            <p class="goal-feedback">{goal.feedback}</p>
+          </div>
+        </article>
+      {/each}
+    {/if}
   </div>
 
-  <article class="practice-phrase">
-    <span>One phrase to keep fresh</span>
-    <p class="japanese">{result.suggestedPhrase.japanese}</p>
-    <p class="romaji">{result.suggestedPhrase.romaji}</p>
-    <small>{result.suggestedPhrase.english}</small>
-  </article>
+  {#if result.kind === 'evidence'}
+    <article class="practice-phrase">
+      <span>One phrase to keep fresh</span>
+      <p class="japanese">{result.suggestedPhrase.japanese}</p>
+      <p class="romaji">{result.suggestedPhrase.romaji}</p>
+      <small>{result.suggestedPhrase.english}</small>
+    </article>
+  {/if}
 
   <p class="result-note">
-    This is task evidence only. It does not award XP, badges, streak credit, or Written Mission
-    completion.
+    {result.kind === 'incomplete'
+      ? 'This incomplete practice attempt awards no evidence, XP, badges, streak credit, or Written Mission completion.'
+      : 'This is task evidence only. It does not award XP, badges, streak credit, or Written Mission completion.'}
   </p>
   <div class="result-actions">
     <a class="btn btn-primary" href="/missions">Back to Travel Missions</a>
@@ -135,6 +167,9 @@
     color: var(--accent-matcha);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
+  }
+  .evidence-list span.skipped {
+    color: var(--state-warning);
   }
   .goal-detail {
     min-width: 0;

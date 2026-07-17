@@ -5,7 +5,9 @@ import type {
   SpokenMissionHistoryEntry,
   SpokenMissionResult,
   SpokenMissionServerTurn,
+  SpokenMissionSkippedGoalEvent,
   SpokenMissionSupportPolicy,
+  SpokenMissionTurnEvidence,
 } from '$lib/types';
 
 export type SpokenMissionServerLine = {
@@ -21,6 +23,10 @@ export type SpokenMissionGoal = {
   serverLines: SpokenMissionServerLine[];
   alternatives: string[];
   rubric: string;
+  retrySuggestion: {
+    japanese: string;
+    romaji: string;
+  };
 };
 
 export type SpokenMissionDefinition = {
@@ -46,8 +52,8 @@ export type SpokenMissionDefinition = {
 
 const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
   missionId: 'mission-order-restaurant',
-  version: 'restaurant-order-v2',
-  supersededVersions: ['restaurant-order-v1'],
+  version: 'restaurant-order-v3',
+  supersededVersions: ['restaurant-order-v1', 'restaurant-order-v2'],
   canDo: 'I can manage a short order conversation in a restaurant.',
   briefing: {
     situation:
@@ -81,6 +87,10 @@ const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
       alternatives: ['ラーメンを一つお願いします。', 'ラーメンをください。', 'ラーメン一つ。'],
       rubric:
         'Accept any clear request for one ramen. The exact counter, particle, and politeness level may vary. Reject a different item, no order, or unrelated intent.',
+      retrySuggestion: {
+        japanese: 'ラーメンを一つお願いします。',
+        romaji: 'raamen o hitotsu onegaishimasu.',
+      },
     },
     {
       key: 'respond',
@@ -101,6 +111,10 @@ const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
       alternatives: ['お水でお願いします。', '水で大丈夫です。', 'お水だけでいいです。'],
       rubric:
         'Accept a clear response that water is sufficient. Minor wording and formality differences are acceptable. Reject ordering an unrelated drink or failing to answer the question.',
+      retrySuggestion: {
+        japanese: 'お水でお願いします。',
+        romaji: 'o-mizu de onegaishimasu.',
+      },
     },
     {
       key: 'repair',
@@ -125,6 +139,10 @@ const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
       ],
       rubric:
         'Accept any clear correction from the wrong item or quantity to one regular ramen. A polite repair phrase is helpful but not required. Reject confirming the mistaken order or giving unrelated intent.',
+      retrySuggestion: {
+        japanese: 'いいえ、普通のラーメンを一つお願いします。',
+        romaji: 'iie, futsuu no raamen o hitotsu onegaishimasu.',
+      },
     },
   ],
   suggestedPhrase: {
@@ -229,7 +247,24 @@ export function toSpokenMissionHistory(
       throw new Error(`[spoken-missions] saved attempt has unknown goal: ${entry.goalKey}`);
     }
 
+    if (isSkippedGoalEvent(entry)) {
+      return {
+        kind: 'skipped',
+        goalKey: entry.goalKey,
+        goalTitle: goal.title,
+        turnNumber: entry.turnNumber,
+        npcDialogue: {
+          japanese: entry.npcJapanese,
+          romaji: entry.npcRomaji,
+        },
+        supportUsed: entry.supportUsed,
+        writtenSupportRevealed: entry.writtenSupportRevealed,
+        skippedAt: entry.skippedAt,
+      };
+    }
+
     return {
+      kind: 'assessment',
       goalKey: entry.goalKey,
       goalTitle: goal.title,
       turnNumber: entry.turnNumber,
@@ -254,11 +289,32 @@ export function toSpokenMissionResult(
   definition: SpokenMissionDefinition,
   attempt: SpokenMissionAttempt,
 ): SpokenMissionResult | null {
+  if (attempt.status === 'incomplete') {
+    const goals = definition.goals.map((goal) => {
+      const skipped = attempt.conversationLog.some(
+        (entry) => isSkippedGoalEvent(entry) && entry.goalKey === goal.key,
+      );
+      const accepted = attempt.conversationLog.some(
+        (entry) =>
+          !isSkippedGoalEvent(entry) && entry.goalKey === goal.key && entry.outcome === 'accepted',
+      );
+      if (!skipped && !accepted) {
+        throw new Error(`[spoken-missions] incomplete attempt has no result for ${goal.key}`);
+      }
+      return {
+        goalKey: goal.key,
+        title: goal.title,
+        status: skipped ? ('skipped' as const) : ('accepted' as const),
+      };
+    });
+    return { kind: 'incomplete', canDo: definition.canDo, goals };
+  }
   if (attempt.status !== 'completed' || !attempt.evidenceState) return null;
 
   const goals = definition.goals.map((goal) => {
     const accepted = attempt.conversationLog.find(
-      (entry) => entry.goalKey === goal.key && entry.outcome === 'accepted',
+      (entry): entry is SpokenMissionTurnEvidence =>
+        !isSkippedGoalEvent(entry) && entry.goalKey === goal.key && entry.outcome === 'accepted',
     );
     if (!accepted) {
       throw new Error(`[spoken-missions] completed attempt is missing ${goal.key} evidence`);
@@ -267,9 +323,16 @@ export function toSpokenMissionResult(
   });
 
   return {
+    kind: 'evidence',
     evidenceState: attempt.evidenceState,
     canDo: definition.canDo,
     goals,
     suggestedPhrase: definition.suggestedPhrase,
   };
+}
+
+function isSkippedGoalEvent(
+  entry: SpokenMissionAttempt['conversationLog'][number],
+): entry is SpokenMissionSkippedGoalEvent {
+  return 'kind' in entry && entry.kind === 'skipped';
 }

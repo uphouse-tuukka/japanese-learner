@@ -15,7 +15,10 @@ Scenarios without a Spoken Mission configuration continue directly to the existi
 A Spoken Mission attempt has three ordered goals.
 The restaurant Can-do is "I can manage a short order conversation in a restaurant."
 Its briefing uses only the neutral Order, Respond, and Repair stage labels, while detailed learner goals, accepted alternatives, and rubrics remain server-owned.
-Each goal advances only after an Accepted assessment, while Retry and Could not assess keep the learner on the same goal.
+Each goal advances after an Accepted assessment.
+A semantic Retry keeps the learner on the same goal and presents one authored Japanese-plus-romaji suggestion, Record again, and a lower-emphasis Skip goal action.
+Could not assess and other technical recovery states keep the learner on the same goal without showing language coaching or Skip goal.
+Skipping advances the conversation but makes the attempt ineligible for Independent or Supported evidence.
 Each restaurant-server turn is audio-first.
 Japanese and romaji stay hidden in the rendered interface until the learner reveals written text.
 The turn control reports loading, playing, stopped, and failure states and changes between Listen, Stop audio, Replay Japanese, and Retry audio as playback progresses.
@@ -58,22 +61,33 @@ Replaying Japanese audio, revealing Japanese plus romaji, and using a Japanese r
 The server loads the goal, alternatives, rubric, evidence rules, and authored NPC line from its own definition.
 The browser never supplies expected answers or grading rules.
 The `clientResponseId` makes a repeated submission idempotent by returning the stored assessment instead of recording or advancing twice.
-The response contains the assessment, the next turn after an Accepted result, completion state, and the final result when the third goal completes.
+The response contains the assessment, an authored retry suggestion only for a semantic Retry, the next turn after an Accepted result, terminal state, and the final result when the third goal finishes.
 Recoverable failures include a `recovery` value that tells the client whether it can retry the same upload or must record again.
+
+### Skip a goal
+
+`POST /api/missions/[id]/spoken/skip` accepts JSON with `userId`, `attemptId`, `turnNumber`, and `clientSkipId`.
+The server permits a skip only for the current turn of an in-progress attempt whose latest assessment is a semantic Retry.
+Selected-user, ownership, mission, unlock, definition-version, and current-progress checks run before the mutation.
+The `clientSkipId` makes repeated requests idempotent so the goal cannot advance twice or create duplicate history.
+Skipping does not accept audio, check AI budget, transcribe speech, or invoke semantic assessment.
+The response returns restored history, the next turn or terminal incomplete result, and never fabricates assessment evidence for the skipped goal.
 
 ## Persistence and resume
 
 Spoken attempts are stored separately from Written Missions in `user_spoken_missions`.
 Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide English-support flag, current-goal English-support flag, current-goal written-support flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
-Attempt status is `in_progress`, `completed`, or `abandoned`.
+Attempt status is `in_progress`, `completed`, `incomplete`, or `abandoned`.
 Storage enforces at most one in-progress attempt per learner and scenario, and a fresh start atomically returns the existing attempt if another request created it first.
 The startup migration abandons all but the newest legacy in-progress attempt for each learner and scenario before creating the unique partial index that enforces this invariant.
-The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, separate English- and written-support disclosure state, client response id, and assessment time.
+Assessed conversation events store authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, separate English- and written-support disclosure state, client response id, and assessment time.
+Skipped conversation events instead store the goal, turn, authored server line, support disclosures, idempotency identifier, and timestamp without a transcript, confidence, semantic feedback, or accepted evidence.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.
 An incompatible in-progress attempt is exposed as an updated-definition fresh start rather than resumable progress.
 The start response restores the full learner-safe conversation history plus written and English support already revealed for the current goal.
-Restored history shows a prior server line only when written support was revealed for that goal.
+Restored history distinguishes accepted, retried, technically unassessed, and skipped events.
+It shows a prior server line only when written support was revealed for that goal.
 Raw audio is not part of database state, API responses, or browser resume storage.
 
 ## Evidence semantics
@@ -82,6 +96,10 @@ Untried is derived when no completed spoken attempt exists.
 Independent means all three goals were Accepted without revealing English listening support.
 Supported means all three goals were Accepted after English listening support was revealed on at least one turn.
 The displayed best evidence is ordered Independent above Supported above Untried, so a later Supported attempt cannot downgrade an earlier Independent result.
+
+An attempt containing a skip can continue through the remaining goals but finishes as Incomplete when the final turn is accepted or skipped.
+Incomplete attempts are terminal, are not resumable, never receive an evidence state, and are excluded from best-evidence selection.
+The incomplete result identifies each goal as Accepted or Skipped and offers a fresh Try again action without changing previously earned evidence.
 
 Spoken evidence and Written Mission completion remain separate.
 A Spoken Mission result is task evidence for the configured Can-do only and does not award XP, badges, category mastery, streak credit, Written Mission completion, or a global readiness claim.
@@ -102,7 +120,7 @@ Transcription and assessment reuse the existing per-user AI budget and token-acc
 Add a `SpokenMissionDefinition` in `src/lib/server/spoken-missions.ts` using the id of an existing mission from `src/lib/server/missions-seed.ts`.
 Do not create a duplicate mission record, catalog node, collection, track, shelf, or navigation route.
 
-The definition must include a new immutable version, Can-do statement, briefing and privacy copy, approximate duration, maximum recording duration, exactly three ordered goals, authored Japanese and romaji server-line variants, English listening-support text, natural alternatives, semantic rubrics, and a suggested practice phrase.
+The definition must include a new immutable version, Can-do statement, briefing and privacy copy, approximate duration, maximum recording duration, exactly three ordered goals, authored Japanese and romaji server-line variants, English listening-support text, natural alternatives, semantic rubrics, paired Japanese-plus-romaji retry suggestions, and a suggested practice phrase.
 Each goal should provide a line for every supported wording variant because one variant index is selected for the whole attempt.
 Changing evidence-relevant content requires a new definition version whose superseded-version list includes every earlier active version that it may replace safely.
 This explicit ordering lets mixed-version start requests converge on the newest definition while completed historical evidence remains available.

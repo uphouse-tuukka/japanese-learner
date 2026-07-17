@@ -635,6 +635,253 @@ describe('Spoken Mission persistence', () => {
     ).resolves.toBeNull();
   });
 
+  it('durably skips a semantically retried goal, advances once, and finishes incomplete', async () => {
+    const spoken = await loadRepositories();
+    const previousBest = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 1,
+    });
+    for (const turnNumber of [1, 2, 3]) {
+      await spoken.recordSpokenMissionAssessment({
+        attemptId: previousBest.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v2',
+        turnNumber,
+        evidence: {
+          goalKey: ['order', 'respond', 'repair'][turnNumber - 1] as 'order' | 'respond' | 'repair',
+          turnNumber,
+          npcJapanese: '日本語',
+          npcRomaji: 'nihongo',
+          transcript: '返事',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: `previous-best-${turnNumber}`,
+          assessedAt: '2026-07-16T09:00:00.000Z',
+        },
+      });
+    }
+    const attempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      wordingVariant: 0,
+    });
+
+    await spoken.markSpokenMissionWrittenSupportRevealed({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+    });
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      evidence: {
+        goalKey: 'order',
+        turnNumber: 1,
+        npcJapanese: 'ご注文はお決まりですか。',
+        npcRomaji: 'go-chuumon wa okimari desu ka.',
+        transcript: 'さようなら',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'The response did not place an order.',
+        supportUsed: false,
+        clientResponseId: 'retry-before-skip',
+        assessedAt: '2026-07-17T09:00:00.000Z',
+      },
+    });
+
+    const skipInput = {
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      goalKey: 'order' as const,
+      npcJapanese: 'ご注文はお決まりですか。',
+      npcRomaji: 'go-chuumon wa okimari desu ka.',
+      clientSkipId: 'skip-order-1',
+    };
+    const skipped = await spoken.skipSpokenMissionGoal(skipInput);
+
+    expect(skipped).toMatchObject({
+      status: 'recorded',
+      attempt: {
+        status: 'in_progress',
+        currentTurn: 2,
+        successfulTurnCount: 0,
+        currentTurnWrittenSupportRevealed: false,
+        evidenceState: null,
+      },
+      event: {
+        kind: 'skipped',
+        goalKey: 'order',
+        turnNumber: 1,
+        writtenSupportRevealed: true,
+        clientSkipId: 'skip-order-1',
+      },
+    });
+    expect(skipped.event).not.toHaveProperty('transcript');
+    expect(skipped.event).not.toHaveProperty('confidence');
+    expect(skipped.event).not.toHaveProperty('feedback');
+    expect(skipped.event).not.toHaveProperty('outcome');
+
+    await expect(spoken.skipSpokenMissionGoal(skipInput)).resolves.toMatchObject({
+      status: 'duplicate',
+      attempt: { currentTurn: 2 },
+      event: { clientSkipId: 'skip-order-1' },
+    });
+    await expect(
+      spoken.getResumableSpokenMissionAttempt('user-1', 'mission-order-restaurant'),
+    ).resolves.toMatchObject({
+      currentTurn: 2,
+      successfulTurnCount: 0,
+      conversationLog: [
+        { outcome: 'retry', clientResponseId: 'retry-before-skip' },
+        { kind: 'skipped', goalKey: 'order', clientSkipId: 'skip-order-1' },
+      ],
+    });
+
+    for (const turnNumber of [2, 3]) {
+      await spoken.recordSpokenMissionAssessment({
+        attemptId: attempt.id,
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v3',
+        turnNumber,
+        evidence: {
+          goalKey: turnNumber === 2 ? 'respond' : 'repair',
+          turnNumber,
+          npcJapanese: '日本語',
+          npcRomaji: 'nihongo',
+          transcript: '返事',
+          outcome: 'accepted',
+          confidence: 'high',
+          feedback: 'Accepted.',
+          supportUsed: false,
+          clientResponseId: `accepted-after-skip-${turnNumber}`,
+          assessedAt: '2026-07-17T09:01:00.000Z',
+        },
+      });
+    }
+
+    await expect(spoken.getSpokenMissionAttempt(attempt.id)).resolves.toMatchObject({
+      status: 'incomplete',
+      currentTurn: 3,
+      successfulTurnCount: 2,
+      evidenceState: null,
+      completedAt: expect.any(String),
+    });
+    await expect(
+      spoken.getResumableSpokenMissionAttempt('user-1', 'mission-order-restaurant'),
+    ).resolves.toBeNull();
+    await expect(
+      spoken.getBestSpokenMissionEvidence('user-1', 'mission-order-restaurant'),
+    ).resolves.toBe('independent');
+  });
+
+  it('rejects skipping unless the current goal latest result is a semantic retry', async () => {
+    const spoken = await loadRepositories();
+    const attempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      wordingVariant: 0,
+    });
+    const skipInput = {
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      goalKey: 'order' as const,
+      npcJapanese: 'ご注文はお決まりですか。',
+      npcRomaji: 'go-chuumon wa okimari desu ka.',
+      clientSkipId: 'restricted-skip',
+    };
+    const evidence = {
+      goalKey: 'order' as const,
+      turnNumber: 1,
+      npcJapanese: skipInput.npcJapanese,
+      npcRomaji: skipInput.npcRomaji,
+      transcript: null,
+      confidence: null,
+      feedback: 'No speech was detected.',
+      supportUsed: false,
+      assessedAt: '2026-07-17T09:00:00.000Z',
+    };
+
+    await expect(spoken.skipSpokenMissionGoal(skipInput)).rejects.toBeInstanceOf(
+      spoken.SpokenMissionProgressConflictError,
+    );
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      evidence: {
+        ...evidence,
+        outcome: 'could_not_assess',
+        clientResponseId: 'could-not-assess-before-skip',
+      },
+    });
+    await expect(spoken.skipSpokenMissionGoal(skipInput)).rejects.toBeInstanceOf(
+      spoken.SpokenMissionProgressConflictError,
+    );
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      evidence: {
+        ...evidence,
+        transcript: 'さようなら',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'The response did not place an order.',
+        clientResponseId: 'retry-before-restricted-skip',
+      },
+    });
+
+    for (const changedInput of [
+      { ...skipInput, userId: 'user-2' },
+      { ...skipInput, missionId: 'mission-first-meeting' },
+      { ...skipInput, definitionVersion: 'restaurant-order-v2' },
+      { ...skipInput, turnNumber: 2 },
+    ]) {
+      await expect(spoken.skipSpokenMissionGoal(changedInput)).rejects.toBeInstanceOf(
+        spoken.SpokenMissionProgressConflictError,
+      );
+    }
+
+    await spoken.recordSpokenMissionAssessment({
+      attemptId: attempt.id,
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v3',
+      turnNumber: 1,
+      evidence: {
+        ...evidence,
+        outcome: 'could_not_assess',
+        clientResponseId: 'latest-could-not-assess',
+      },
+    });
+    await expect(spoken.skipSpokenMissionGoal(skipInput)).rejects.toBeInstanceOf(
+      spoken.SpokenMissionProgressConflictError,
+    );
+  });
+
   it('preserves a support reveal that lands concurrently with the completing assessment', async () => {
     const spoken = await loadRepositories();
     const attempt = await spoken.createSpokenMissionAttempt({

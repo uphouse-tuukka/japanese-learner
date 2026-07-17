@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type {
   SpokenMissionBriefing,
   SpokenMissionServerTurn,
+  SpokenMissionSkipResponse,
   SpokenMissionStartResponse,
   SpokenMissionSupportResponse,
   SpokenMissionTurnResponse,
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   recorderStart: vi.fn(),
   onRecordingReady: null as null | ((recording: { audio: Blob; mimeType: string }) => void),
   requestEnglishSupport: vi.fn(),
+  requestSkip: vi.fn(),
   requestStart: vi.fn(),
   requestTurn: vi.fn(),
   requestWrittenSupport: vi.fn(),
@@ -22,6 +24,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./spoken-mission-client', () => ({
   requestSpokenMissionStart: mocks.requestStart,
+  requestSpokenMissionSkip: mocks.requestSkip,
   requestSpokenMissionEnglishSupport: mocks.requestEnglishSupport,
   requestSpokenMissionWrittenSupport: mocks.requestWrittenSupport,
   requestSpokenMissionTurn: mocks.requestTurn,
@@ -86,8 +89,8 @@ const secondTurn: SpokenMissionServerTurn = {
 };
 
 const startPayload: SpokenMissionStartResponse = {
-  attemptId: 'spokenmission-v2',
-  definitionVersion: 'restaurant-order-v2',
+  attemptId: 'spokenmission-v3',
+  definitionVersion: 'restaurant-order-v3',
   supportPolicy: {
     englishListeningSupport: 'optional',
     evidenceWithoutEnglishSupport: 'independent',
@@ -111,6 +114,7 @@ const acceptedTurn: SpokenMissionTurnResponse = {
     outcome: 'accepted',
     confidence: 'high',
     feedback: 'You ordered one ramen.',
+    retrySuggestion: null,
   },
   nextTurn: secondTurn,
   isComplete: false,
@@ -329,5 +333,132 @@ it('retains delayed English support use after the learner advances turns', async
       'English support was used earlier in this attempt. Completion will be Supported.',
     );
     expect(document.body.textContent).not.toContain('Are you ready to order?');
+  });
+});
+
+it('continues after a semantic retry is skipped and finishes with an incomplete result', async () => {
+  const thirdTurn: SpokenMissionServerTurn = {
+    turnNumber: 3,
+    goalKey: 'repair',
+    goalTitle: 'Repair',
+    npcDialogue: { japanese: '二つですね。', romaji: 'futatsu desu ne.' },
+  };
+  mocks.requestTurn
+    .mockResolvedValueOnce({
+      duplicate: false,
+      assessment: {
+        transcript: 'さようなら',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'The response did not place an order.',
+        retrySuggestion: {
+          japanese: 'ラーメンを一つお願いします。',
+          romaji: 'raamen o hitotsu onegaishimasu.',
+        },
+      },
+      nextTurn: null,
+      isComplete: false,
+      result: null,
+    } satisfies SpokenMissionTurnResponse)
+    .mockResolvedValueOnce({ ...acceptedTurn, nextTurn: thirdTurn })
+    .mockResolvedValueOnce({
+      duplicate: false,
+      assessment: {
+        transcript: 'いいえ、一つです。',
+        outcome: 'accepted',
+        confidence: 'high',
+        feedback: 'You corrected the order.',
+        retrySuggestion: null,
+      },
+      nextTurn: null,
+      isComplete: true,
+      result: {
+        kind: 'incomplete',
+        canDo: briefing.canDo,
+        goals: [
+          { goalKey: 'order', title: 'Order', status: 'skipped' },
+          { goalKey: 'respond', title: 'Respond', status: 'accepted' },
+          { goalKey: 'repair', title: 'Repair', status: 'accepted' },
+        ],
+      },
+    } satisfies SpokenMissionTurnResponse);
+  const skipPayload: SpokenMissionSkipResponse = {
+    duplicate: false,
+    nextTurn: secondTurn,
+    history: [
+      {
+        kind: 'assessment',
+        goalKey: 'order',
+        goalTitle: 'Order',
+        turnNumber: 1,
+        npcDialogue: firstTurn.npcDialogue,
+        assessment: {
+          transcript: 'さようなら',
+          outcome: 'retry',
+          confidence: 'high',
+          feedback: 'The response did not place an order.',
+        },
+        supportUsed: false,
+        writtenSupportRevealed: false,
+        assessedAt: '2026-07-17T09:00:00.000Z',
+      },
+      {
+        kind: 'skipped',
+        goalKey: 'order',
+        goalTitle: 'Order',
+        turnNumber: 1,
+        npcDialogue: firstTurn.npcDialogue,
+        supportUsed: false,
+        writtenSupportRevealed: false,
+        skippedAt: '2026-07-17T09:01:00.000Z',
+      },
+    ],
+    isComplete: false,
+    result: null,
+  };
+  let resolveSkip!: (value: SpokenMissionSkipResponse) => void;
+  mocks.requestSkip.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveSkip = resolve;
+      }),
+  );
+
+  await withStartedMission(async () => {
+    mocks.onRecordingReady?.({ audio: new Blob(['first']), mimeType: 'audio/webm' });
+    await settle();
+    expect(document.body.textContent).toContain('ラーメンを一つお願いします。');
+    expect(document.body.textContent).toContain('raamen o hitotsu onegaishimasu.');
+    expect(document.activeElement?.textContent).toContain('Try this goal again');
+
+    button('Skip goal').click();
+    await settle();
+    expect(document.body.textContent).toContain('Skipping goal…');
+    expect(document.body.textContent).not.toContain('Transcribing and assessing');
+    expect(mocks.requestSkip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: 'spokenmission-v3',
+        turnNumber: 1,
+        clientSkipId: expect.any(String),
+      }),
+    );
+    resolveSkip(skipPayload);
+    await settle();
+    expect(document.body.textContent).toContain('Goal 2 of 3');
+    expect(document.body.textContent).toContain('Skipped');
+    expect(document.activeElement?.textContent).toContain('Respond');
+
+    mocks.onRecordingReady?.({ audio: new Blob(['second']), mimeType: 'audio/webm' });
+    await settle();
+    button('Continue').click();
+    await settle();
+    expect(document.body.textContent).toContain('Goal 3 of 3');
+
+    mocks.onRecordingReady?.({ audio: new Blob(['third']), mimeType: 'audio/webm' });
+    await settle();
+    expect(document.body.textContent).toContain('Incomplete attempt');
+    expect(document.body.textContent).toContain('Your previous best evidence is unchanged.');
+    expect(document.activeElement?.textContent).toContain('Incomplete attempt');
+    expect(button('Try again')).toBeDefined();
   });
 });

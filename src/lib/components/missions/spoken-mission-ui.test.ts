@@ -18,6 +18,7 @@ import type {
 } from '$lib/types';
 
 const result: SpokenMissionResultData = {
+  kind: 'evidence',
   evidenceState: 'supported',
   canDo: 'I can complete the restaurant task.',
   goals: [
@@ -73,6 +74,7 @@ const result: SpokenMissionResultData = {
 
 const history: SpokenMissionHistoryEntry[] = [
   {
+    kind: 'assessment',
     goalKey: 'order',
     goalTitle: 'Order',
     turnNumber: 1,
@@ -303,7 +305,7 @@ describe('Spoken Mission learner-visible support UI', () => {
 
     expect(html).not.toContain(history[0].npcDialogue.japanese);
     expect(html).not.toContain(history[0].npcDialogue.romaji);
-    expect(html).toContain(history[0].assessment.transcript);
+    expect(html).toContain('ラーメンを一つお願いします。');
   });
 
   it('starts audio-first and reveals written and English support independently', () => {
@@ -337,6 +339,55 @@ describe('Spoken Mission learner-visible support UI', () => {
     expect(laterTurn).toContain(
       'English support was used earlier in this attempt. Completion will be Supported.',
     );
+  });
+
+  it('offers authored Japanese and romaji coaching plus Skip goal only after a semantic retry', () => {
+    const retry = renderTurn({
+      submissionState: 'feedback',
+      assessment: {
+        transcript: 'さようなら',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'The response did not place an order.',
+        retrySuggestion: {
+          japanese: 'ラーメンを一つお願いします。',
+          romaji: 'raamen o hitotsu onegaishimasu.',
+        },
+      },
+    });
+    expect(retry).toContain('ラーメンを一つお願いします。');
+    expect(retry).toContain('raamen o hitotsu onegaishimasu.');
+    expect(retry).not.toContain('Please order one ramen');
+    expect(retry).toContain('Record again');
+    expect(retry).toContain('Skip goal');
+    expect(retry).toMatch(/will not earn Independent or Supported\s+evidence/);
+
+    const skipping = renderTurn({
+      submissionState: 'feedback',
+      skipState: 'processing',
+      assessment: {
+        transcript: 'さようなら',
+        outcome: 'retry',
+        confidence: 'high',
+        feedback: 'The response did not place an order.',
+      },
+    });
+    expect(skipping).toContain('Skipping goal…');
+    expect(skipping).toContain('Saving the skip and preparing the next goal…');
+    expect(skipping).not.toContain('Transcribing and assessing');
+
+    const technicalRecovery = renderTurn({
+      submissionState: 'feedback',
+      assessment: {
+        transcript: null,
+        outcome: 'could_not_assess',
+        confidence: null,
+        feedback: 'No speech was detected.',
+        retrySuggestion: null,
+      },
+    });
+    expect(technicalRecovery).not.toContain('Skip goal');
+    expect(technicalRecovery).not.toContain('ラーメンを一つお願いします。');
   });
 
   it.each([
@@ -437,6 +488,27 @@ describe('Spoken Mission learner-visible support UI', () => {
       expect(html).toContain(goal.feedback);
     }
     expect(html).toContain('You repaired the misunderstanding.');
+  });
+
+  it('keeps incomplete results distinct from task evidence', () => {
+    const html = render(SpokenMissionResult, {
+      props: {
+        result: {
+          kind: 'incomplete',
+          canDo: 'I can manage a short order conversation in a restaurant.',
+          goals: [
+            { goalKey: 'order', title: 'Order', status: 'skipped' },
+            { goalKey: 'respond', title: 'Respond', status: 'accepted' },
+            { goalKey: 'repair', title: 'Repair', status: 'accepted' },
+          ],
+        },
+        onTryAgain: vi.fn(),
+      },
+    }).body;
+
+    expect(html).toContain('Incomplete attempt');
+    expect(html).toContain('awards no evidence');
+    expect(html).not.toContain('This is task evidence only');
   });
 
   it.each([
