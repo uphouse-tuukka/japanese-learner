@@ -1,7 +1,8 @@
-import type { InStatement } from '@libsql/client';
+import { createClient, type InStatement } from '@libsql/client';
 import { describe, expect, it } from 'vitest';
 import {
   PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+  SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY,
   SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
   USER_XP_MISSION_REASONS_MIGRATION_KEY,
   hasUserXpMissionReasons,
@@ -124,6 +125,11 @@ class FakeMigrationDb {
       if (sql.includes('ALTER TABLE portfolio_challenge_attempts ADD COLUMN')) {
         this.addPortfolioColumn(sql);
       }
+      if (sql.includes('INSERT INTO _migrations')) {
+        const key = firstArg(statement);
+        this.insertedMigrationKeys.push(String(key));
+        this.existingMigrationKeys.add(String(key));
+      }
     }
     return [];
   }
@@ -210,6 +216,7 @@ describe('runDatabaseMigrations', () => {
         USER_XP_MISSION_REASONS_MIGRATION_KEY,
         PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
         SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
+        SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY,
       ],
     });
 
@@ -276,5 +283,108 @@ describe('runDatabaseMigrations', () => {
       'ALTER TABLE user_spoken_missions ADD COLUMN current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1));',
     );
     expect(db.insertedMigrationKeys).toEqual(['spoken_mission_written_support']);
+  });
+});
+
+describe('Spoken Mission single in-progress attempt migration', () => {
+  const previousMigrationKeys = [
+    USER_XP_MISSION_REASONS_MIGRATION_KEY,
+    PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+    SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
+  ];
+
+  async function createMigrationDatabase() {
+    const db = createClient({ url: 'file::memory:' });
+    await db.execute(`CREATE TABLE _migrations (key TEXT PRIMARY KEY);`);
+    for (const key of previousMigrationKeys) {
+      await db.execute({ sql: `INSERT INTO _migrations (key) VALUES (?);`, args: [key] });
+    }
+    return db;
+  }
+
+  it('repairs duplicate active attempts before installing and recording the invariant', async () => {
+    const db = await createMigrationDatabase();
+    await db.batch([
+      `CREATE TABLE user_spoken_missions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        mission_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+      {
+        sql: `INSERT INTO user_spoken_missions VALUES (?, ?, ?, 'in_progress', ?);`,
+        args: ['older', 'user-1', 'mission-1', '2026-07-16T09:00:00.000Z'],
+      },
+      {
+        sql: `INSERT INTO user_spoken_missions VALUES (?, ?, ?, 'in_progress', ?);`,
+        args: ['newer', 'user-1', 'mission-1', '2026-07-17T09:00:00.000Z'],
+      },
+      {
+        sql: `INSERT INTO user_spoken_missions VALUES (?, ?, ?, 'in_progress', ?);`,
+        args: ['other-mission', 'user-1', 'mission-2', '2026-07-15T09:00:00.000Z'],
+      },
+    ]);
+
+    await runDatabaseMigrations(db);
+    await runDatabaseMigrations(db);
+
+    const attempts = await db.execute(`SELECT id, status FROM user_spoken_missions ORDER BY id;`);
+    expect(attempts.rows).toEqual([
+      expect.objectContaining({ id: 'newer', status: 'in_progress' }),
+      expect.objectContaining({ id: 'older', status: 'abandoned' }),
+      expect.objectContaining({ id: 'other-mission', status: 'in_progress' }),
+    ]);
+    const indexes = await db.execute({
+      sql: `SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?;`,
+      args: ['idx_user_spoken_missions_single_in_progress'],
+    });
+    expect(indexes.rows).toHaveLength(1);
+    const markers = await db.execute({
+      sql: `SELECT key FROM _migrations WHERE key = ?;`,
+      args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+    });
+    expect(markers.rows).toHaveLength(1);
+    await expect(
+      db.execute({
+        sql: `INSERT INTO user_spoken_missions VALUES (?, ?, ?, 'in_progress', ?);`,
+        args: ['duplicate', 'user-1', 'mission-1', '2026-07-18T09:00:00.000Z'],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('defers safely until the attempt table has every required column', async () => {
+    const db = await createMigrationDatabase();
+
+    await runDatabaseMigrations(db);
+    await db.execute(`CREATE TABLE user_spoken_missions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      mission_id TEXT NOT NULL,
+      status TEXT NOT NULL
+    );`);
+    await runDatabaseMigrations(db);
+
+    const markers = await db.execute({
+      sql: `SELECT key FROM _migrations WHERE key = ?;`,
+      args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+    });
+    expect(markers.rows).toHaveLength(0);
+    const indexes = await db.execute({
+      sql: `SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?;`,
+      args: ['idx_user_spoken_missions_single_in_progress'],
+    });
+    expect(indexes.rows).toHaveLength(0);
+
+    await db.execute(
+      `ALTER TABLE user_spoken_missions ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';`,
+    );
+    await runDatabaseMigrations(db);
+
+    const completedMarkers = await db.execute({
+      sql: `SELECT key FROM _migrations WHERE key = ?;`,
+      args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+    });
+    expect(completedMarkers.rows).toHaveLength(1);
   });
 });

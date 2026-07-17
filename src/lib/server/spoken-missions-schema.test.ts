@@ -1,11 +1,13 @@
 import { createClient } from '@libsql/client';
 import { describe, expect, it } from 'vitest';
+import { runDatabaseMigrations } from './db-migrations';
 import { getSchemaStatements } from './db-schema';
 
 describe('Spoken Mission database schema', () => {
   it('creates the dedicated attempt table and enforces its evidence constraints on a fresh database', async () => {
     const db = createClient({ url: 'file::memory:' });
     await db.batch(getSchemaStatements());
+    await runDatabaseMigrations(db);
 
     const table = await db.execute({
       sql: `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_spoken_missions'`,
@@ -84,6 +86,7 @@ describe('Spoken Mission database schema', () => {
     ]);
 
     await db.batch(getSchemaStatements());
+    await runDatabaseMigrations(db);
 
     const written = await db.execute({
       sql: `SELECT * FROM user_missions WHERE id = 'written-1'`,
@@ -127,11 +130,7 @@ describe('Spoken Mission database schema', () => {
 
   it('keeps only the newest active attempt when adding the invariant to existing storage', async () => {
     const db = createClient({ url: 'file::memory:' });
-    const previousSchema = getSchemaStatements().filter((statement) => {
-      const sql = typeof statement === 'string' ? statement : statement.sql;
-      return !sql.includes('active_position') && !sql.includes('single_in_progress');
-    });
-    await db.batch(previousSchema);
+    await db.batch(getSchemaStatements());
     await db.batch([
       {
         sql: `INSERT INTO user_spoken_missions (
@@ -159,7 +158,7 @@ describe('Spoken Mission database schema', () => {
       },
     ]);
 
-    await db.batch(getSchemaStatements());
+    await runDatabaseMigrations(db);
 
     const attempts = await db.execute({
       sql: `SELECT id, status FROM user_spoken_missions ORDER BY id`,

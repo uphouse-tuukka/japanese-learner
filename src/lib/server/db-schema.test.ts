@@ -52,6 +52,8 @@ describe('getSchemaStatements', () => {
     expect(schemaSql).toContain(
       'CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_resumable ON user_spoken_missions(user_id, mission_id, status, updated_at);',
     );
+    expect(schemaSql).not.toContain('active_position');
+    expect(schemaSql).not.toContain('idx_user_spoken_missions_single_in_progress');
   });
 
   it('keeps the current token, mission, and portfolio indexes represented', () => {

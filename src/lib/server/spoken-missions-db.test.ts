@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const dbHarness = vi.hoisted(() => ({
   client: null as Client | null,
-  runDatabaseMigrations: vi.fn(),
   seedMissions: vi.fn(),
 }));
 
@@ -14,10 +13,6 @@ vi.mock('./db-client', () => ({
   },
 }));
 
-vi.mock('./db-migrations', () => ({
-  runDatabaseMigrations: dbHarness.runDatabaseMigrations,
-}));
-
 vi.mock('./missions-seed', () => ({
   seedMissions: dbHarness.seedMissions,
 }));
@@ -25,7 +20,6 @@ vi.mock('./missions-seed', () => ({
 async function loadRepositories() {
   vi.resetModules();
   dbHarness.client = createClient({ url: 'file::memory:' });
-  dbHarness.runDatabaseMigrations.mockResolvedValue(undefined);
   dbHarness.seedMissions.mockResolvedValue(undefined);
   const db = await import('./db');
   const spoken = await import('./spoken-missions-db');
@@ -37,7 +31,6 @@ describe('Spoken Mission persistence', () => {
   afterEach(() => {
     vi.useRealTimers();
     dbHarness.client = null;
-    dbHarness.runDatabaseMigrations.mockReset();
     dbHarness.seedMissions.mockReset();
   });
 

@@ -5,7 +5,6 @@ const harness = vi.hoisted(() => ({
   client: null as Client | null,
   assess: vi.fn(),
   checkBudget: vi.fn(),
-  runDatabaseMigrations: vi.fn(),
   seedMissions: vi.fn(),
 }));
 
@@ -14,10 +13,6 @@ vi.mock('$lib/server/db-client', () => ({
     if (!harness.client) throw new Error('Test database client was not initialized.');
     return harness.client;
   },
-}));
-
-vi.mock('$lib/server/db-migrations', () => ({
-  runDatabaseMigrations: harness.runDatabaseMigrations,
 }));
 
 vi.mock('$lib/server/missions-seed', () => ({ seedMissions: harness.seedMissions }));
@@ -98,7 +93,6 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
   beforeEach(async () => {
     vi.resetModules();
     harness.client = createClient({ url: 'file::memory:' });
-    harness.runDatabaseMigrations.mockReset().mockResolvedValue(undefined);
     harness.seedMissions.mockReset().mockResolvedValue(undefined);
     harness.checkBudget.mockReset().mockResolvedValue({ allowed: true });
     harness.assess.mockReset();

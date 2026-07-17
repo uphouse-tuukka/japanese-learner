@@ -3,6 +3,7 @@ import type { InStatement } from '@libsql/client';
 export const USER_XP_MISSION_REASONS_MIGRATION_KEY = 'user_xp_mission_reasons';
 export const PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY = 'portfolio_v2_session_columns';
 export const SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY = 'spoken_mission_written_support';
+export const SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY = 'spoken_mission_single_in_progress';
 
 export type MigrationDatabase = {
   execute(statement: InStatement): Promise<{ rows: Array<unknown> }>;
@@ -31,6 +32,12 @@ const SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN: ColumnDefinition = {
   definition:
     'current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1))',
 };
+const SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS = [
+  'user_id',
+  'mission_id',
+  'status',
+  'updated_at',
+] as const;
 
 export function hasUserXpMissionReasons(userXpCreateSql: unknown): boolean {
   return (
@@ -170,6 +177,47 @@ async function runSpokenMissionWrittenSupportMigration(db: MigrationDatabase): P
   await recordMigrationKey(db, SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY);
 }
 
+async function runSpokenMissionSingleInProgressMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SPOKEN_MISSION_ATTEMPTS_TABLE);
+  if (
+    !SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS.every((columnName) =>
+      columnNames.has(columnName),
+    )
+  ) {
+    return;
+  }
+
+  await db.batch([
+    `UPDATE user_spoken_missions
+SET status = 'abandoned', updated_at = datetime('now')
+WHERE rowid IN (
+  SELECT rowid
+  FROM (
+    SELECT
+      rowid,
+      ROW_NUMBER() OVER (
+        PARTITION BY user_id, mission_id
+        ORDER BY datetime(updated_at) DESC, rowid DESC
+      ) AS active_position
+    FROM user_spoken_missions
+    WHERE status = 'in_progress'
+  )
+  WHERE active_position > 1
+);`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_spoken_missions_single_in_progress
+ON user_spoken_missions(user_id, mission_id)
+WHERE status = 'in_progress';`,
+    {
+      sql: `INSERT INTO _migrations (key) VALUES (?);`,
+      args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+    },
+  ]);
+}
+
 export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void> {
   await db.execute({
     sql: `CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);`,
@@ -209,5 +257,14 @@ export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void
 
   if (spokenMissionWrittenSupportMigration.rows.length === 0) {
     await runSpokenMissionWrittenSupportMigration(db);
+  }
+
+  const spokenMissionSingleInProgressMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
+  });
+
+  if (spokenMissionSingleInProgressMigration.rows.length === 0) {
+    await runSpokenMissionSingleInProgressMigration(db);
   }
 }
