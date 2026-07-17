@@ -91,6 +91,43 @@ describe('Spoken Mission persistence', () => {
     expect(activeAttempts.rows).toHaveLength(1);
   });
 
+  it('atomically replaces an incompatible winner for concurrent current-definition starts', async () => {
+    const spoken = await loadRepositories();
+    const incompatibleAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v1',
+      wordingVariant: 1,
+    });
+    const input = {
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    };
+
+    const results = await Promise.all([
+      spoken.getOrCreateSpokenMissionAttempt(input),
+      spoken.getOrCreateSpokenMissionAttempt(input),
+    ]);
+
+    expect(new Set(results.map(({ attempt }) => attempt.id))).toHaveLength(1);
+    expect(
+      results.every(({ attempt }) => attempt.definitionVersion === 'restaurant-order-v2'),
+    ).toBe(true);
+    await expect(spoken.getSpokenMissionAttempt(incompatibleAttempt.id)).resolves.toMatchObject({
+      status: 'abandoned',
+    });
+    const activeAttempts = await dbHarness.client!.execute({
+      sql: `SELECT id, definition_version FROM user_spoken_missions
+        WHERE user_id = ? AND mission_id = ? AND status = 'in_progress'`,
+      args: ['user-1', 'mission-order-restaurant'],
+    });
+    expect(activeAttempts.rows).toEqual([
+      expect.objectContaining({ definition_version: 'restaurant-order-v2' }),
+    ]);
+  });
+
   it('restores written support without changing English evidence eligibility and clears it on advance', async () => {
     const spoken = await loadRepositories();
     const attempt = await spoken.createSpokenMissionAttempt({

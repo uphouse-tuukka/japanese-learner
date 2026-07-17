@@ -171,18 +171,36 @@ export async function getOrCreateSpokenMissionAttempt(
   input: SpokenMissionAttemptCreationInput,
 ): Promise<{ attempt: SpokenMissionAttempt; created: boolean }> {
   const db = await getDb();
-  const id = `spokenmission-${randomUUID()}`;
-  const timestamp = new Date().toISOString();
-  const inserted = await db.execute(
-    buildSpokenMissionAttemptInsert(input, id, timestamp, undefined, true),
-  );
-  const attempt =
-    inserted.rowsAffected === 1
-      ? await getSpokenMissionAttempt(id)
-      : await getResumableSpokenMissionAttempt(input.userId, input.missionId);
+  for (let attemptNumber = 0; attemptNumber < 3; attemptNumber += 1) {
+    const id = `spokenmission-${randomUUID()}`;
+    const timestamp = new Date().toISOString();
+    const inserted = await db.execute(
+      buildSpokenMissionAttemptInsert(input, id, timestamp, undefined, true),
+    );
+    if (inserted.rowsAffected === 1) {
+      const created = await getSpokenMissionAttempt(id);
+      if (!created) throw new Error('[spoken-missions-db] failed to load created attempt');
+      return { attempt: created, created: true };
+    }
 
-  if (!attempt) throw new Error('[spoken-missions-db] failed to get or create attempt');
-  return { attempt, created: inserted.rowsAffected === 1 };
+    const existing = await getResumableSpokenMissionAttempt(input.userId, input.missionId);
+    if (!existing) continue;
+    if (existing.definitionVersion === input.definitionVersion) {
+      return { attempt: existing, created: false };
+    }
+
+    try {
+      const replacement = await restartSpokenMissionAttempt({
+        ...input,
+        attemptId: existing.id,
+      });
+      return { attempt: replacement, created: true };
+    } catch (error) {
+      if (!(error instanceof SpokenMissionProgressConflictError)) throw error;
+    }
+  }
+
+  throw new SpokenMissionProgressConflictError();
 }
 
 export class SpokenMissionProgressConflictError extends Error {

@@ -129,7 +129,14 @@ async function addColumnIfMissing(
     return;
   }
 
-  await db.execute(getAddColumnStatement(tableName, column));
+  try {
+    await db.execute(getAddColumnStatement(tableName, column));
+  } catch (error) {
+    const refreshedColumnNames = await getTableColumnNames(db, tableName);
+    if (!hasTableColumn(refreshedColumnNames, column.name)) {
+      throw error;
+    }
+  }
   columnNames.add(column.name);
 }
 
@@ -142,7 +149,7 @@ function hasAllColumns(
 
 async function recordMigrationKey(db: MigrationDatabase, key: string): Promise<void> {
   await db.execute({
-    sql: `INSERT INTO _migrations (key) VALUES (?);`,
+    sql: `INSERT INTO _migrations (key) VALUES (?) ON CONFLICT(key) DO NOTHING;`,
     args: [key],
   });
 }
@@ -212,7 +219,7 @@ WHERE rowid IN (
 ON user_spoken_missions(user_id, mission_id)
 WHERE status = 'in_progress';`,
     {
-      sql: `INSERT INTO _migrations (key) VALUES (?);`,
+      sql: `INSERT INTO _migrations (key) VALUES (?) ON CONFLICT(key) DO NOTHING;`,
       args: [SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY],
     },
   ]);

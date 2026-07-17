@@ -302,6 +302,53 @@ describe('Spoken Mission single in-progress attempt migration', () => {
     return db;
   }
 
+  it('allows concurrent cold-start runners to complete both Spoken Mission migrations', async () => {
+    const db = createClient({ url: 'file::memory:' });
+    await db.batch([
+      `CREATE TABLE _migrations (key TEXT PRIMARY KEY);`,
+      {
+        sql: `INSERT INTO _migrations (key) VALUES (?);`,
+        args: [USER_XP_MISSION_REASONS_MIGRATION_KEY],
+      },
+      {
+        sql: `INSERT INTO _migrations (key) VALUES (?);`,
+        args: [PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY],
+      },
+      `CREATE TABLE user_spoken_missions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        mission_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+    ]);
+
+    await Promise.all([runDatabaseMigrations(db), runDatabaseMigrations(db)]);
+
+    const columns = await db.execute(`PRAGMA table_info(user_spoken_missions);`);
+    expect(
+      columns.rows.filter((row) => row.name === 'current_turn_written_support_revealed'),
+    ).toHaveLength(1);
+    const indexes = await db.execute({
+      sql: `SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?;`,
+      args: ['idx_user_spoken_missions_single_in_progress'],
+    });
+    expect(indexes.rows).toHaveLength(1);
+    const markers = await db.execute({
+      sql: `SELECT key FROM _migrations
+        WHERE key IN (?, ?)
+        ORDER BY key;`,
+      args: [
+        SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY,
+        SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
+      ],
+    });
+    expect(markers.rows).toEqual([
+      expect.objectContaining({ key: SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY }),
+      expect.objectContaining({ key: SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY }),
+    ]);
+  });
+
   it('repairs duplicate active attempts before installing and recording the invariant', async () => {
     const db = await createMigrationDatabase();
     await db.batch([
