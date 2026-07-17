@@ -178,10 +178,13 @@
   ): boolean {
     return (
       generation === supportRequestGeneration &&
-      stage === 'active' &&
-      attemptId === requestAttemptId &&
+      ownsSupportAttempt(requestAttemptId) &&
       currentTurn?.turnNumber === turnNumber
     );
+  }
+
+  function ownsSupportAttempt(requestAttemptId: string): boolean {
+    return stage === 'active' && attemptId === requestAttemptId;
   }
 
   async function startMission(startOver: boolean): Promise<void> {
@@ -314,10 +317,11 @@
         turnNumber,
       });
 
+      if (!ownsSupportAttempt(requestAttemptId)) return;
+      englishSupportUsedDuringAttempt = payload.supportUsed;
       if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       revealedEnglishSupport = payload.englishSupport;
       englishSupportRevealed = true;
-      englishSupportUsedDuringAttempt = true;
     } catch (error) {
       if (!ownsSupportRequest(generation, requestAttemptId, turnNumber)) return;
       errorMessage = error instanceof Error ? error.message : 'Could not reveal English support.';

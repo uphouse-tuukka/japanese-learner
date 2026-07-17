@@ -371,3 +371,102 @@ it('ignores written support that resolves after the learner advances turns', asy
     await unmount(component);
   }
 });
+
+it('retains delayed English support use after the learner advances turns', async () => {
+  const firstTurn = {
+    turnNumber: 1,
+    goalKey: 'order' as const,
+    goalTitle: 'Order',
+    npcDialogue: {
+      japanese: 'ご注文はお決まりですか。',
+      romaji: 'go-chuumon wa okimari desu ka.',
+    },
+  };
+  const secondTurn = {
+    turnNumber: 2,
+    goalKey: 'respond' as const,
+    goalTitle: 'Respond',
+    npcDialogue: {
+      japanese: 'お飲み物はいかがですか。',
+      romaji: 'o-nomimono wa ikaga desu ka.',
+    },
+  };
+  mocks.requestStart.mockResolvedValue({
+    attemptId: 'spokenmission-v2',
+    definitionVersion: 'restaurant-order-v2',
+    supportPolicy: {
+      englishListeningSupport: 'optional',
+      evidenceWithoutEnglishSupport: 'independent',
+      evidenceWithEnglishSupport: 'supported',
+    },
+    briefing,
+    turn: firstTurn,
+    history: [],
+    totalTurns: 3,
+    resumed: false,
+    supportUsed: false,
+    currentTurnEnglishSupportRevealed: false,
+    currentTurnEnglishSupport: null,
+    currentTurnWrittenSupportRevealed: false,
+  });
+  mocks.requestTurn.mockResolvedValue({
+    assessment: {
+      transcript: 'ラーメンを一つお願いします。',
+      outcome: 'accepted',
+      confidence: 'high',
+      feedback: 'You ordered one ramen.',
+    },
+    nextTurn: secondTurn,
+    isComplete: false,
+    result: null,
+  });
+
+  type EnglishSupportResponse = {
+    englishSupport: string;
+    supportUsed: true;
+  };
+  let resolveEnglishSupport!: (value: EnglishSupportResponse) => void;
+  mocks.requestEnglishSupport.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveEnglishSupport = resolve;
+      }),
+  );
+
+  const component = mount(SpokenMission, {
+    target: document.body,
+    props: {
+      missionId: 'mission-order-restaurant',
+      userId: 'user-1',
+      briefing,
+      bestEvidence: 'untried',
+      resumable: null,
+      onChooseWritten: vi.fn(),
+    },
+  });
+
+  try {
+    button('Start Spoken Mission').click();
+    await settle();
+    button('Reveal English support').click();
+    await settle();
+    mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
+    await settle();
+    button('Continue').click();
+    await settle();
+
+    resolveEnglishSupport({
+      englishSupport: 'Are you ready to order?',
+      supportUsed: true,
+    });
+    await settle();
+
+    expect(document.body.textContent).toContain('Goal 2 of 3');
+    expect(document.body.textContent).toContain(
+      'English support was used earlier in this attempt. Completion will be Supported.',
+    );
+    expect(document.body.textContent).not.toContain('Are you ready to order?');
+  } finally {
+    await unmount(component);
+  }
+});
