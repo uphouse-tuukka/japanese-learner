@@ -14,7 +14,7 @@ import {
   toSpokenMissionHistory,
 } from '$lib/server/spoken-missions';
 import {
-  createSpokenMissionAttempt,
+  getOrCreateSpokenMissionAttempt,
   getMostRecentSpokenMissionVariant,
   getResumableSpokenMissionAttempt,
   restartSpokenMissionAttempt,
@@ -94,12 +94,13 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
         throw error;
       }
     } else {
-      attempt = await createSpokenMissionAttempt({
+      const freshAttempt = await getOrCreateSpokenMissionAttempt({
         userId,
         missionId: mission.id,
         definitionVersion: definition.version,
         wordingVariant,
       });
+      return json(serializeStartResponse(definition, freshAttempt.attempt, !freshAttempt.created));
     }
 
     return json(serializeStartResponse(definition, attempt, false));

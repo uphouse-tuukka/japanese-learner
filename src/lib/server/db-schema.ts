@@ -181,6 +181,25 @@ expires_at TEXT NOT NULL
     `CREATE INDEX IF NOT EXISTS idx_user_milestones_user_id ON user_milestones(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_user_missions_user ON user_missions(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_user_missions_mission ON user_missions(mission_id);`,
+    `UPDATE user_spoken_missions
+SET status = 'abandoned', updated_at = datetime('now')
+WHERE rowid IN (
+  SELECT rowid
+  FROM (
+    SELECT
+      rowid,
+      ROW_NUMBER() OVER (
+        PARTITION BY user_id, mission_id
+        ORDER BY datetime(updated_at) DESC, rowid DESC
+      ) AS active_position
+    FROM user_spoken_missions
+    WHERE status = 'in_progress'
+  )
+  WHERE active_position > 1
+);`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_spoken_missions_single_in_progress
+ON user_spoken_missions(user_id, mission_id)
+WHERE status = 'in_progress';`,
     `CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_user_mission ON user_spoken_missions(user_id, mission_id);`,
     `CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_resumable ON user_spoken_missions(user_id, mission_id, status, updated_at);`,
     `CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);`,

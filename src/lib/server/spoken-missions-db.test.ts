@@ -74,6 +74,30 @@ describe('Spoken Mission persistence', () => {
     ).resolves.toBeNull();
   });
 
+  it('atomically gets or creates one active attempt for concurrent fresh starts', async () => {
+    const spoken = await loadRepositories();
+    const input = {
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 0,
+    };
+
+    const results = await Promise.all([
+      spoken.getOrCreateSpokenMissionAttempt(input),
+      spoken.getOrCreateSpokenMissionAttempt(input),
+    ]);
+
+    expect(new Set(results.map(({ attempt }) => attempt.id))).toHaveLength(1);
+    expect(results.filter(({ created }) => created)).toHaveLength(1);
+    const activeAttempts = await dbHarness.client!.execute({
+      sql: `SELECT id FROM user_spoken_missions
+        WHERE user_id = ? AND mission_id = ? AND status = 'in_progress'`,
+      args: ['user-1', 'mission-order-restaurant'],
+    });
+    expect(activeAttempts.rows).toHaveLength(1);
+  });
+
   it('restores written support without changing English evidence eligibility and clears it on advance', async () => {
     const spoken = await loadRepositories();
     const attempt = await spoken.createSpokenMissionAttempt({
@@ -184,9 +208,9 @@ describe('Spoken Mission persistence', () => {
 
   it('atomically replaces only the exact current in-progress attempt', async () => {
     const spoken = await loadRepositories();
-    const olderAttempt = await spoken.createSpokenMissionAttempt({
+    const unrelatedAttempt = await spoken.createSpokenMissionAttempt({
       userId: 'user-1',
-      missionId: 'mission-order-restaurant',
+      missionId: 'mission-first-meeting',
       definitionVersion: 'restaurant-order-v1',
       wordingVariant: 0,
     });
@@ -211,7 +235,7 @@ describe('Spoken Mission persistence', () => {
     await expect(spoken.getSpokenMissionAttempt(currentAttempt.id)).resolves.toMatchObject({
       status: 'abandoned',
     });
-    await expect(spoken.getSpokenMissionAttempt(olderAttempt.id)).resolves.toMatchObject({
+    await expect(spoken.getSpokenMissionAttempt(unrelatedAttempt.id)).resolves.toMatchObject({
       status: 'in_progress',
     });
     expect(replacement).toMatchObject({

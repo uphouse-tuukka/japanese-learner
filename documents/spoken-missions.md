@@ -1,6 +1,6 @@
 # Spoken Missions
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-17
 
 Spoken Missions let a learner complete a server-authored Can-do by voice inside an existing Travel Mission scenario.
 They are additive to Written Missions and do not change Written Mission modes, completion, XP, badges, streaks, or resume storage.
@@ -64,6 +64,7 @@ Recoverable failures include a `recovery` value that tells the client whether it
 Spoken attempts are stored separately from Written Missions in `user_spoken_missions`.
 Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide English-support flag, current-goal English-support flag, current-goal written-support flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
 Attempt status is `in_progress`, `completed`, or `abandoned`.
+Storage enforces at most one in-progress attempt per learner and scenario, and a fresh start atomically returns the existing attempt if another request created it first.
 The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, support usage, client response id, and assessment time.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.

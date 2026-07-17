@@ -92,10 +92,11 @@ function buildSpokenMissionAttemptInsert(
   id: string,
   timestamp: string,
   restartGuard?: { attemptId: string; abandonedAt: string },
+  ignoreConflict = false,
 ): InStatement {
   return {
     sql: `
-INSERT INTO user_spoken_missions (
+INSERT ${ignoreConflict ? 'OR IGNORE ' : ''}INTO user_spoken_missions (
   id, user_id, mission_id, definition_version, status, current_turn, support_used,
   successful_turn_count, wording_variant, conversation_log, evidence_state,
   completed_at, created_at, updated_at
@@ -164,6 +165,24 @@ export async function createSpokenMissionAttempt(
   const created = await getSpokenMissionAttempt(id);
   if (!created) throw new Error('[spoken-missions-db] failed to load created attempt');
   return created;
+}
+
+export async function getOrCreateSpokenMissionAttempt(
+  input: SpokenMissionAttemptCreationInput,
+): Promise<{ attempt: SpokenMissionAttempt; created: boolean }> {
+  const db = await getDb();
+  const id = `spokenmission-${randomUUID()}`;
+  const timestamp = new Date().toISOString();
+  const inserted = await db.execute(
+    buildSpokenMissionAttemptInsert(input, id, timestamp, undefined, true),
+  );
+  const attempt =
+    inserted.rowsAffected === 1
+      ? await getSpokenMissionAttempt(id)
+      : await getResumableSpokenMissionAttempt(input.userId, input.missionId);
+
+  if (!attempt) throw new Error('[spoken-missions-db] failed to get or create attempt');
+  return { attempt, created: inserted.rowsAffected === 1 };
 }
 
 export class SpokenMissionProgressConflictError extends Error {

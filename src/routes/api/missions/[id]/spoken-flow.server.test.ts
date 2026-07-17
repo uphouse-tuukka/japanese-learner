@@ -116,6 +116,34 @@ describe('unlocked restaurant Spoken Mission route flow', () => {
     harness.client = null;
   });
 
+  it('returns one current attempt when simultaneous fresh starts race', async () => {
+    const startRoute = await import('./spoken/start/+server');
+
+    const responses = await Promise.all([
+      startRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: startRequest(),
+        cookies: cookies(),
+      } as never),
+      startRoute.POST({
+        params: { id: 'mission-order-restaurant' },
+        request: startRequest(),
+        cookies: cookies(),
+      } as never),
+    ]);
+    const starts = await Promise.all(responses.map((response) => response.json()));
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(new Set(starts.map((start) => start.attemptId))).toHaveLength(1);
+    expect(starts.filter((start) => start.resumed)).toHaveLength(1);
+    const activeAttempts = await harness.client!.execute({
+      sql: `SELECT id FROM user_spoken_missions
+        WHERE user_id = ? AND mission_id = ? AND status = 'in_progress'`,
+      args: ['user-1', 'mission-order-restaurant'],
+    });
+    expect(activeAttempts.rows).toHaveLength(1);
+  });
+
   it('completes Order, Respond, and Repair independently and persists evidence idempotently', async () => {
     harness.assess
       .mockResolvedValueOnce({

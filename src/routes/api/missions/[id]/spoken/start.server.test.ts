@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  create: vi.fn(),
   getCategorySessionCount: vi.fn(),
   getDefinition: vi.fn(),
   getMissionById: vi.fn(),
   getMostRecentVariant: vi.fn(),
+  getOrCreate: vi.fn(),
   getResumable: vi.fn(),
   getUser: vi.fn(),
   restart: vi.fn(),
@@ -25,8 +25,8 @@ vi.mock('$lib/server/spoken-missions-db', async (importOriginal) => {
   const original = await importOriginal<typeof import('$lib/server/spoken-missions-db')>();
   return {
     ...original,
-    createSpokenMissionAttempt: mocks.create,
     getMostRecentSpokenMissionVariant: mocks.getMostRecentVariant,
+    getOrCreateSpokenMissionAttempt: mocks.getOrCreate,
     getResumableSpokenMissionAttempt: mocks.getResumable,
     restartSpokenMissionAttempt: mocks.restart,
   };
@@ -143,7 +143,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     mocks.getResumable.mockResolvedValue(null);
     mocks.getMostRecentVariant.mockResolvedValue(null);
     mocks.selectVariant.mockReturnValue(0);
-    mocks.create.mockResolvedValue(attempt);
+    mocks.getOrCreate.mockResolvedValue({ attempt, created: true });
     mocks.restart.mockResolvedValue({ ...attempt, id: 'spokenmission-2' });
   });
 
@@ -186,7 +186,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     expect(payload.turn).not.toHaveProperty('englishSupport');
     expect(JSON.stringify(payload)).not.toContain('rubric');
     expect(JSON.stringify(payload)).not.toContain('alternatives');
-    expect(mocks.create).toHaveBeenCalledWith({
+    expect(mocks.getOrCreate).toHaveBeenCalledWith({
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v1',
@@ -250,7 +250,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     expect(JSON.stringify(payload)).not.toContain('private-response-id');
     expect(JSON.stringify(payload)).not.toContain('"audio":');
     expect(mocks.restart).not.toHaveBeenCalled();
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('abandons only the in-progress attempt when Start over is explicit', async () => {
@@ -266,7 +266,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       definitionVersion: 'restaurant-order-v1',
       wordingVariant: 0,
     });
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('replaces an incompatible saved attempt with the current definition automatically', async () => {
@@ -294,7 +294,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       definitionVersion: 'restaurant-order-v2',
       wordingVariant: 0,
     });
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('returns the single current replacement when incompatible starts race', async () => {
@@ -317,7 +317,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       resumed: true,
     });
     expect(mocks.getResumable).toHaveBeenCalledTimes(2);
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('rejects a selected-profile mismatch before reading or changing attempts', async () => {
@@ -328,7 +328,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     expect(mocks.getMissionById).not.toHaveBeenCalled();
     expect(mocks.getResumable).not.toHaveBeenCalled();
     expect(mocks.restart).not.toHaveBeenCalled();
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('returns a recoverable conflict when the resumable attempt changes during Start over', async () => {
@@ -341,19 +341,22 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Spoken Mission progress changed. Reload and try again.',
     });
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('uses the immediately previous attempt variant when selecting fresh wording', async () => {
     mocks.getMostRecentVariant.mockResolvedValue(0);
     mocks.selectVariant.mockReturnValue(1);
-    mocks.create.mockResolvedValue({ ...attempt, wordingVariant: 1 });
+    mocks.getOrCreate.mockResolvedValue({
+      attempt: { ...attempt, wordingVariant: 1 },
+      created: true,
+    });
 
     const response = await start({ userId: 'user-1' });
 
     expect(response.status).toBe(200);
     expect(mocks.selectVariant).toHaveBeenCalledWith(definition, 0);
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ wordingVariant: 1 }));
+    expect(mocks.getOrCreate).toHaveBeenCalledWith(expect.objectContaining({ wordingVariant: 1 }));
   });
 
   it('rejects locked access before loading or changing attempts', async () => {
@@ -364,7 +367,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     expect(response.status).toBe(403);
     expect(mocks.getResumable).not.toHaveBeenCalled();
     expect(mocks.restart).not.toHaveBeenCalled();
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('rejects scenarios without server-owned Spoken Mission configuration', async () => {
@@ -377,6 +380,6 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       ok: false,
       error: 'Spoken Mission is not available for this scenario.',
     });
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 });

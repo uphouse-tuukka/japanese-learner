@@ -26,6 +26,21 @@ describe('Spoken Mission database schema', () => {
         args: ['spoken-1', 'user-1', 'mission-1', 'v1', 'incorrect'],
       }),
     ).rejects.toThrow();
+
+    await db.execute({
+      sql: `INSERT INTO user_spoken_missions (
+        id, user_id, mission_id, definition_version
+      ) VALUES (?, ?, ?, ?)`,
+      args: ['spoken-active-1', 'user-1', 'mission-1', 'v1'],
+    });
+    await expect(
+      db.execute({
+        sql: `INSERT INTO user_spoken_missions (
+          id, user_id, mission_id, definition_version
+        ) VALUES (?, ?, ?, ?)`,
+        args: ['spoken-active-2', 'user-1', 'mission-1', 'v1'],
+      }),
+    ).rejects.toThrow();
   });
 
   it('adds Spoken Mission storage to an existing mission database without changing Written Mission rows', async () => {
@@ -94,6 +109,7 @@ describe('Spoken Mission database schema', () => {
     });
     expect(indexes.rows.map((row) => row.name)).toEqual([
       'idx_user_spoken_missions_resumable',
+      'idx_user_spoken_missions_single_in_progress',
       'idx_user_spoken_missions_user_mission',
       'sqlite_autoindex_user_spoken_missions_1',
     ]);
@@ -107,5 +123,50 @@ describe('Spoken Mission database schema', () => {
         args: ['invalid-completion', 'user-1', 'mission-order-restaurant', 'v1'],
       }),
     ).rejects.toThrow();
+  });
+
+  it('keeps only the newest active attempt when adding the invariant to existing storage', async () => {
+    const db = createClient({ url: 'file::memory:' });
+    const previousSchema = getSchemaStatements().filter((statement) => {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      return !sql.includes('active_position') && !sql.includes('single_in_progress');
+    });
+    await db.batch(previousSchema);
+    await db.batch([
+      {
+        sql: `INSERT INTO user_spoken_missions (
+          id, user_id, mission_id, definition_version, updated_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+        args: [
+          'spoken-old',
+          'user-1',
+          'mission-order-restaurant',
+          'restaurant-order-v1',
+          '2026-07-16T09:00:00.000Z',
+        ],
+      },
+      {
+        sql: `INSERT INTO user_spoken_missions (
+          id, user_id, mission_id, definition_version, updated_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+        args: [
+          'spoken-new',
+          'user-1',
+          'mission-order-restaurant',
+          'restaurant-order-v2',
+          '2026-07-17T09:00:00.000Z',
+        ],
+      },
+    ]);
+
+    await db.batch(getSchemaStatements());
+
+    const attempts = await db.execute({
+      sql: `SELECT id, status FROM user_spoken_missions ORDER BY id`,
+    });
+    expect(attempts.rows).toEqual([
+      expect.objectContaining({ id: 'spoken-new', status: 'in_progress' }),
+      expect.objectContaining({ id: 'spoken-old', status: 'abandoned' }),
+    ]);
   });
 });
