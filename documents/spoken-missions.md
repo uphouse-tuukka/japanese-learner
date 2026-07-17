@@ -18,6 +18,8 @@ Its briefing uses only the neutral Order, Respond, and Repair stage labels, whil
 Each goal advances only after an Accepted assessment, while Retry and Could not assess keep the learner on the same goal.
 Each restaurant-server turn is audio-first.
 Japanese and romaji stay hidden in the rendered interface until the learner reveals written text.
+The turn control reports loading, playing, stopped, and failure states and changes between Listen, Stop audio, Replay Japanese, and Retry audio as playback progresses.
+Sentence audio uses the shared server-first TTS boundary with browser speech fallback, and listening or revealing either support type never requests microphone permission.
 
 ## API contracts
 
@@ -28,7 +30,7 @@ They enforce the selected-user boundary, user and mission existence, the existin
 
 `POST /api/missions/[id]/spoken/start` accepts JSON with `userId` and optional boolean `startOver`.
 Without `startOver`, the endpoint resumes the newest matching in-progress attempt when one exists.
-If that attempt uses an older immutable definition, the endpoint atomically abandons it and returns a fresh current-definition attempt instead of a version-conflict dead end.
+If that attempt uses an immutable definition listed as safely superseded by the current definition, the endpoint atomically abandons it and returns a fresh current-definition attempt instead of a version-conflict dead end.
 With `startOver`, it atomically abandons the current in-progress attempt and creates a replacement without deleting completed evidence.
 The response contains the attempt id, server-owned definition version, structured listening-support policy, learner-safe briefing, current authored server turn, restored transcript and assessment history, separate current-turn written and English disclosure states, and total turn count.
 The briefing states that completing without English listening support records Independent evidence, while revealing that support records Supported evidence.
@@ -65,7 +67,8 @@ Spoken attempts are stored separately from Written Missions in `user_spoken_miss
 Each row records the attempt id, user id, existing mission id, definition version, status, current turn, attempt-wide English-support flag, current-goal English-support flag, current-goal written-support flag, successful-turn count, wording variant, structured conversation log, evidence state, completion time, and timestamps.
 Attempt status is `in_progress`, `completed`, or `abandoned`.
 Storage enforces at most one in-progress attempt per learner and scenario, and a fresh start atomically returns the existing attempt if another request created it first.
-The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, support usage, client response id, and assessment time.
+The startup migration abandons all but the newest legacy in-progress attempt for each learner and scenario before creating the unique partial index that enforces this invariant.
+The structured conversation log stores authored Japanese and romaji, learner transcript, outcome, confidence, learner-facing feedback, separate English- and written-support disclosure state, client response id, and assessment time.
 
 The mission detail loader exposes only the selected profile's newest resumable attempt metadata and best completed evidence.
 An incompatible in-progress attempt is exposed as an updated-definition fresh start rather than resumable progress.

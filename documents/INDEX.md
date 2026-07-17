@@ -81,9 +81,9 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `documents/spoken-missions.md`
 
 - Status: active
-- Description: Production guide for Spoken Mission product boundaries, API contracts, attempt persistence, evidence semantics, raw-audio privacy, and enabling another existing scenario.
-- Source files affected: `src/lib/server/spoken-missions.ts`, `src/lib/server/spoken-missions-db.ts`, `src/routes/api/missions/[id]/spoken/**`, `src/routes/missions/[id]/**`, `src/lib/components/missions/SpokenMission*.svelte`
-- Last verified: 2026-07-16
+- Description: Production guide for Spoken Mission product boundaries, audio-first turn behavior, support disclosures, API contracts, attempt persistence, evidence semantics, raw-audio privacy, and enabling another existing scenario.
+- Source files affected: `src/lib/server/spoken-missions.ts`, `src/lib/server/spoken-missions-db.ts`, `src/lib/server/spoken-mission-disclosure.ts`, `src/lib/server/db-schema.ts`, `src/lib/server/db-migrations.ts`, `src/routes/api/missions/[id]/spoken/**`, `src/routes/missions/[id]/**`, `src/lib/components/missions/SpokenMission*.svelte`, `src/lib/utils/audio.ts`, `src/lib/utils/tts.ts`
+- Last verified: 2026-07-17
 
 ### `documents/templates/plan-template.md`
 
