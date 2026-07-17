@@ -113,6 +113,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Source files affected: `src/routes/missions/[id]/**`, `src/lib/components/missions/**`, `src/lib/utils/audio-recorder.ts`, Spoken Mission APIs and persistence
 - Last verified: 2026-07-15
 
+### `documents/reviews/2026-07-17-revised-spoken-mission-browser-acceptance.md`
+
+- Status: active
+- Description: Final end-to-end acceptance for the audio-first restaurant Spoken Mission, including support disclosures, retry coaching, skip recovery, successful and incomplete results, accessibility, mobile layout, real microphone capture, privacy, and residual provider limitations.
+- Source files affected: `src/lib/components/missions/**`, `src/lib/server/spoken-missions*.ts`, `src/routes/api/missions/[id]/spoken/**`, `documents/spoken-missions.md`
+- Last verified: 2026-07-17
+
 ### `documents/design/exercise-ui-guidelines.md`
 
 - Status: active

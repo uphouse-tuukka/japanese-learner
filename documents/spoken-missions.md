@@ -115,6 +115,13 @@ Voice-assessment logs contain sanitized operational metadata only.
 They do not contain raw audio, complete learner content, secrets, full prompts, or complete provider payloads.
 Transcription and assessment reuse the existing per-user AI budget and token-accounting boundaries.
 
+## Final validation
+
+The complete revised restaurant journey is recorded in the [2026-07-17 browser acceptance review](reviews/2026-07-17-revised-spoken-mission-browser-acceptance.md).
+That pass used Google Chrome for Testing 147.0.7727.15 on desktop and at a 390 by 844 mobile viewport with the host ALC257 microphone, real MediaRecorder capture, audible Japanese Web Audio playback, permission-timing checks, and deterministic network-boundary assessment responses.
+The mounted learner-flow tests and focused route and persistence suites cover Independent, Supported, semantic Retry, Skip, Incomplete, resume, idempotency, disclosure restoration, and best-evidence behavior.
+The final pass had no live OpenAI credential, so provider TTS, transcription, and grading were not re-exercised; the [2026-07-15 browser acceptance review](reviews/2026-07-15-spoken-mission-browser-acceptance.md) remains the live-provider evidence for those underlying boundaries.
+
 ## Enabling another existing scenario
 
 Add a `SpokenMissionDefinition` in `src/lib/server/spoken-missions.ts` using the id of an existing mission from `src/lib/server/missions-seed.ts`.
