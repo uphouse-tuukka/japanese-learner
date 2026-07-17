@@ -1,5 +1,13 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, it, vi } from 'vitest';
+import type {
+  SpokenMissionBriefing,
+  SpokenMissionServerTurn,
+  SpokenMissionStartResponse,
+  SpokenMissionSupportResponse,
+  SpokenMissionTurnResponse,
+  SpokenMissionWrittenSupportResponse,
+} from '$lib/types';
 
 const mocks = vi.hoisted(() => ({
   recorderStart: vi.fn(),
@@ -42,7 +50,7 @@ vi.mock('$lib/utils/tts', () => ({
 
 import SpokenMission from './SpokenMission.svelte';
 
-const briefing = {
+const briefing: SpokenMissionBriefing = {
   canDo: 'I can manage a short order conversation in a restaurant.',
   situation: 'You are ordering at a busy ramen restaurant.',
   assessment: 'Communicative intent is assessed, not accent.',
@@ -51,10 +59,62 @@ const briefing = {
   approximateMinutes: 2,
   maxRecordingSeconds: 12,
   goals: [
-    { key: 'order' as const, title: 'Order' },
-    { key: 'respond' as const, title: 'Respond' },
-    { key: 'repair' as const, title: 'Repair' },
+    { key: 'order', title: 'Order' },
+    { key: 'respond', title: 'Respond' },
+    { key: 'repair', title: 'Repair' },
   ],
+};
+
+const firstTurn: SpokenMissionServerTurn = {
+  turnNumber: 1,
+  goalKey: 'order',
+  goalTitle: 'Order',
+  npcDialogue: {
+    japanese: 'ご注文はお決まりですか。',
+    romaji: 'go-chuumon wa okimari desu ka.',
+  },
+};
+
+const secondTurn: SpokenMissionServerTurn = {
+  turnNumber: 2,
+  goalKey: 'respond',
+  goalTitle: 'Respond',
+  npcDialogue: {
+    japanese: 'お飲み物はいかがですか。',
+    romaji: 'o-nomimono wa ikaga desu ka.',
+  },
+};
+
+const startPayload: SpokenMissionStartResponse = {
+  attemptId: 'spokenmission-v2',
+  definitionVersion: 'restaurant-order-v2',
+  supportPolicy: {
+    englishListeningSupport: 'optional',
+    evidenceWithoutEnglishSupport: 'independent',
+    evidenceWithEnglishSupport: 'supported',
+  },
+  briefing,
+  turn: firstTurn,
+  history: [],
+  totalTurns: 3,
+  resumed: false,
+  supportUsed: false,
+  currentTurnEnglishSupportRevealed: false,
+  currentTurnEnglishSupport: null,
+  currentTurnWrittenSupportRevealed: false,
+};
+
+const acceptedTurn: SpokenMissionTurnResponse = {
+  duplicate: false,
+  assessment: {
+    transcript: 'ラーメンを一つお願いします。',
+    outcome: 'accepted',
+    confidence: 'high',
+    feedback: 'You ordered one ramen.',
+  },
+  nextTurn: secondTurn,
+  isComplete: false,
+  result: null,
 };
 
 function button(label: string): HTMLButtonElement {
@@ -72,55 +132,8 @@ async function settle(): Promise<void> {
   await tick();
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  document.body.replaceChildren();
-  mocks.onRecordingReady = null;
-  vi.resetAllMocks();
-});
-
-it('keeps the restaurant turn audio-first until each support action is chosen', async () => {
-  mocks.requestStart.mockResolvedValue({
-    attemptId: 'spokenmission-v2',
-    definitionVersion: 'restaurant-order-v2',
-    supportPolicy: {
-      englishListeningSupport: 'optional',
-      evidenceWithoutEnglishSupport: 'independent',
-      evidenceWithEnglishSupport: 'supported',
-    },
-    briefing,
-    turn: {
-      turnNumber: 1,
-      goalKey: 'order',
-      goalTitle: 'Order',
-      npcDialogue: {
-        japanese: 'ご注文はお決まりですか。',
-        romaji: 'go-chuumon wa okimari desu ka.',
-      },
-    },
-    history: [],
-    totalTurns: 3,
-    resumed: false,
-    supportUsed: false,
-    currentTurnEnglishSupportRevealed: false,
-    currentTurnEnglishSupport: null,
-    currentTurnWrittenSupportRevealed: false,
-  });
-  mocks.speak.mockImplementation(async (_text, options) => {
-    options?.onPlaybackStart?.();
-  });
-  mocks.requestWrittenSupport.mockResolvedValue({
-    writtenText: {
-      japanese: 'ご注文はお決まりですか。',
-      romaji: 'go-chuumon wa okimari desu ka.',
-    },
-    writtenSupportRevealed: true,
-  });
-  mocks.requestEnglishSupport.mockResolvedValue({
-    englishSupport: 'Are you ready to order?',
-    supportUsed: true,
-  });
-
+async function withStartedMission(run: () => Promise<void>): Promise<void> {
+  mocks.requestStart.mockResolvedValue(startPayload);
   const component = mount(SpokenMission, {
     target: document.body,
     props: {
@@ -136,82 +149,59 @@ it('keeps the restaurant turn audio-first until each support action is chosen', 
   try {
     button('Start Spoken Mission').click();
     await settle();
+    await run();
+  } finally {
+    await unmount(component);
+  }
+}
 
-    expect(document.body.textContent).not.toContain('ご注文はお決まりですか。');
-    expect(document.body.textContent).not.toContain('go-chuumon wa okimari desu ka.');
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+  mocks.onRecordingReady = null;
+  vi.resetAllMocks();
+});
+
+it('keeps the restaurant turn audio-first until each support action is chosen', async () => {
+  mocks.speak.mockImplementation(async (_text, options) => {
+    options?.onPlaybackStart?.();
+  });
+  mocks.requestWrittenSupport.mockResolvedValue({
+    writtenText: firstTurn.npcDialogue,
+    writtenSupportRevealed: true,
+  } satisfies SpokenMissionWrittenSupportResponse);
+  mocks.requestEnglishSupport.mockResolvedValue({
+    englishSupport: 'Are you ready to order?',
+    supportUsed: true,
+  } satisfies SpokenMissionSupportResponse);
+
+  await withStartedMission(async () => {
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.japanese);
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.romaji);
 
     button('Listen').click();
     await settle();
     expect(mocks.speak).toHaveBeenCalledWith(
-      'ご注文はお決まりですか。',
+      firstTurn.npcDialogue.japanese,
       expect.objectContaining({ preferBrowser: false }),
     );
     expect(mocks.recorderStart).not.toHaveBeenCalled();
 
     button('Reveal written text').click();
     await settle();
-    expect(document.body.textContent).toContain('ご注文はお決まりですか。');
-    expect(document.body.textContent).toContain('go-chuumon wa okimari desu ka.');
+    expect(document.body.textContent).toContain(firstTurn.npcDialogue.japanese);
+    expect(document.body.textContent).toContain(firstTurn.npcDialogue.romaji);
     expect(document.body.textContent).not.toContain('Are you ready to order?');
 
     button('Reveal English support').click();
     await settle();
     expect(document.body.textContent).toContain('Are you ready to order?');
     expect(mocks.recorderStart).not.toHaveBeenCalled();
-  } finally {
-    await unmount(component);
-  }
+  });
 });
 
 it('cancels a loading server line when the learner advances turns', async () => {
-  const firstTurn = {
-    turnNumber: 1,
-    goalKey: 'order' as const,
-    goalTitle: 'Order',
-    npcDialogue: {
-      japanese: 'ご注文はお決まりですか。',
-      romaji: 'go-chuumon wa okimari desu ka.',
-    },
-  };
-  const secondTurn = {
-    turnNumber: 2,
-    goalKey: 'respond' as const,
-    goalTitle: 'Respond',
-    npcDialogue: {
-      japanese: 'お飲み物はいかがですか。',
-      romaji: 'o-nomimono wa ikaga desu ka.',
-    },
-  };
-  mocks.requestStart.mockResolvedValue({
-    attemptId: 'spokenmission-v2',
-    definitionVersion: 'restaurant-order-v2',
-    supportPolicy: {
-      englishListeningSupport: 'optional',
-      evidenceWithoutEnglishSupport: 'independent',
-      evidenceWithEnglishSupport: 'supported',
-    },
-    briefing,
-    turn: firstTurn,
-    history: [],
-    totalTurns: 3,
-    resumed: false,
-    supportUsed: false,
-    currentTurnEnglishSupportRevealed: false,
-    currentTurnEnglishSupport: null,
-    currentTurnWrittenSupportRevealed: false,
-  });
-  const acceptedTurn = {
-    assessment: {
-      transcript: 'ラーメンを一つお願いします。',
-      outcome: 'accepted',
-      confidence: 'high',
-      feedback: 'You ordered one ramen.',
-    },
-    nextTurn: secondTurn,
-    isComplete: false,
-    result: null,
-  } as const;
-  let resolveTurn!: (value: typeof acceptedTurn) => void;
+  let resolveTurn!: (value: SpokenMissionTurnResponse) => void;
   mocks.requestTurn.mockImplementation(
     () =>
       new Promise((resolve) => {
@@ -230,21 +220,7 @@ it('cancels a loading server line when the learner advances turns', async () => 
       }),
   );
 
-  const component = mount(SpokenMission, {
-    target: document.body,
-    props: {
-      missionId: 'mission-order-restaurant',
-      userId: 'user-1',
-      briefing,
-      bestEvidence: 'untried',
-      resumable: null,
-      onChooseWritten: vi.fn(),
-    },
-  });
-
-  try {
-    button('Start Spoken Mission').click();
-    await settle();
+  await withStartedMission(async () => {
     button('Listen').click();
     await settle();
 
@@ -269,66 +245,14 @@ it('cancels a loading server line when the learner advances turns', async () => 
     expect(playbackSignal?.aborted).toBe(true);
     expect(button('Listen').disabled).toBe(false);
     expect(document.body.textContent).not.toContain('Japanese audio is playing.');
-  } finally {
-    await unmount(component);
-  }
+  });
 });
 
 it('ignores written support that resolves after the learner advances turns', async () => {
-  const firstTurn = {
-    turnNumber: 1,
-    goalKey: 'order' as const,
-    goalTitle: 'Order',
-    npcDialogue: {
-      japanese: 'ご注文はお決まりですか。',
-      romaji: 'go-chuumon wa okimari desu ka.',
-    },
-  };
-  const secondTurn = {
-    turnNumber: 2,
-    goalKey: 'respond' as const,
-    goalTitle: 'Respond',
-    npcDialogue: {
-      japanese: 'お飲み物はいかがですか。',
-      romaji: 'o-nomimono wa ikaga desu ka.',
-    },
-  };
-  mocks.requestStart.mockResolvedValue({
-    attemptId: 'spokenmission-v2',
-    definitionVersion: 'restaurant-order-v2',
-    supportPolicy: {
-      englishListeningSupport: 'optional',
-      evidenceWithoutEnglishSupport: 'independent',
-      evidenceWithEnglishSupport: 'supported',
-    },
-    briefing,
-    turn: firstTurn,
-    history: [],
-    totalTurns: 3,
-    resumed: false,
-    supportUsed: false,
-    currentTurnEnglishSupportRevealed: false,
-    currentTurnEnglishSupport: null,
-    currentTurnWrittenSupportRevealed: false,
-  });
-  mocks.requestTurn.mockResolvedValue({
-    assessment: {
-      transcript: 'ラーメンを一つお願いします。',
-      outcome: 'accepted',
-      confidence: 'high',
-      feedback: 'You ordered one ramen.',
-    },
-    nextTurn: secondTurn,
-    isComplete: false,
-    result: null,
-  });
+  mocks.requestTurn.mockResolvedValue(acceptedTurn);
 
-  type WrittenSupportResponse = {
-    writtenText: { japanese: string; romaji: string };
-    writtenSupportRevealed: true;
-  };
-  let resolveFirstWrittenSupport!: (value: WrittenSupportResponse) => void;
-  let resolveSecondWrittenSupport!: (value: WrittenSupportResponse) => void;
+  let resolveFirstWrittenSupport!: (value: SpokenMissionWrittenSupportResponse) => void;
+  let resolveSecondWrittenSupport!: (value: SpokenMissionWrittenSupportResponse) => void;
   mocks.requestWrittenSupport
     .mockImplementationOnce(
       () =>
@@ -343,21 +267,7 @@ it('ignores written support that resolves after the learner advances turns', asy
         }),
     );
 
-  const component = mount(SpokenMission, {
-    target: document.body,
-    props: {
-      missionId: 'mission-order-restaurant',
-      userId: 'user-1',
-      briefing,
-      bestEvidence: 'untried',
-      resumable: null,
-      onChooseWritten: vi.fn(),
-    },
-  });
-
-  try {
-    button('Start Spoken Mission').click();
-    await settle();
+  await withStartedMission(async () => {
     button('Reveal written text').click();
     await settle();
     mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
@@ -386,65 +296,13 @@ it('ignores written support that resolves after the learner advances turns', asy
 
     expect(document.body.textContent).toContain(secondTurn.npcDialogue.japanese);
     expect(document.body.textContent).toContain(secondTurn.npcDialogue.romaji);
-  } finally {
-    await unmount(component);
-  }
+  });
 });
 
 it('retains delayed English support use after the learner advances turns', async () => {
-  const firstTurn = {
-    turnNumber: 1,
-    goalKey: 'order' as const,
-    goalTitle: 'Order',
-    npcDialogue: {
-      japanese: 'ご注文はお決まりですか。',
-      romaji: 'go-chuumon wa okimari desu ka.',
-    },
-  };
-  const secondTurn = {
-    turnNumber: 2,
-    goalKey: 'respond' as const,
-    goalTitle: 'Respond',
-    npcDialogue: {
-      japanese: 'お飲み物はいかがですか。',
-      romaji: 'o-nomimono wa ikaga desu ka.',
-    },
-  };
-  mocks.requestStart.mockResolvedValue({
-    attemptId: 'spokenmission-v2',
-    definitionVersion: 'restaurant-order-v2',
-    supportPolicy: {
-      englishListeningSupport: 'optional',
-      evidenceWithoutEnglishSupport: 'independent',
-      evidenceWithEnglishSupport: 'supported',
-    },
-    briefing,
-    turn: firstTurn,
-    history: [],
-    totalTurns: 3,
-    resumed: false,
-    supportUsed: false,
-    currentTurnEnglishSupportRevealed: false,
-    currentTurnEnglishSupport: null,
-    currentTurnWrittenSupportRevealed: false,
-  });
-  mocks.requestTurn.mockResolvedValue({
-    assessment: {
-      transcript: 'ラーメンを一つお願いします。',
-      outcome: 'accepted',
-      confidence: 'high',
-      feedback: 'You ordered one ramen.',
-    },
-    nextTurn: secondTurn,
-    isComplete: false,
-    result: null,
-  });
+  mocks.requestTurn.mockResolvedValue(acceptedTurn);
 
-  type EnglishSupportResponse = {
-    englishSupport: string;
-    supportUsed: true;
-  };
-  let resolveEnglishSupport!: (value: EnglishSupportResponse) => void;
+  let resolveEnglishSupport!: (value: SpokenMissionSupportResponse) => void;
   mocks.requestEnglishSupport.mockImplementation(
     () =>
       new Promise((resolve) => {
@@ -452,21 +310,7 @@ it('retains delayed English support use after the learner advances turns', async
       }),
   );
 
-  const component = mount(SpokenMission, {
-    target: document.body,
-    props: {
-      missionId: 'mission-order-restaurant',
-      userId: 'user-1',
-      briefing,
-      bestEvidence: 'untried',
-      resumable: null,
-      onChooseWritten: vi.fn(),
-    },
-  });
-
-  try {
-    button('Start Spoken Mission').click();
-    await settle();
+  await withStartedMission(async () => {
     button('Reveal English support').click();
     await settle();
     mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
@@ -485,7 +329,5 @@ it('retains delayed English support use after the learner advances turns', async
       'English support was used earlier in this attempt. Completion will be Supported.',
     );
     expect(document.body.textContent).not.toContain('Are you ready to order?');
-  } finally {
-    await unmount(component);
-  }
+  });
 });

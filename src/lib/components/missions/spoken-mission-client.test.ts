@@ -231,4 +231,37 @@ describe('Spoken Mission browser support boundaries', () => {
       expect.any(Object),
     );
   });
+
+  it('uses the English support fallback when the request cannot reach the server', async () => {
+    await expect(
+      requestSpokenMissionEnglishSupport({
+        ...input,
+        fetcher: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      }),
+    ).rejects.toThrow('Could not reveal English support.');
+  });
+
+  it('uses the written support fallback when the response is not JSON', async () => {
+    await expect(
+      requestSpokenMissionWrittenSupport({
+        ...input,
+        fetcher: vi
+          .fn()
+          .mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 })),
+      }),
+    ).rejects.toThrow('Could not reveal written text.');
+  });
+
+  it('preserves a structured support API error', async () => {
+    await expect(
+      requestSpokenMissionEnglishSupport({
+        ...input,
+        fetcher: vi
+          .fn()
+          .mockResolvedValue(
+            Response.json({ error: 'Attempt is no longer active.' }, { status: 409 }),
+          ),
+      }),
+    ).rejects.toThrow('Attempt is no longer active.');
+  });
 });

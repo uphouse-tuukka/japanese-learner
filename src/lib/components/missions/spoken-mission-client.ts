@@ -43,9 +43,10 @@ async function requestSpokenMissionSupport<T>(
   isValid: (payload: Partial<T>) => payload is T,
   fallbackError: string,
 ): Promise<T> {
-  const response = await (input.fetcher ?? fetch)(
-    `/api/missions/${input.missionId}/spoken/${path}`,
-    {
+  let response: Response;
+  let payload: Partial<T> & { error?: string };
+  try {
+    response = await (input.fetcher ?? fetch)(`/api/missions/${input.missionId}/spoken/${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -53,9 +54,11 @@ async function requestSpokenMissionSupport<T>(
         attemptId: input.attemptId,
         turnNumber: input.turnNumber,
       }),
-    },
-  );
-  const payload = (await response.json()) as Partial<T> & { error?: string };
+    });
+    payload = (await response.json()) as Partial<T> & { error?: string };
+  } catch {
+    throw new Error(fallbackError);
+  }
   if (!response.ok || !isValid(payload)) {
     throw new Error(payload.error ?? fallbackError);
   }
