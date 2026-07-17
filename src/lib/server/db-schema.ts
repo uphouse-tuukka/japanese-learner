@@ -127,7 +127,7 @@ id TEXT PRIMARY KEY,
 user_id TEXT NOT NULL,
 mission_id TEXT NOT NULL,
 definition_version TEXT NOT NULL,
-status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'abandoned')) DEFAULT 'in_progress',
+status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'incomplete', 'abandoned')) DEFAULT 'in_progress',
 current_turn INTEGER NOT NULL DEFAULT 1 CHECK(current_turn BETWEEN 1 AND 3),
 support_used INTEGER NOT NULL DEFAULT 0 CHECK(support_used IN (0, 1)),
 current_turn_support_used INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_support_used IN (0, 1)),
@@ -142,7 +142,9 @@ updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 CHECK(
   (status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3)
   OR
-  (status != 'completed' AND evidence_state IS NULL AND completed_at IS NULL)
+  (status = 'incomplete' AND evidence_state IS NULL AND completed_at IS NOT NULL)
+  OR
+  (status IN ('in_progress', 'abandoned') AND evidence_state IS NULL AND completed_at IS NULL)
 )
 );`,
     `CREATE TABLE IF NOT EXISTS user_badges (

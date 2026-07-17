@@ -255,6 +255,55 @@ describe('POST /api/missions/[id]/spoken/start', () => {
     expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
+  it('restores the next turn plus retried and skipped history after an intermediate skip', async () => {
+    mocks.getResumable.mockResolvedValue({
+      ...attempt,
+      currentTurn: 2,
+      conversationLog: [
+        {
+          goalKey: 'order',
+          turnNumber: 1,
+          npcJapanese: 'ご注文は？',
+          npcRomaji: 'go-chuumon wa?',
+          transcript: 'さようなら',
+          outcome: 'retry',
+          confidence: 'high',
+          feedback: 'The response did not place an order.',
+          supportUsed: false,
+          writtenSupportRevealed: false,
+          clientResponseId: 'retry-before-skip',
+          assessedAt: '2026-07-17T09:00:00.000Z',
+        },
+        {
+          kind: 'skipped',
+          goalKey: 'order',
+          turnNumber: 1,
+          npcJapanese: 'ご注文は？',
+          npcRomaji: 'go-chuumon wa?',
+          supportUsed: false,
+          writtenSupportRevealed: false,
+          clientSkipId: 'private-skip-id',
+          skippedAt: '2026-07-17T09:01:00.000Z',
+        },
+      ],
+    });
+
+    const response = await start({ userId: 'user-1' });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toMatchObject({
+      resumed: true,
+      turn: { turnNumber: 2, goalKey: 'respond' },
+      history: [
+        { kind: 'assessment', assessment: { outcome: 'retry' } },
+        { kind: 'skipped', goalKey: 'order', turnNumber: 1 },
+      ],
+    });
+    expect(JSON.stringify(payload)).not.toContain('private-skip-id');
+    expect(JSON.stringify(payload)).not.toContain('retry-before-skip');
+  });
+
   it('abandons only the in-progress attempt when Start over is explicit', async () => {
     mocks.getResumable.mockResolvedValue(attempt);
 

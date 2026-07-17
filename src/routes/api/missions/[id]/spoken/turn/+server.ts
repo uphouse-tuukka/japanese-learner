@@ -20,6 +20,7 @@ import {
 } from '$lib/server/voice-assessment';
 import type {
   SpokenMissionAttempt,
+  SpokenMissionSkippedGoalEvent,
   SpokenMissionTurnEvidence,
   SpokenMissionTurnResponse,
 } from '$lib/types';
@@ -88,9 +89,10 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
     const { attempt, definition, mission } = access;
 
     const duplicate = attempt.conversationLog.find(
-      (entry) => entry.clientResponseId === clientResponseId,
+      (entry): entry is SpokenMissionTurnEvidence =>
+        !isSkippedGoalEvent(entry) && entry.clientResponseId === clientResponseId,
     );
-    if (attempt.status === 'completed') {
+    if (attempt.status === 'completed' || attempt.status === 'incomplete') {
       return duplicate
         ? json(serializeTurnResponse(definition, attempt, duplicate, true))
         : jsonError('Spoken Mission attempt is not in progress.', 400);
@@ -186,8 +188,9 @@ function serializeTurnResponse(
   evidence: SpokenMissionTurnEvidence,
   duplicate: boolean,
 ): SpokenMissionTurnResponse {
-  const completed = attempt.status === 'completed';
+  const terminal = attempt.status === 'completed' || attempt.status === 'incomplete';
   const advanced = evidence.outcome === 'accepted';
+  const goal = definition.goals[evidence.turnNumber - 1];
   return {
     duplicate,
     assessment: {
@@ -195,12 +198,19 @@ function serializeTurnResponse(
       transcript: evidence.transcript,
       confidence: evidence.confidence,
       feedback: evidence.feedback,
+      retrySuggestion: evidence.outcome === 'retry' ? (goal?.retrySuggestion ?? null) : null,
     },
     nextTurn:
-      !completed && advanced
+      !terminal && advanced
         ? getSpokenMissionServerTurn(definition, attempt.wordingVariant, attempt.currentTurn)
         : null,
-    isComplete: completed,
+    isComplete: terminal,
     result: toSpokenMissionResult(definition, attempt),
   };
+}
+
+function isSkippedGoalEvent(
+  entry: SpokenMissionAttempt['conversationLog'][number],
+): entry is SpokenMissionSkippedGoalEvent {
+  return 'kind' in entry && entry.kind === 'skipped';
 }

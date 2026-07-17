@@ -4,7 +4,10 @@ import { getDb } from './db';
 import type {
   SpokenMissionAttempt,
   SpokenMissionAttemptStatus,
+  SpokenMissionConversationEntry,
   SpokenMissionEvidenceState,
+  SpokenMissionGoalKey,
+  SpokenMissionSkippedGoalEvent,
   SpokenMissionTurnEvidence,
 } from '$lib/types';
 
@@ -28,14 +31,26 @@ function asTimestamp(value: unknown): string {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
-function parseConversationLog(value: unknown): SpokenMissionTurnEvidence[] {
+function parseConversationLog(value: unknown): SpokenMissionConversationEntry[] {
   if (typeof value !== 'string') return [];
   try {
     const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? (parsed as SpokenMissionTurnEvidence[]) : [];
+    return Array.isArray(parsed) ? (parsed as SpokenMissionConversationEntry[]) : [];
   } catch {
     return [];
   }
+}
+
+function isSkippedGoalEvent(
+  entry: SpokenMissionConversationEntry,
+): entry is SpokenMissionSkippedGoalEvent {
+  return 'kind' in entry && entry.kind === 'skipped';
+}
+
+function isAssessmentEvidence(
+  entry: SpokenMissionConversationEntry,
+): entry is SpokenMissionTurnEvidence {
+  return !isSkippedGoalEvent(entry);
 }
 
 function mapSpokenMissionAttempt(row: Record<string, unknown>): SpokenMissionAttempt {
@@ -325,7 +340,8 @@ export async function recordSpokenMissionAssessment(input: {
   if (!existing) throw new SpokenMissionProgressConflictError();
 
   const duplicate = existing.conversationLog.find(
-    (entry) => entry.clientResponseId === input.evidence.clientResponseId,
+    (entry): entry is SpokenMissionTurnEvidence =>
+      isAssessmentEvidence(entry) && entry.clientResponseId === input.evidence.clientResponseId,
   );
   if (duplicate) {
     return { status: 'duplicate', attempt: existing, evidence: duplicate };
@@ -349,10 +365,14 @@ export async function recordSpokenMissionAssessment(input: {
       existing.currentTurnWrittenSupportRevealed || input.evidence.writtenSupportRevealed === true,
   };
   const successfulTurnCount = existing.successfulTurnCount + (accepted ? 1 : 0);
-  const completed = accepted && successfulTurnCount === 3;
+  const finished = accepted && existing.currentTurn === 3;
+  const hasSkippedGoal = existing.conversationLog.some(isSkippedGoalEvent);
+  const completed = finished && !hasSkippedGoal && successfulTurnCount === 3;
+  const incomplete = finished && hasSkippedGoal;
+  const terminal = completed || incomplete;
   const timestamp = new Date().toISOString();
   const conversationLog = [...existing.conversationLog, storedEvidence];
-  const currentTurn = completed
+  const currentTurn = terminal
     ? 3
     : accepted
       ? Math.min(3, existing.currentTurn + 1)
@@ -399,7 +419,7 @@ WHERE id = ?
   )
 `,
     args: [
-      completed ? 'completed' : 'in_progress',
+      completed ? 'completed' : incomplete ? 'incomplete' : 'in_progress',
       currentTurn,
       storedEvidence.supportUsed ? 1 : 0,
       accepted ? 1 : 0,
@@ -409,7 +429,7 @@ WHERE id = ?
       JSON.stringify(conversationLog),
       completed ? 1 : 0,
       storedEvidence.supportUsed ? 1 : 0,
-      completed ? timestamp : null,
+      terminal ? timestamp : null,
       timestamp,
       input.attemptId,
       input.userId,
@@ -425,7 +445,8 @@ WHERE id = ?
   if (result.rowsAffected === 0) {
     const latest = await getSpokenMissionAttempt(input.attemptId);
     const concurrentDuplicate = latest?.conversationLog.find(
-      (entry) => entry.clientResponseId === input.evidence.clientResponseId,
+      (entry): entry is SpokenMissionTurnEvidence =>
+        isAssessmentEvidence(entry) && entry.clientResponseId === input.evidence.clientResponseId,
     );
     if (latest && concurrentDuplicate) {
       return { status: 'duplicate', attempt: latest, evidence: concurrentDuplicate };
@@ -448,6 +469,140 @@ WHERE id = ?
   const updated = await getSpokenMissionAttempt(input.attemptId);
   if (!updated) throw new SpokenMissionProgressConflictError();
   return { status: 'recorded', attempt: updated, evidence: storedEvidence };
+}
+
+export type SkipSpokenMissionGoalResult = {
+  status: 'recorded' | 'duplicate';
+  attempt: SpokenMissionAttempt;
+  event: SpokenMissionSkippedGoalEvent;
+};
+
+export async function skipSpokenMissionGoal(input: {
+  attemptId: string;
+  userId: string;
+  missionId: string;
+  definitionVersion: string;
+  turnNumber: number;
+  goalKey: SpokenMissionGoalKey;
+  npcJapanese: string;
+  npcRomaji: string;
+  clientSkipId: string;
+}): Promise<SkipSpokenMissionGoalResult> {
+  const existing = await getSpokenMissionAttempt(input.attemptId);
+  if (!existing) throw new SpokenMissionProgressConflictError();
+
+  const duplicate = existing.conversationLog.find(
+    (entry): entry is SpokenMissionSkippedGoalEvent =>
+      isSkippedGoalEvent(entry) && entry.clientSkipId === input.clientSkipId,
+  );
+  if (duplicate) {
+    return { status: 'duplicate', attempt: existing, event: duplicate };
+  }
+
+  if (
+    existing.userId !== input.userId ||
+    existing.missionId !== input.missionId ||
+    existing.definitionVersion !== input.definitionVersion ||
+    existing.status !== 'in_progress' ||
+    existing.currentTurn !== input.turnNumber
+  ) {
+    throw new SpokenMissionProgressConflictError();
+  }
+
+  const latestAssessment = existing.conversationLog.findLast(
+    (entry): entry is SpokenMissionTurnEvidence =>
+      isAssessmentEvidence(entry) &&
+      entry.turnNumber === input.turnNumber &&
+      entry.goalKey === input.goalKey,
+  );
+  if (!latestAssessment || latestAssessment.outcome !== 'retry') {
+    throw new SpokenMissionProgressConflictError();
+  }
+
+  const timestamp = new Date().toISOString();
+  const event: SpokenMissionSkippedGoalEvent = {
+    kind: 'skipped',
+    goalKey: input.goalKey,
+    turnNumber: input.turnNumber,
+    npcJapanese: input.npcJapanese,
+    npcRomaji: input.npcRomaji,
+    supportUsed: existing.currentTurnSupportUsed,
+    writtenSupportRevealed: existing.currentTurnWrittenSupportRevealed,
+    clientSkipId: input.clientSkipId,
+    skippedAt: timestamp,
+  };
+  const terminal = input.turnNumber === 3;
+  const conversationLog = [...existing.conversationLog, event];
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+UPDATE user_spoken_missions
+SET
+  status = ?,
+  current_turn = ?,
+  current_turn_support_used = 0,
+  current_turn_written_support_revealed = 0,
+  conversation_log = ?,
+  completed_at = ?,
+  updated_at = ?
+WHERE id = ?
+  AND user_id = ?
+  AND mission_id = ?
+  AND definition_version = ?
+  AND status = 'in_progress'
+  AND current_turn = ?
+  AND current_turn_support_used = ?
+  AND current_turn_written_support_revealed = ?
+  AND NOT EXISTS (
+    SELECT 1
+    FROM json_each(user_spoken_missions.conversation_log)
+    WHERE json_extract(value, '$.clientSkipId') = ?
+  )
+`,
+    args: [
+      terminal ? 'incomplete' : 'in_progress',
+      terminal ? 3 : input.turnNumber + 1,
+      JSON.stringify(conversationLog),
+      terminal ? timestamp : null,
+      timestamp,
+      input.attemptId,
+      input.userId,
+      input.missionId,
+      input.definitionVersion,
+      input.turnNumber,
+      existing.currentTurnSupportUsed ? 1 : 0,
+      existing.currentTurnWrittenSupportRevealed ? 1 : 0,
+      input.clientSkipId,
+    ],
+  });
+
+  if (result.rowsAffected === 0) {
+    const latest = await getSpokenMissionAttempt(input.attemptId);
+    const concurrentDuplicate = latest?.conversationLog.find(
+      (entry): entry is SpokenMissionSkippedGoalEvent =>
+        isSkippedGoalEvent(entry) && entry.clientSkipId === input.clientSkipId,
+    );
+    if (latest && concurrentDuplicate) {
+      return { status: 'duplicate', attempt: latest, event: concurrentDuplicate };
+    }
+    if (
+      latest &&
+      latest.userId === input.userId &&
+      latest.missionId === input.missionId &&
+      latest.definitionVersion === input.definitionVersion &&
+      latest.status === 'in_progress' &&
+      latest.currentTurn === input.turnNumber &&
+      (latest.currentTurnSupportUsed !== existing.currentTurnSupportUsed ||
+        latest.currentTurnWrittenSupportRevealed !== existing.currentTurnWrittenSupportRevealed)
+    ) {
+      return skipSpokenMissionGoal(input);
+    }
+    throw new SpokenMissionProgressConflictError();
+  }
+
+  const updated = await getSpokenMissionAttempt(input.attemptId);
+  if (!updated) throw new SpokenMissionProgressConflictError();
+  return { status: 'recorded', attempt: updated, event };
 }
 
 export async function getBestSpokenMissionEvidence(

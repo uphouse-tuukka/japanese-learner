@@ -45,7 +45,7 @@ const attempt = {
   id: 'spokenmission-1',
   userId: 'user-1',
   missionId: 'mission-order-restaurant',
-  definitionVersion: 'restaurant-order-v2',
+  definitionVersion: 'restaurant-order-v3',
   status: 'in_progress',
   currentTurn: 1,
   supportUsed: false,
@@ -121,7 +121,14 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      assessment: { outcome: 'retry', transcript: 'さようなら' },
+      assessment: {
+        outcome: 'retry',
+        transcript: 'さようなら',
+        retrySuggestion: {
+          japanese: 'ラーメンを一つお願いします。',
+          romaji: 'raamen o hitotsu onegaishimasu.',
+        },
+      },
       nextTurn: null,
       isComplete: false,
     });
@@ -141,6 +148,8 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
         evidence: expect.objectContaining({ outcome: 'retry', supportUsed: false }),
       }),
     );
+    expect(mocks.record.mock.calls[0][0].evidence).not.toHaveProperty('retrySuggestion');
+    expect(JSON.stringify(await (await turn()).json())).not.toContain('english');
   });
 
   it('rejects a selected-user mismatch before profile, mission, attempt, budget, or AI work', async () => {
@@ -198,7 +207,7 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
     expect(mocks.record).not.toHaveBeenCalled();
   });
 
-  it.each(['completed', 'abandoned'] as const)(
+  it.each(['completed', 'incomplete', 'abandoned'] as const)(
     'rejects a new turn submission for a %s attempt',
     async (status) => {
       mocks.getAttempt.mockResolvedValue({ ...attempt, status });
@@ -394,6 +403,7 @@ describe('POST /api/missions/[id]/spoken/turn validation', () => {
       assessment: {
         outcome: 'could_not_assess',
         feedback: result.feedback,
+        retrySuggestion: null,
       },
       nextTurn: null,
       isComplete: false,

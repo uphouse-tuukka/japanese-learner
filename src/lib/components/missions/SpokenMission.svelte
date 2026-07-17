@@ -7,12 +7,14 @@
   import type {
     SpokenMissionAudioStatus,
     SpokenMissionSubmissionState,
+    SpokenMissionSkipState,
     SpokenMissionSupportDisclosureState,
     SpokenMissionTurnActions,
     SpokenMissionTurnViewState,
   } from './spoken-mission-turn-contract';
   import {
     requestSpokenMissionEnglishSupport,
+    requestSpokenMissionSkip,
     requestSpokenMissionStart,
     requestSpokenMissionTurn,
     requestSpokenMissionWrittenSupport,
@@ -64,6 +66,7 @@
 
   let stage = $state<Stage>('briefing');
   let submissionState = $state<SpokenMissionSubmissionState>('idle');
+  let skipState = $state<SpokenMissionSkipState>('idle');
   let submissionRecovery = $state<SpokenMissionTurnRecovery>('none');
   let attemptId = $state('');
   let currentTurn = $state<SpokenMissionServerTurn | null>(null);
@@ -80,6 +83,7 @@
   let result = $state<SpokenMissionResult | null>(null);
   let errorMessage = $state('');
   let pendingRecording = $state<PendingRecording | null>(null);
+  let pendingSkipId = $state<string | null>(null);
   let recorderStatus = $state<AudioRecorderStatus>('idle');
   let recordingSeconds = $state(0);
   let recorderError = $state('');
@@ -93,6 +97,7 @@
   );
   const supportActionsEnabled = $derived(
     submissionState !== 'processing' &&
+      skipState !== 'processing' &&
       !(submissionState === 'feedback' && assessment?.outcome === 'accepted'),
   );
 
@@ -123,6 +128,7 @@
       },
       assessment: {
         submissionState,
+        skipState,
         result: assessment,
         pendingNextTurn,
       },
@@ -217,7 +223,9 @@
         : null;
       writtenSupportDisclosureState = 'idle';
       submissionState = 'idle';
+      skipState = 'idle';
       submissionRecovery = 'none';
+      pendingSkipId = null;
       stage = 'active';
       resetRecorder();
     } catch (error) {
@@ -285,14 +293,15 @@
     errorMessage = '';
     pendingRecording = null;
     submissionState = 'idle';
+    skipState = 'idle';
     submissionRecovery = 'none';
+    pendingSkipId = null;
     recorder?.retry();
   }
 
-  function continueToNextGoal(): void {
-    if (!pendingNextTurn) return;
+  function activateTurn(nextTurn: SpokenMissionServerTurn): void {
     supportRequestGeneration += 1;
-    currentTurn = pendingNextTurn;
+    currentTurn = nextTurn;
     pendingNextTurn = null;
     englishSupportRevealed = false;
     revealedEnglishSupport = null;
@@ -303,8 +312,46 @@
     stopServerLinePlayback('idle');
     assessment = null;
     submissionState = 'idle';
+    skipState = 'idle';
     submissionRecovery = 'none';
+    pendingSkipId = null;
     recorder?.retry();
+  }
+
+  async function skipGoal(): Promise<void> {
+    if (!currentTurn || assessment?.outcome !== 'retry' || !assessment.retrySuggestion) return;
+    const requestTurnNumber = currentTurn.turnNumber;
+    const clientSkipId = pendingSkipId ?? createResponseId();
+    pendingSkipId = clientSkipId;
+    skipState = 'processing';
+    errorMessage = '';
+    try {
+      const payload = await requestSpokenMissionSkip({
+        missionId,
+        userId,
+        attemptId,
+        turnNumber: requestTurnNumber,
+        clientSkipId,
+      });
+      history = payload.history;
+      result = payload.result;
+      pendingSkipId = null;
+      if (payload.isComplete && payload.result) {
+        stopServerLinePlayback('idle');
+        stage = 'complete';
+        return;
+      }
+      if (!payload.nextTurn) throw new Error('Could not continue after skipping this goal.');
+      activateTurn(payload.nextTurn);
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Could not skip this goal.';
+      skipState = 'idle';
+    }
+  }
+
+  function continueToNextGoal(): void {
+    if (!pendingNextTurn) return;
+    activateTurn(pendingNextTurn);
   }
 
   async function revealEnglishSupport(): Promise<void> {
@@ -431,6 +478,7 @@
     assessment: {
       continue: continueToNextGoal,
       retryGoal,
+      skipGoal,
     },
     recovery: {
       retryUpload: submitRecording,

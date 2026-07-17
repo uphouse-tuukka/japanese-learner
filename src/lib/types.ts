@@ -352,7 +352,7 @@ export interface MissionWithProgress extends Mission {
   spokenEvidence: SpokenMissionEvidenceState | 'untried';
 }
 
-export type SpokenMissionAttemptStatus = 'in_progress' | 'completed' | 'abandoned';
+export type SpokenMissionAttemptStatus = 'in_progress' | 'completed' | 'incomplete' | 'abandoned';
 export type SpokenMissionEvidenceState = 'supported' | 'independent';
 export type SpokenMissionAssessmentOutcome = 'accepted' | 'retry' | 'could_not_assess';
 export type SpokenMissionTurnRecovery = 'retry_upload' | 'record_again' | 'none';
@@ -370,7 +370,17 @@ export interface SpokenMissionAssessment {
   feedback: string;
 }
 
+export interface SpokenMissionRetrySuggestion {
+  japanese: string;
+  romaji: string;
+}
+
+export interface SpokenMissionTurnAssessment extends SpokenMissionAssessment {
+  retrySuggestion: SpokenMissionRetrySuggestion | null;
+}
+
 export interface SpokenMissionTurnEvidence extends SpokenMissionAssessment {
+  kind?: 'assessment';
   goalKey: SpokenMissionGoalKey;
   turnNumber: number;
   npcJapanese: string;
@@ -380,6 +390,22 @@ export interface SpokenMissionTurnEvidence extends SpokenMissionAssessment {
   clientResponseId: string;
   assessedAt: string;
 }
+
+export interface SpokenMissionSkippedGoalEvent {
+  kind: 'skipped';
+  goalKey: SpokenMissionGoalKey;
+  turnNumber: number;
+  npcJapanese: string;
+  npcRomaji: string;
+  supportUsed: boolean;
+  writtenSupportRevealed: boolean;
+  clientSkipId: string;
+  skippedAt: string;
+}
+
+export type SpokenMissionConversationEntry =
+  | SpokenMissionTurnEvidence
+  | SpokenMissionSkippedGoalEvent;
 
 export interface SpokenMissionAttempt {
   id: string;
@@ -393,7 +419,7 @@ export interface SpokenMissionAttempt {
   currentTurnWrittenSupportRevealed: boolean;
   successfulTurnCount: number;
   wordingVariant: number;
-  conversationLog: SpokenMissionTurnEvidence[];
+  conversationLog: SpokenMissionConversationEntry[];
   evidenceState: SpokenMissionEvidenceState | null;
   completedAt: string | null;
   createdAt: string;
@@ -430,7 +456,8 @@ export interface SpokenMissionServerTurn {
   };
 }
 
-export interface SpokenMissionHistoryEntry {
+export interface SpokenMissionAssessmentHistoryEntry {
+  kind: 'assessment';
   goalKey: SpokenMissionGoalKey;
   goalTitle: string;
   turnNumber: number;
@@ -444,7 +471,26 @@ export interface SpokenMissionHistoryEntry {
   assessedAt: string;
 }
 
-export interface SpokenMissionResult {
+export interface SpokenMissionSkippedHistoryEntry {
+  kind: 'skipped';
+  goalKey: SpokenMissionGoalKey;
+  goalTitle: string;
+  turnNumber: number;
+  npcDialogue: {
+    japanese: string;
+    romaji: string;
+  };
+  supportUsed: boolean;
+  writtenSupportRevealed: boolean;
+  skippedAt: string;
+}
+
+export type SpokenMissionHistoryEntry =
+  | SpokenMissionAssessmentHistoryEntry
+  | SpokenMissionSkippedHistoryEntry;
+
+export interface SpokenMissionEvidenceResult {
+  kind: 'evidence';
   evidenceState: SpokenMissionEvidenceState;
   canDo: string;
   goals: Array<SpokenMissionTurnEvidence & { title: string }>;
@@ -454,6 +500,18 @@ export interface SpokenMissionResult {
     english: string;
   };
 }
+
+export interface SpokenMissionIncompleteResult {
+  kind: 'incomplete';
+  canDo: string;
+  goals: Array<{
+    goalKey: SpokenMissionGoalKey;
+    title: string;
+    status: 'accepted' | 'skipped';
+  }>;
+}
+
+export type SpokenMissionResult = SpokenMissionEvidenceResult | SpokenMissionIncompleteResult;
 
 export interface SpokenMissionStartResponse {
   attemptId: string;
@@ -485,8 +543,16 @@ export interface SpokenMissionWrittenSupportResponse {
 
 export interface SpokenMissionTurnResponse {
   duplicate: boolean;
-  assessment: SpokenMissionAssessment;
+  assessment: SpokenMissionTurnAssessment;
   nextTurn: SpokenMissionServerTurn | null;
+  isComplete: boolean;
+  result: SpokenMissionResult | null;
+}
+
+export interface SpokenMissionSkipResponse {
+  duplicate: boolean;
+  nextTurn: SpokenMissionServerTurn | null;
+  history: SpokenMissionHistoryEntry[];
   isComplete: boolean;
   result: SpokenMissionResult | null;
 }

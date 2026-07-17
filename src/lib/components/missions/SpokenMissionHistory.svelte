@@ -15,20 +15,30 @@
   </header>
 
   <ol class="history-list">
-    {#each history as entry, index (`${entry.assessedAt}-${entry.goalKey}-${index}`)}
+    {#each history as entry, index (`${entry.kind === 'skipped' ? entry.skippedAt : entry.assessedAt}-${entry.goalKey}-${index}`)}
       <li>
-        <div class="history-marker" data-outcome={entry.assessment.outcome} aria-hidden="true">
-          {entry.assessment.outcome === 'accepted' ? '✓' : index + 1}
+        <div
+          class="history-marker"
+          data-outcome={entry.kind === 'skipped' ? 'skipped' : entry.assessment.outcome}
+          aria-hidden="true"
+        >
+          {entry.kind === 'skipped'
+            ? '–'
+            : entry.assessment.outcome === 'accepted'
+              ? '✓'
+              : index + 1}
         </div>
         <div class="history-content">
           <div class="history-meta">
             <strong>Goal {entry.turnNumber}: {entry.goalTitle}</strong>
-            <span data-outcome={entry.assessment.outcome}>
-              {entry.assessment.outcome === 'accepted'
-                ? 'Accepted'
-                : entry.assessment.outcome === 'retry'
-                  ? 'Tried again'
-                  : 'Could not assess'}
+            <span data-outcome={entry.kind === 'skipped' ? 'skipped' : entry.assessment.outcome}>
+              {entry.kind === 'skipped'
+                ? 'Skipped'
+                : entry.assessment.outcome === 'accepted'
+                  ? 'Accepted'
+                  : entry.assessment.outcome === 'retry'
+                    ? 'Tried again'
+                    : 'Could not assess'}
             </span>
           </div>
           <div class="exchange" class:with-server-line={entry.writtenSupportRevealed}>
@@ -39,12 +49,21 @@
                 <p class="romaji">{entry.npcDialogue.romaji}</p>
               </div>
             {/if}
-            <div class="learner-line">
-              <small>Your transcript</small>
-              <p lang="ja">{entry.assessment.transcript ?? 'No speech was detected.'}</p>
-            </div>
+            {#if entry.kind === 'assessment'}
+              <div class="learner-line">
+                <small>Your transcript</small>
+                <p lang="ja">{entry.assessment.transcript ?? 'No speech was detected.'}</p>
+              </div>
+            {:else}
+              <div class="learner-line skipped-line">
+                <small>Your action</small>
+                <p>Goal skipped after an incorrect response.</p>
+              </div>
+            {/if}
           </div>
-          <p class="feedback">{entry.assessment.feedback}</p>
+          {#if entry.kind === 'assessment'}
+            <p class="feedback">{entry.assessment.feedback}</p>
+          {/if}
           {#if entry.supportUsed}
             <small class="support-note">English support was used for this response.</small>
           {/if}
@@ -112,6 +131,10 @@
     border-color: var(--accent-matcha);
     background: var(--accent-matcha-wash);
     color: var(--accent-matcha);
+  }
+  .history-marker[data-outcome='skipped'] {
+    border-color: var(--state-warning);
+    color: var(--state-warning);
   }
   .history-content {
     min-width: 0;

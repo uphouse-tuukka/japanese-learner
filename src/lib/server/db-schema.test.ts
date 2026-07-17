@@ -33,7 +33,9 @@ describe('getSchemaStatements', () => {
   it('defines constrained, indexed Spoken Mission attempts separately from Written Missions', () => {
     const schemaSql = getSchemaStatements().map(sqlText).join('\n');
 
-    expect(schemaSql).toContain("CHECK(status IN ('in_progress', 'completed', 'abandoned'))");
+    expect(schemaSql).toContain(
+      "CHECK(status IN ('in_progress', 'completed', 'incomplete', 'abandoned'))",
+    );
     expect(schemaSql).toContain("CHECK(evidence_state IN ('supported', 'independent'))");
     expect(schemaSql).toContain('CHECK(current_turn BETWEEN 1 AND 3)');
     expect(schemaSql).toContain(
@@ -45,6 +47,9 @@ describe('getSchemaStatements', () => {
     expect(schemaSql).toContain('CHECK(successful_turn_count BETWEEN 0 AND 3)');
     expect(schemaSql).toContain(
       "status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3",
+    );
+    expect(schemaSql).toContain(
+      "status = 'incomplete' AND evidence_state IS NULL AND completed_at IS NOT NULL",
     );
     expect(schemaSql).toContain(
       'CREATE INDEX IF NOT EXISTS idx_user_spoken_missions_user_mission ON user_spoken_missions(user_id, mission_id);',

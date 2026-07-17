@@ -168,4 +168,70 @@ describe('Spoken Mission database schema', () => {
       expect.objectContaining({ id: 'spoken-old', status: 'abandoned' }),
     ]);
   });
+
+  it('migrates existing Spoken Mission attempts to the terminal incomplete contract', async () => {
+    const db = createClient({ url: 'file::memory:' });
+    await db.batch(getSchemaStatements());
+    await db.batch([
+      `DROP TABLE user_spoken_missions;`,
+      `CREATE TABLE user_spoken_missions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        mission_id TEXT NOT NULL,
+        definition_version TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'abandoned')) DEFAULT 'in_progress',
+        current_turn INTEGER NOT NULL DEFAULT 1 CHECK(current_turn BETWEEN 1 AND 3),
+        support_used INTEGER NOT NULL DEFAULT 0 CHECK(support_used IN (0, 1)),
+        current_turn_support_used INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_support_used IN (0, 1)),
+        current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1)),
+        successful_turn_count INTEGER NOT NULL DEFAULT 0 CHECK(successful_turn_count BETWEEN 0 AND 3),
+        wording_variant INTEGER NOT NULL DEFAULT 0 CHECK(wording_variant >= 0),
+        conversation_log TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(conversation_log)),
+        evidence_state TEXT CHECK(evidence_state IN ('supported', 'independent')),
+        completed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK(
+          (status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3)
+          OR
+          (status != 'completed' AND evidence_state IS NULL AND completed_at IS NULL)
+        )
+      );`,
+      `INSERT INTO user_spoken_missions (
+        id, user_id, mission_id, definition_version, status, successful_turn_count,
+        evidence_state, completed_at, conversation_log
+      ) VALUES (
+        'historical-complete', 'user-1', 'mission-order-restaurant', 'restaurant-order-v2',
+        'completed', 3, 'independent', '2026-07-16T09:00:00.000Z', '[]'
+      );`,
+    ]);
+
+    await runDatabaseMigrations(db);
+
+    await expect(
+      db.execute({
+        sql: `INSERT INTO user_spoken_missions (
+          id, user_id, mission_id, definition_version, status, current_turn,
+          successful_turn_count, conversation_log, completed_at
+        ) VALUES (?, ?, ?, ?, 'incomplete', 3, 2, ?, ?)`,
+        args: [
+          'incomplete-attempt',
+          'user-1',
+          'mission-order-restaurant',
+          'restaurant-order-v3',
+          JSON.stringify([{ kind: 'skipped', goalKey: 'order' }]),
+          '2026-07-17T09:00:00.000Z',
+        ],
+      }),
+    ).resolves.toMatchObject({ rowsAffected: 1 });
+
+    const historical = await db.execute({
+      sql: `SELECT status, evidence_state FROM user_spoken_missions WHERE id = ?`,
+      args: ['historical-complete'],
+    });
+    expect(historical.rows[0]).toMatchObject({
+      status: 'completed',
+      evidence_state: 'independent',
+    });
+  });
 });

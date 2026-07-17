@@ -4,6 +4,7 @@ export const USER_XP_MISSION_REASONS_MIGRATION_KEY = 'user_xp_mission_reasons';
 export const PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY = 'portfolio_v2_session_columns';
 export const SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY = 'spoken_mission_written_support';
 export const SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY = 'spoken_mission_single_in_progress';
+export const SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY = 'spoken_mission_incomplete_status';
 
 export type MigrationDatabase = {
   execute(statement: InStatement): Promise<{ rows: Array<unknown> }>;
@@ -36,6 +37,24 @@ const SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS = [
   'user_id',
   'mission_id',
   'status',
+  'updated_at',
+] as const;
+const SPOKEN_MISSION_INCOMPLETE_STATUS_REQUIRED_COLUMNS = [
+  'id',
+  'user_id',
+  'mission_id',
+  'definition_version',
+  'status',
+  'current_turn',
+  'support_used',
+  'current_turn_support_used',
+  'current_turn_written_support_revealed',
+  'successful_turn_count',
+  'wording_variant',
+  'conversation_log',
+  'evidence_state',
+  'completed_at',
+  'created_at',
   'updated_at',
 ] as const;
 
@@ -225,6 +244,82 @@ WHERE status = 'in_progress';`,
   ]);
 }
 
+async function runSpokenMissionIncompleteStatusMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SPOKEN_MISSION_ATTEMPTS_TABLE);
+  if (
+    !SPOKEN_MISSION_INCOMPLETE_STATUS_REQUIRED_COLUMNS.every((columnName) =>
+      columnNames.has(columnName),
+    )
+  ) {
+    return;
+  }
+
+  const table = await db.execute({
+    sql: `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_ATTEMPTS_TABLE],
+  });
+  const createSql = (table.rows[0] as Record<string, unknown> | undefined)?.sql;
+  if (typeof createSql === 'string' && createSql.includes("'incomplete'")) {
+    await recordMigrationKey(db, SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY);
+    return;
+  }
+
+  await db.batch([
+    `CREATE TABLE user_spoken_missions_incomplete_migration (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL,
+mission_id TEXT NOT NULL,
+definition_version TEXT NOT NULL,
+status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'incomplete', 'abandoned')) DEFAULT 'in_progress',
+current_turn INTEGER NOT NULL DEFAULT 1 CHECK(current_turn BETWEEN 1 AND 3),
+support_used INTEGER NOT NULL DEFAULT 0 CHECK(support_used IN (0, 1)),
+current_turn_support_used INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_support_used IN (0, 1)),
+current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1)),
+successful_turn_count INTEGER NOT NULL DEFAULT 0 CHECK(successful_turn_count BETWEEN 0 AND 3),
+wording_variant INTEGER NOT NULL DEFAULT 0 CHECK(wording_variant >= 0),
+conversation_log TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(conversation_log)),
+evidence_state TEXT CHECK(evidence_state IN ('supported', 'independent')),
+completed_at TEXT,
+created_at TEXT NOT NULL DEFAULT (datetime('now')),
+updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+CHECK(
+  (status = 'completed' AND evidence_state IS NOT NULL AND completed_at IS NOT NULL AND successful_turn_count = 3)
+  OR
+  (status = 'incomplete' AND evidence_state IS NULL AND completed_at IS NOT NULL)
+  OR
+  (status IN ('in_progress', 'abandoned') AND evidence_state IS NULL AND completed_at IS NULL)
+)
+);`,
+    `INSERT INTO user_spoken_missions_incomplete_migration (
+  id, user_id, mission_id, definition_version, status, current_turn, support_used,
+  current_turn_support_used, current_turn_written_support_revealed,
+  successful_turn_count, wording_variant, conversation_log, evidence_state,
+  completed_at, created_at, updated_at
+)
+SELECT
+  id, user_id, mission_id, definition_version, status, current_turn, support_used,
+  current_turn_support_used, current_turn_written_support_revealed,
+  successful_turn_count, wording_variant, conversation_log, evidence_state,
+  completed_at, created_at, updated_at
+FROM user_spoken_missions;`,
+    `DROP TABLE user_spoken_missions;`,
+    `ALTER TABLE user_spoken_missions_incomplete_migration RENAME TO user_spoken_missions;`,
+    `CREATE INDEX idx_user_spoken_missions_user_mission ON user_spoken_missions(user_id, mission_id);`,
+    `CREATE INDEX idx_user_spoken_missions_resumable ON user_spoken_missions(user_id, mission_id, status, updated_at);`,
+    `CREATE UNIQUE INDEX idx_user_spoken_missions_single_in_progress
+ON user_spoken_missions(user_id, mission_id)
+WHERE status = 'in_progress';`,
+    {
+      sql: `INSERT INTO _migrations (key) VALUES (?) ON CONFLICT(key) DO NOTHING;`,
+      args: [SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY],
+    },
+  ]);
+}
+
 export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void> {
   await db.execute({
     sql: `CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);`,
@@ -273,5 +368,14 @@ export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void
 
   if (spokenMissionSingleInProgressMigration.rows.length === 0) {
     await runSpokenMissionSingleInProgressMigration(db);
+  }
+
+  const spokenMissionIncompleteStatusMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY],
+  });
+
+  if (spokenMissionIncompleteStatusMigration.rows.length === 0) {
+    await runSpokenMissionIncompleteStatusMigration(db);
   }
 }
