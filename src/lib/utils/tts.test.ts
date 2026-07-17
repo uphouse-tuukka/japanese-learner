@@ -113,4 +113,31 @@ describe('speak', () => {
     expect(onPlaybackError).toHaveBeenCalledOnce();
     expect(mockPlayAudio).not.toHaveBeenCalled();
   });
+
+  it('does not start server playback after the caller aborts while audio is loading', async () => {
+    let resolveAudio: ((audio: ArrayBuffer) => void) | undefined;
+    const audioData = new Promise<ArrayBuffer>((resolve) => {
+      resolveAudio = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => audioData,
+      }),
+    );
+    configureOpenAiTts(true, true);
+    const controller = new AbortController();
+
+    const playback = speak('ご注文はお決まりですか。', {
+      preferBrowser: false,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    controller.abort();
+    resolveAudio?.(new Uint8Array([4, 5, 6]).buffer);
+
+    await expect(playback).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mockPlayAudio).not.toHaveBeenCalled();
+  });
 });

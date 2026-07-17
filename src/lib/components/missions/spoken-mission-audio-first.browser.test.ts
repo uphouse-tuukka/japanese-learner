@@ -3,8 +3,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   recorderStart: vi.fn(),
+  onRecordingReady: null as null | ((recording: { audio: Blob; mimeType: string }) => void),
   requestEnglishSupport: vi.fn(),
   requestStart: vi.fn(),
+  requestTurn: vi.fn(),
   requestWrittenSupport: vi.fn(),
   speak: vi.fn(),
   stop: vi.fn(),
@@ -14,18 +16,23 @@ vi.mock('./spoken-mission-client', () => ({
   requestSpokenMissionStart: mocks.requestStart,
   requestSpokenMissionEnglishSupport: mocks.requestEnglishSupport,
   requestSpokenMissionWrittenSupport: mocks.requestWrittenSupport,
-  requestSpokenMissionTurn: vi.fn(),
+  requestSpokenMissionTurn: mocks.requestTurn,
   SpokenMissionTurnRequestError: class extends Error {},
 }));
 
 vi.mock('$lib/utils/audio-recorder', () => ({
-  createAudioRecorder: () => ({
-    start: mocks.recorderStart,
-    stop: vi.fn(),
-    cancel: vi.fn(),
-    retry: vi.fn(),
-    dispose: vi.fn(),
-  }),
+  createAudioRecorder: (options: {
+    onRecordingReady: (recording: { audio: Blob; mimeType: string }) => void;
+  }) => {
+    mocks.onRecordingReady = options.onRecordingReady;
+    return {
+      start: mocks.recorderStart,
+      stop: vi.fn(),
+      cancel: vi.fn(),
+      retry: vi.fn(),
+      dispose: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('$lib/utils/tts', () => ({
@@ -68,7 +75,8 @@ async function settle(): Promise<void> {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.replaceChildren();
-  Object.values(mocks).forEach((mock) => mock.mockReset());
+  mocks.onRecordingReady = null;
+  vi.resetAllMocks();
 });
 
 it('keeps the restaurant turn audio-first until each support action is chosen', async () => {
@@ -150,6 +158,98 @@ it('keeps the restaurant turn audio-first until each support action is chosen', 
     await settle();
     expect(document.body.textContent).toContain('Are you ready to order?');
     expect(mocks.recorderStart).not.toHaveBeenCalled();
+  } finally {
+    await unmount(component);
+  }
+});
+
+it('cancels a loading server line when the learner advances turns', async () => {
+  const firstTurn = {
+    turnNumber: 1,
+    goalKey: 'order' as const,
+    goalTitle: 'Order',
+    npcDialogue: {
+      japanese: 'ご注文はお決まりですか。',
+      romaji: 'go-chuumon wa okimari desu ka.',
+    },
+  };
+  const secondTurn = {
+    turnNumber: 2,
+    goalKey: 'respond' as const,
+    goalTitle: 'Respond',
+    npcDialogue: {
+      japanese: 'お飲み物はいかがですか。',
+      romaji: 'o-nomimono wa ikaga desu ka.',
+    },
+  };
+  mocks.requestStart.mockResolvedValue({
+    attemptId: 'spokenmission-v2',
+    definitionVersion: 'restaurant-order-v2',
+    supportPolicy: {
+      englishListeningSupport: 'optional',
+      evidenceWithoutEnglishSupport: 'independent',
+      evidenceWithEnglishSupport: 'supported',
+    },
+    briefing,
+    turn: firstTurn,
+    history: [],
+    totalTurns: 3,
+    resumed: false,
+    supportUsed: false,
+    currentTurnEnglishSupportRevealed: false,
+    currentTurnEnglishSupport: null,
+    currentTurnWrittenSupportRevealed: false,
+  });
+  mocks.requestTurn.mockResolvedValue({
+    assessment: {
+      transcript: 'ラーメンを一つお願いします。',
+      outcome: 'accepted',
+      confidence: 'high',
+      feedback: 'You ordered one ramen.',
+    },
+    nextTurn: secondTurn,
+    isComplete: false,
+    result: null,
+  });
+
+  let playbackSignal: AbortSignal | undefined;
+  mocks.speak.mockImplementation(
+    (_text, options) =>
+      new Promise<void>((_resolve, reject) => {
+        playbackSignal = options?.signal;
+        playbackSignal?.addEventListener('abort', () => reject(playbackSignal?.reason), {
+          once: true,
+        });
+      }),
+  );
+
+  const component = mount(SpokenMission, {
+    target: document.body,
+    props: {
+      missionId: 'mission-order-restaurant',
+      userId: 'user-1',
+      briefing,
+      bestEvidence: 'untried',
+      resumable: null,
+      onChooseWritten: vi.fn(),
+    },
+  });
+
+  try {
+    button('Start Spoken Mission').click();
+    await settle();
+    button('Listen').click();
+    await settle();
+
+    expect(button('Loading audio…').disabled).toBe(true);
+    mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
+    await settle();
+    button('Continue').click();
+    await settle();
+
+    expect(playbackSignal?.aborted).toBe(true);
+    expect(button('Listen').disabled).toBe(false);
+    expect(document.body.textContent).not.toContain('Japanese audio is playing.');
   } finally {
     await unmount(component);
   }

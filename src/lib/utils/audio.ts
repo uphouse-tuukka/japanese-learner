@@ -3,6 +3,12 @@ let currentSource: AudioBufferSourceNode | null = null;
 let currentPlaybackResolve: (() => void) | null = null;
 let playing = false;
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw signal.reason ?? new DOMException('Playback was aborted.', 'AbortError');
+  }
+}
+
 function getAudioContext(): AudioContext {
   if (!audioContext) {
     const AudioContextCtor =
@@ -51,11 +57,16 @@ async function decodeAudio(audioData: ArrayBuffer | Blob): Promise<AudioBuffer> 
 export async function playAudio(
   audioData: ArrayBuffer | Blob,
   onPlaybackStart?: () => void,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal);
   const context = await ensureContextReady();
+  throwIfAborted(signal);
   const buffer = await decodeAudio(audioData);
+  throwIfAborted(signal);
 
   stopAudio();
+  throwIfAborted(signal);
 
   const source = context.createBufferSource();
   source.buffer = buffer;
@@ -65,13 +76,23 @@ export async function playAudio(
   playing = true;
 
   await new Promise<void>((resolve) => {
-    currentPlaybackResolve = resolve;
+    const finishPlayback = (): void => {
+      signal?.removeEventListener('abort', stopPlayback);
+      resolve();
+    };
+    const stopPlayback = (): void => {
+      stopAudio();
+    };
+
+    currentPlaybackResolve = finishPlayback;
     source.onended = () => {
       markStopped(source);
     };
+    signal?.addEventListener('abort', stopPlayback, { once: true });
     onPlaybackStart?.();
     source.start(0);
   });
+  throwIfAborted(signal);
 }
 
 export async function playFromUrl(url: string): Promise<void> {

@@ -72,4 +72,20 @@ describe('playAudio', () => {
     expect(settled).toBe(true);
     expect(isPlaying()).toBe(false);
   });
+
+  it('stops active playback when its caller aborts', async () => {
+    const { getLastSource } = installMockAudioContext();
+    const { isPlaying, playAudio } = await import('$lib/utils/audio');
+    const controller = new AbortController();
+    const playback = playAudio(new Uint8Array([1, 2, 3]).buffer, undefined, controller.signal);
+
+    await vi.waitFor(() => {
+      expect(getLastSource()).not.toBeNull();
+    });
+    controller.abort();
+
+    await expect(playback).rejects.toMatchObject({ name: 'AbortError' });
+    expect(getLastSource()?.stop).toHaveBeenCalledOnce();
+    expect(isPlaying()).toBe(false);
+  });
 });

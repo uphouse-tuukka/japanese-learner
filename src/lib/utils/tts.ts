@@ -8,6 +8,7 @@ export interface SpeakOptions {
   voice?: string;
   fallbackVoice?: string;
   preferBrowser?: boolean;
+  signal?: AbortSignal;
   onPlaybackStart?: () => void;
   onPlaybackError?: () => void;
 }
@@ -18,6 +19,12 @@ const serverAudioCache = new Map<string, ArrayBuffer>();
 const pendingServerAudio = new Map<string, Promise<ArrayBuffer>>();
 let useOpenAiTts = false;
 let serverTtsAvailable = false;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw signal.reason ?? new DOMException('Speech was aborted.', 'AbortError');
+  }
+}
 
 export function configureOpenAiTts(enabled: boolean, serverAvailable = enabled): void {
   useOpenAiTts = enabled;
@@ -181,9 +188,11 @@ async function speakViaServer(
   voice: string,
   speed: number,
   onPlaybackStart?: () => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const data = await fetchServerAudio(text, voice, speed);
-  await playAudio(data.slice(0), onPlaybackStart);
+  throwIfAborted(signal);
+  await playAudio(data.slice(0), onPlaybackStart, signal);
 }
 
 async function speakViaBrowser(
@@ -193,7 +202,9 @@ async function speakViaBrowser(
   volume: number,
   fallbackVoiceName?: string,
   onPlaybackStart?: () => void,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal);
   if (!isSupported()) {
     throw new Error('Browser speech synthesis is not supported.');
   }
@@ -204,12 +215,21 @@ async function speakViaBrowser(
   }
 
   const japaneseVoice = await getJapaneseVoice(fallbackVoiceName);
+  throwIfAborted(signal);
   if (!japaneseVoice) {
     throw new Error('No Japanese speech synthesis voice is available.');
   }
 
   await new Promise<void>((resolve, reject) => {
     const utterance = new SpeechSynthesisUtterance(text);
+    const finish = (callback: () => void): void => {
+      signal?.removeEventListener('abort', abortPlayback);
+      callback();
+    };
+    const abortPlayback = (): void => {
+      synth.cancel();
+      finish(() => reject(signal?.reason ?? new DOMException('Speech was aborted.', 'AbortError')));
+    };
     utterance.voice = japaneseVoice;
     utterance.lang = japaneseVoice.lang || 'ja-JP';
     utterance.rate = rate;
@@ -220,13 +240,18 @@ async function speakViaBrowser(
     };
 
     utterance.onend = () => {
-      resolve();
+      finish(resolve);
     };
 
     utterance.onerror = (speechError) => {
-      reject(speechError.error || speechError);
+      finish(() => reject(speechError.error || speechError));
     };
 
+    signal?.addEventListener('abort', abortPlayback, { once: true });
+    if (signal?.aborted) {
+      abortPlayback();
+      return;
+    }
     synth.speak(utterance);
   });
 }
@@ -244,12 +269,14 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
   const browserFallbackVoiceName = options.fallbackVoice;
   const onPlaybackStart = options.onPlaybackStart;
   const onPlaybackError = options.onPlaybackError;
+  const signal = options.signal;
   const useBrowserFirst =
     options.preferBrowser === true ||
     (!useOpenAiTts && options.preferBrowser !== false) ||
     (options.preferBrowser === undefined && trimmedText.length <= 15);
   const canUseServerTts = serverTtsAvailable;
 
+  throwIfAborted(signal);
   stop();
 
   if (useBrowserFirst || !canUseServerTts) {
@@ -261,9 +288,11 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
         volume,
         browserFallbackVoiceName,
         onPlaybackStart,
+        signal,
       );
       return;
     } catch (browserError) {
+      throwIfAborted(signal);
       if (!canUseServerTts) {
         console.warn('[tts] browser speech failed and server synthesis is unavailable', {
           voice: browserFallbackVoiceName,
@@ -285,14 +314,15 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
       });
     }
 
-    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart);
+    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart, signal);
     return;
   }
 
   try {
-    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart);
+    await speakViaServer(trimmedText, serverVoice, rate, onPlaybackStart, signal);
     return;
   } catch (serverError) {
+    throwIfAborted(signal);
     console.warn('[tts] server speech failed, falling back to browser synthesis', {
       voice: serverVoice,
       rate,
@@ -307,6 +337,7 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
     volume,
     browserFallbackVoiceName,
     onPlaybackStart,
+    signal,
   );
 }
 

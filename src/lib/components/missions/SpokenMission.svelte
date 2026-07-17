@@ -76,6 +76,7 @@
   let recorderError = $state('');
   let audioStatus = $state<SpokenMissionAudioStatus>('idle');
   let recorder: AudioRecorderController | null = null;
+  let audioPlaybackController: AbortController | null = null;
 
   const canRecord = $derived(
     submissionState === 'idle' && (recorderStatus === 'idle' || recorderStatus === 'error'),
@@ -149,9 +150,19 @@
     });
   }
 
-  async function startMission(startOver: boolean): Promise<void> {
+  function stopServerLinePlayback(nextStatus?: SpokenMissionAudioStatus): void {
+    audioPlaybackController?.abort();
+    audioPlaybackController = null;
     stop();
-    audioStatus = 'idle';
+    if (nextStatus) audioStatus = nextStatus;
+  }
+
+  function ownsServerLinePlayback(controller: AbortController): boolean {
+    return !controller.signal.aborted && audioPlaybackController === controller;
+  }
+
+  async function startMission(startOver: boolean): Promise<void> {
+    stopServerLinePlayback('idle');
     stage = 'starting';
     errorMessage = '';
     try {
@@ -223,7 +234,10 @@
       result = payload.result;
       pendingRecording = null;
       submissionState = 'feedback';
-      if (payload.isComplete && payload.result) stage = 'complete';
+      if (payload.isComplete && payload.result) {
+        stopServerLinePlayback('idle');
+        stage = 'complete';
+      }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : 'Could not assess this response.';
       submissionRecovery = error instanceof SpokenMissionTurnRequestError ? error.recovery : 'none';
@@ -253,8 +267,7 @@
     writtenSupportRevealed = false;
     revealedWrittenSupport = null;
     writtenSupportDisclosureState = 'idle';
-    stop();
-    audioStatus = 'idle';
+    stopServerLinePlayback('idle');
     assessment = null;
     submissionState = 'idle';
     submissionRecovery = 'none';
@@ -307,34 +320,51 @@
   async function playServerLine(): Promise<void> {
     if (!currentTurn) return;
     if (audioStatus === 'playing') {
-      stop();
-      audioStatus = 'stopped';
+      stopServerLinePlayback('stopped');
       return;
     }
     if (audioStatus === 'loading') return;
 
+    const playbackController = new AbortController();
+    audioPlaybackController = playbackController;
     audioStatus = 'loading';
     let playbackFailed = false;
     try {
       await speak(currentTurn.npcDialogue.japanese, {
         preferBrowser: false,
+        signal: playbackController.signal,
         onPlaybackStart: () => {
+          if (!ownsServerLinePlayback(playbackController)) {
+            stop();
+            return;
+          }
           audioStatus = 'playing';
         },
         onPlaybackError: () => {
+          if (!ownsServerLinePlayback(playbackController)) {
+            return;
+          }
           playbackFailed = true;
           audioStatus = 'error';
         },
       });
+      if (!ownsServerLinePlayback(playbackController)) {
+        return;
+      }
+      audioPlaybackController = null;
       if (!playbackFailed) audioStatus = 'stopped';
     } catch {
+      if (!ownsServerLinePlayback(playbackController)) {
+        return;
+      }
+      audioPlaybackController = null;
       audioStatus = 'error';
     }
   }
 
   onDestroy(() => {
     recorder?.dispose();
-    stop();
+    stopServerLinePlayback();
   });
 
   const turnActions: SpokenMissionTurnActions = {
