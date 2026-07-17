@@ -91,6 +91,10 @@
   const canRecord = $derived(
     submissionState === 'idle' && (recorderStatus === 'idle' || recorderStatus === 'error'),
   );
+  const supportActionsEnabled = $derived(
+    submissionState !== 'processing' &&
+      !(submissionState === 'feedback' && assessment?.outcome === 'accepted'),
+  );
 
   let activeTurnState = $derived.by((): SpokenMissionTurnViewState | null => {
     if (!currentTurn) return null;
@@ -104,6 +108,7 @@
         errorMessage: recorderError,
       },
       support: {
+        actionsEnabled: supportActionsEnabled,
         written: {
           revealed: writtenSupportRevealed,
           text: revealedWrittenSupport,
@@ -303,7 +308,8 @@
   }
 
   async function revealEnglishSupport(): Promise<void> {
-    if (!currentTurn || englishSupportDisclosureState === 'processing') return;
+    if (!currentTurn || !supportActionsEnabled || englishSupportDisclosureState === 'processing')
+      return;
     const generation = supportRequestGeneration;
     const requestAttemptId = attemptId;
     const turnNumber = currentTurn.turnNumber;
@@ -333,7 +339,8 @@
   }
 
   async function revealWrittenSupport(): Promise<void> {
-    if (!currentTurn || writtenSupportDisclosureState === 'processing') return;
+    if (!currentTurn || !supportActionsEnabled || writtenSupportDisclosureState === 'processing')
+      return;
     const generation = supportRequestGeneration;
     const requestAttemptId = attemptId;
     const turnNumber = currentTurn.turnNumber;

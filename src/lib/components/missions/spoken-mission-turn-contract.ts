@@ -19,6 +19,7 @@ export type SpokenMissionTurnViewState = {
     errorMessage: string;
   };
   support: {
+    actionsEnabled: boolean;
     written: {
       revealed: boolean;
       text: SpokenMissionServerTurn['npcDialogue'] | null;

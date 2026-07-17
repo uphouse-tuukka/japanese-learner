@@ -26,6 +26,7 @@ export type SpokenMissionGoal = {
 export type SpokenMissionDefinition = {
   missionId: string;
   version: string;
+  supersededVersions: readonly string[];
   canDo: string;
   briefing: {
     situation: string;
@@ -46,6 +47,7 @@ export type SpokenMissionDefinition = {
 const ORDER_AT_A_RESTAURANT: SpokenMissionDefinition = {
   missionId: 'mission-order-restaurant',
   version: 'restaurant-order-v2',
+  supersededVersions: ['restaurant-order-v1'],
   canDo: 'I can manage a short order conversation in a restaurant.',
   briefing: {
     situation:

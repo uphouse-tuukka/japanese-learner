@@ -49,6 +49,7 @@ import { SpokenMissionProgressConflictError } from '$lib/server/spoken-missions-
 const definition = {
   missionId: 'mission-order-restaurant',
   version: 'restaurant-order-v1',
+  supersededVersions: [],
   canDo: 'I can complete the restaurant task.',
   briefing: {
     situation: 'At a restaurant.',
@@ -190,6 +191,7 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v1',
+      supersededDefinitionVersions: [],
       wordingVariant: 0,
     });
   });
@@ -264,13 +266,18 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v1',
+      supersededDefinitionVersions: [],
       wordingVariant: 0,
     });
     expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('replaces an incompatible saved attempt with the current definition automatically', async () => {
-    const currentDefinition = { ...definition, version: 'restaurant-order-v2' } as const;
+    const currentDefinition = {
+      ...definition,
+      version: 'restaurant-order-v2',
+      supersededVersions: ['restaurant-order-v1'],
+    } as const;
     mocks.getDefinition.mockReturnValue(currentDefinition);
     mocks.getResumable.mockResolvedValue(attempt);
     mocks.restart.mockResolvedValue({
@@ -292,13 +299,18 @@ describe('POST /api/missions/[id]/spoken/start', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v2',
+      supersededDefinitionVersions: ['restaurant-order-v1'],
       wordingVariant: 0,
     });
     expect(mocks.getOrCreate).not.toHaveBeenCalled();
   });
 
   it('returns the single current replacement when incompatible starts race', async () => {
-    const currentDefinition = { ...definition, version: 'restaurant-order-v2' } as const;
+    const currentDefinition = {
+      ...definition,
+      version: 'restaurant-order-v2',
+      supersededVersions: ['restaurant-order-v1'],
+    } as const;
     const replacement = {
       ...attempt,
       id: 'spokenmission-v2',

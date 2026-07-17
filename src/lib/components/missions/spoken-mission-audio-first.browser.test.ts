@@ -200,7 +200,7 @@ it('cancels a loading server line when the learner advances turns', async () => 
     currentTurnEnglishSupport: null,
     currentTurnWrittenSupportRevealed: false,
   });
-  mocks.requestTurn.mockResolvedValue({
+  const acceptedTurn = {
     assessment: {
       transcript: 'ラーメンを一つお願いします。',
       outcome: 'accepted',
@@ -210,7 +210,14 @@ it('cancels a loading server line when the learner advances turns', async () => 
     nextTurn: secondTurn,
     isComplete: false,
     result: null,
-  });
+  } as const;
+  let resolveTurn!: (value: typeof acceptedTurn) => void;
+  mocks.requestTurn.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveTurn = resolve;
+      }),
+  );
 
   let playbackSignal: AbortSignal | undefined;
   mocks.speak.mockImplementation(
@@ -244,6 +251,18 @@ it('cancels a loading server line when the learner advances turns', async () => 
     expect(button('Loading audio…').disabled).toBe(true);
     mocks.onRecordingReady?.({ audio: new Blob(['audio']), mimeType: 'audio/webm' });
     await settle();
+
+    expect(button('Reveal written text').disabled).toBe(true);
+    expect(button('Reveal English support').disabled).toBe(true);
+    button('Reveal written text').click();
+    button('Reveal English support').click();
+    expect(mocks.requestWrittenSupport).not.toHaveBeenCalled();
+    expect(mocks.requestEnglishSupport).not.toHaveBeenCalled();
+
+    resolveTurn(acceptedTurn);
+    await settle();
+    expect(button('Reveal written text').disabled).toBe(true);
+    expect(button('Reveal English support').disabled).toBe(true);
     button('Continue').click();
     await settle();
 

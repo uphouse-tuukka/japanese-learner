@@ -78,6 +78,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
           userId,
           missionId: mission.id,
           definitionVersion: definition.version,
+          supersededDefinitionVersions: definition.supersededVersions,
           wordingVariant,
         });
       } catch (error) {
@@ -98,6 +99,7 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
         userId,
         missionId: mission.id,
         definitionVersion: definition.version,
+        supersededDefinitionVersions: definition.supersededVersions,
         wordingVariant,
       });
       return json(serializeStartResponse(definition, freshAttempt.attempt, !freshAttempt.created));

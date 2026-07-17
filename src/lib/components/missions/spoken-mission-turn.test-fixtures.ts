@@ -74,6 +74,15 @@ export function createSpokenMissionTurnProps(
   actions: SpokenMissionTurnActions = createSpokenMissionTurnActions(),
 ): SpokenMissionTurnProps {
   const englishSupportRevealed = input.englishSupportRevealed ?? false;
+  const assessment =
+    input.submissionState === 'feedback'
+      ? (input.assessment ?? {
+          transcript: 'ラーメンを一つお願いします。',
+          outcome: 'accepted' as const,
+          confidence: 'high' as const,
+          feedback: 'You ordered one ramen.',
+        })
+      : null;
   return {
     viewState: {
       turn: spokenMissionServerTurn,
@@ -85,6 +94,9 @@ export function createSpokenMissionTurnProps(
         errorMessage: input.recorderError ?? '',
       },
       support: {
+        actionsEnabled:
+          input.submissionState !== 'processing' &&
+          !(input.submissionState === 'feedback' && assessment?.outcome === 'accepted'),
         written: {
           revealed: input.writtenSupportRevealed ?? false,
           text: input.writtenSupportRevealed ? spokenMissionServerTurn.npcDialogue : null,
@@ -99,15 +111,7 @@ export function createSpokenMissionTurnProps(
       },
       assessment: {
         submissionState: input.submissionState ?? 'idle',
-        result:
-          input.submissionState === 'feedback'
-            ? (input.assessment ?? {
-                transcript: 'ラーメンを一つお願いします。',
-                outcome: 'accepted',
-                confidence: 'high',
-                feedback: 'You ordered one ramen.',
-              })
-            : null,
+        result: assessment,
         pendingNextTurn: input.pendingNextTurn ?? null,
       },
       recovery: {

@@ -73,6 +73,7 @@ describe('Spoken Mission persistence', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v2',
+      supersededDefinitionVersions: ['restaurant-order-v1'],
       wordingVariant: 0,
     };
 
@@ -103,6 +104,7 @@ describe('Spoken Mission persistence', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v2',
+      supersededDefinitionVersions: ['restaurant-order-v1'],
       wordingVariant: 0,
     };
 
@@ -126,6 +128,75 @@ describe('Spoken Mission persistence', () => {
     expect(activeAttempts.rows).toEqual([
       expect.objectContaining({ definition_version: 'restaurant-order-v2' }),
     ]);
+  });
+
+  it('never returns an inserted attempt abandoned by a newer definition start', async () => {
+    const spoken = await loadRepositories();
+    const client = dbHarness.client!;
+    const execute = client.execute.bind(client);
+    let injectedNewerStart = false;
+    let newerStart: Awaited<ReturnType<typeof spoken.getOrCreateSpokenMissionAttempt>> | null =
+      null;
+    vi.spyOn(client, 'execute').mockImplementation(async (statement) => {
+      const sql = typeof statement === 'string' ? statement : (statement as { sql: string }).sql;
+      if (!injectedNewerStart && sql.includes('FROM user_spoken_missions WHERE id = ? LIMIT 1')) {
+        injectedNewerStart = true;
+        newerStart = await spoken.getOrCreateSpokenMissionAttempt({
+          userId: 'user-1',
+          missionId: 'mission-order-restaurant',
+          definitionVersion: 'restaurant-order-v2',
+          supersededDefinitionVersions: ['restaurant-order-v1'],
+          wordingVariant: 1,
+        });
+      }
+      return execute(statement);
+    });
+
+    await expect(
+      spoken.getOrCreateSpokenMissionAttempt({
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        supersededDefinitionVersions: [],
+        wordingVariant: 0,
+      }),
+    ).rejects.toBeInstanceOf(spoken.SpokenMissionProgressConflictError);
+
+    expect(injectedNewerStart).toBe(true);
+    expect(newerStart).toMatchObject({
+      attempt: { definitionVersion: 'restaurant-order-v2', status: 'in_progress' },
+    });
+    await expect(
+      spoken.getResumableSpokenMissionAttempt('user-1', 'mission-order-restaurant'),
+    ).resolves.toMatchObject({
+      definitionVersion: 'restaurant-order-v2',
+      status: 'in_progress',
+    });
+  });
+
+  it('does not let an older definition displace a newer active attempt', async () => {
+    const spoken = await loadRepositories();
+    const newerAttempt = await spoken.createSpokenMissionAttempt({
+      userId: 'user-1',
+      missionId: 'mission-order-restaurant',
+      definitionVersion: 'restaurant-order-v2',
+      wordingVariant: 1,
+    });
+
+    await expect(
+      spoken.getOrCreateSpokenMissionAttempt({
+        userId: 'user-1',
+        missionId: 'mission-order-restaurant',
+        definitionVersion: 'restaurant-order-v1',
+        supersededDefinitionVersions: [],
+        wordingVariant: 0,
+      }),
+    ).rejects.toBeInstanceOf(spoken.SpokenMissionProgressConflictError);
+
+    await expect(spoken.getSpokenMissionAttempt(newerAttempt.id)).resolves.toMatchObject({
+      definitionVersion: 'restaurant-order-v2',
+      status: 'in_progress',
+    });
   });
 
   it('restores written support without changing English evidence eligibility and clears it on advance', async () => {
@@ -259,6 +330,7 @@ describe('Spoken Mission persistence', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v1',
+      supersededDefinitionVersions: [],
       wordingVariant: 0,
     });
 
@@ -280,6 +352,7 @@ describe('Spoken Mission persistence', () => {
         userId: 'user-1',
         missionId: 'mission-order-restaurant',
         definitionVersion: 'restaurant-order-v1',
+        supersededDefinitionVersions: [],
         wordingVariant: 1,
       }),
     ).rejects.toBeInstanceOf(spoken.SpokenMissionProgressConflictError);
@@ -332,6 +405,7 @@ describe('Spoken Mission persistence', () => {
       userId: 'user-1',
       missionId: 'mission-order-restaurant',
       definitionVersion: 'restaurant-order-v2',
+      supersededDefinitionVersions: ['restaurant-order-v1'],
       wordingVariant: 0,
     });
 
@@ -371,6 +445,7 @@ describe('Spoken Mission persistence', () => {
         userId: 'user-1',
         missionId: 'mission-order-restaurant',
         definitionVersion: 'restaurant-order-v1',
+        supersededDefinitionVersions: [],
         wordingVariant: 0,
       }),
     ).rejects.toThrow('replacement failed');

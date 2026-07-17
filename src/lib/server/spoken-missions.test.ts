@@ -13,6 +13,7 @@ describe('spoken mission definitions', () => {
     const definition = getSpokenMissionDefinition('mission-order-restaurant');
     expect(definition).toMatchObject({
       version: 'restaurant-order-v2',
+      supersededVersions: ['restaurant-order-v1'],
       canDo: 'I can manage a short order conversation in a restaurant.',
       approximateMinutes: 2,
       maxRecordingSeconds: 12,

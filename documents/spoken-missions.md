@@ -101,7 +101,8 @@ Do not create a duplicate mission record, catalog node, collection, track, shelf
 
 The definition must include a new immutable version, Can-do statement, briefing and privacy copy, approximate duration, maximum recording duration, exactly three ordered goals, authored Japanese and romaji server-line variants, English listening-support text, natural alternatives, semantic rubrics, and a suggested practice phrase.
 Each goal should provide a line for every supported wording variant because one variant index is selected for the whole attempt.
-Changing evidence-relevant content requires a new definition version so an incompatible saved attempt is replaced safely while completed historical evidence remains available.
+Changing evidence-relevant content requires a new definition version whose superseded-version list includes every earlier active version that it may replace safely.
+This explicit ordering lets mixed-version start requests converge on the newest definition while completed historical evidence remains available.
 
 Add definition, route-flow, loader, privacy, resume, idempotency, evidence, and learner-visible UI coverage for the scenario.
 Run the focused Spoken Mission tests while iterating and finish with `npm run validate:ci`.

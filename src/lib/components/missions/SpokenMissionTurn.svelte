@@ -14,6 +14,7 @@
   let recordingSeconds = $derived(viewState.recorder.recordingSeconds);
   let canRecord = $derived(viewState.recorder.canRecord);
   let recorderError = $derived(viewState.recorder.errorMessage);
+  let supportActionsEnabled = $derived(viewState.support.actionsEnabled);
   let writtenSupportRevealed = $derived(viewState.support.written.revealed);
   let writtenSupport = $derived(viewState.support.written.text);
   let writtenSupportDisclosureState = $derived(viewState.support.written.disclosureState);
@@ -146,7 +147,7 @@
         <button
           class="line-button support"
           type="button"
-          disabled={writtenSupportDisclosureState === 'processing'}
+          disabled={!supportActionsEnabled || writtenSupportDisclosureState === 'processing'}
           onclick={actions.support.revealWritten}
         >
           {writtenSupportDisclosureState === 'processing'
@@ -158,7 +159,7 @@
         <button
           class="line-button support"
           type="button"
-          disabled={englishSupportDisclosureState === 'processing'}
+          disabled={!supportActionsEnabled || englishSupportDisclosureState === 'processing'}
           onclick={actions.support.revealEnglish}
         >
           {englishSupportDisclosureState === 'processing'

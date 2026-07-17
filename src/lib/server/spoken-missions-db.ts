@@ -87,6 +87,27 @@ type SpokenMissionAttemptCreationInput = {
   wordingVariant: number;
 };
 
+type SpokenMissionAttemptStartInput = SpokenMissionAttemptCreationInput & {
+  supersededDefinitionVersions: readonly string[];
+};
+
+function canReplaceSpokenMissionAttempt(
+  input: SpokenMissionAttemptStartInput,
+  attempt: SpokenMissionAttempt,
+): boolean {
+  return (
+    attempt.definitionVersion === input.definitionVersion ||
+    input.supersededDefinitionVersions.includes(attempt.definitionVersion)
+  );
+}
+
+function isActiveSpokenMissionAttempt(
+  attempt: SpokenMissionAttempt | null,
+  definitionVersion: string,
+): attempt is SpokenMissionAttempt {
+  return attempt?.status === 'in_progress' && attempt.definitionVersion === definitionVersion;
+}
+
 function buildSpokenMissionAttemptInsert(
   input: SpokenMissionAttemptCreationInput,
   id: string,
@@ -168,7 +189,7 @@ export async function createSpokenMissionAttempt(
 }
 
 export async function getOrCreateSpokenMissionAttempt(
-  input: SpokenMissionAttemptCreationInput,
+  input: SpokenMissionAttemptStartInput,
 ): Promise<{ attempt: SpokenMissionAttempt; created: boolean }> {
   const db = await getDb();
   for (let attemptNumber = 0; attemptNumber < 3; attemptNumber += 1) {
@@ -180,13 +201,19 @@ export async function getOrCreateSpokenMissionAttempt(
     if (inserted.rowsAffected === 1) {
       const created = await getSpokenMissionAttempt(id);
       if (!created) throw new Error('[spoken-missions-db] failed to load created attempt');
-      return { attempt: created, created: true };
+      if (isActiveSpokenMissionAttempt(created, input.definitionVersion)) {
+        return { attempt: created, created: true };
+      }
+      continue;
     }
 
     const existing = await getResumableSpokenMissionAttempt(input.userId, input.missionId);
     if (!existing) continue;
     if (existing.definitionVersion === input.definitionVersion) {
       return { attempt: existing, created: false };
+    }
+    if (!canReplaceSpokenMissionAttempt(input, existing)) {
+      throw new SpokenMissionProgressConflictError();
     }
 
     try {
@@ -464,11 +491,21 @@ LIMIT 1
 }
 
 export async function restartSpokenMissionAttempt(
-  input: SpokenMissionAttemptCreationInput & {
+  input: SpokenMissionAttemptStartInput & {
     attemptId: string;
   },
 ): Promise<SpokenMissionAttempt> {
   const db = await getDb();
+  const existing = await getSpokenMissionAttempt(input.attemptId);
+  if (
+    !existing ||
+    existing.userId !== input.userId ||
+    existing.missionId !== input.missionId ||
+    existing.status !== 'in_progress' ||
+    !canReplaceSpokenMissionAttempt(input, existing)
+  ) {
+    throw new SpokenMissionProgressConflictError();
+  }
   const replacementId = `spokenmission-${randomUUID()}`;
   const timestamp = new Date().toISOString();
   const [abandoned, inserted] = await db.batch(
@@ -477,9 +514,19 @@ export async function restartSpokenMissionAttempt(
         sql: `
 UPDATE user_spoken_missions
 SET status = 'abandoned', updated_at = ?
-WHERE id = ? AND user_id = ? AND mission_id = ? AND status = 'in_progress'
+WHERE id = ?
+  AND user_id = ?
+  AND mission_id = ?
+  AND definition_version = ?
+  AND status = 'in_progress'
 `,
-        args: [timestamp, input.attemptId, input.userId, input.missionId],
+        args: [
+          timestamp,
+          input.attemptId,
+          input.userId,
+          input.missionId,
+          existing.definitionVersion,
+        ],
       },
       buildSpokenMissionAttemptInsert(input, replacementId, timestamp, {
         attemptId: input.attemptId,
@@ -495,5 +542,8 @@ WHERE id = ? AND user_id = ? AND mission_id = ? AND status = 'in_progress'
 
   const replacement = await getSpokenMissionAttempt(replacementId);
   if (!replacement) throw new Error('[spoken-missions-db] failed to load replacement attempt');
+  if (!isActiveSpokenMissionAttempt(replacement, input.definitionVersion)) {
+    throw new SpokenMissionProgressConflictError();
+  }
   return replacement;
 }
