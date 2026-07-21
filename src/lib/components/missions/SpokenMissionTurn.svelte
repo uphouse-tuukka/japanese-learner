@@ -243,7 +243,6 @@
           >
             {skipState === 'processing' ? 'Skipping goal…' : 'Skip goal'}
           </button>
-          >
         </div>
         <p class="skip-warning">
           Continuing after a skip means this attempt will not earn Independent or Supported
