@@ -269,41 +269,292 @@ describe('deterministic category selection', () => {
 });
 
 describe('review candidate derivation', () => {
-  it('uses wrong/mixed exercise evidence plus exact handoff and journal mentions', () => {
+  it('keeps journal, summary weakness, and handoff mentions advisory', () => {
     const evidence = buildCoverageEvidence({
       sessions: [
         sourceSession('1', 'greetings_basics', 'Polite openers', '2026-05-04T08:00:00.000Z', {
           keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
           handoffNotes: ['Review sumimasen in a new situation.'],
-        }),
-        sourceSession('2', 'transport', 'Train platforms', '2026-05-03T08:00:00.000Z', {
-          weaknesses: ['Train platforms still need practice.'],
-          keyPhrases: ['何番線ですか'],
+          weaknesses: ['Polite openers still need practice.'],
         }),
       ],
+    });
+
+    expect(evidence.reviewCandidates).toEqual([]);
+  });
+
+  it('resolves older phrase weakness evidence after a later correct item result', () => {
+    const sessions = [
+      sourceSession('mastery', 'greetings_basics', 'Polite openers', '2026-05-05T08:00:00.000Z', {
+        accuracy: 100,
+        keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      }),
+      sourceSession('weakness', 'greetings_basics', 'Polite openers', '2026-05-04T08:00:00.000Z', {
+        accuracy: 0,
+        keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      }),
+    ];
+
+    const evidence = buildCoverageEvidence({
+      sessions,
       exerciseResults: [
         {
-          sessionId: '1',
-          exerciseId: 'exercise-1',
+          sessionId: 'weakness',
+          exerciseId: 'weakness-result',
           isCorrect: false,
           answerText: 'sorry',
           createdAt: '2026-05-04T08:10:00.000Z',
           exercise,
         },
+        {
+          sessionId: 'mastery',
+          exerciseId: 'mastery-result',
+          isCorrect: true,
+          answerText: 'Excuse me',
+          createdAt: '2026-05-05T08:10:00.000Z',
+          exercise,
+        },
       ],
-      learningJournal: 'Persistent weak spot: Train platforms under pressure.',
     });
 
-    const phraseCandidate = evidence.reviewCandidates.find(
-      (candidate) =>
-        candidate.type === 'key_phrase' && candidate.display === 'すみません (sumimasen)',
-    );
-    expect(phraseCandidate?.reasonCodes).toEqual(['handoff_note_mention', 'wrong_exercise_result']);
+    expect(evidence.reviewCandidates).toEqual([]);
+  });
 
-    const topicCandidate = evidence.reviewCandidates.find(
-      (candidate) => candidate.type === 'lesson_topic' && candidate.identity === 'train platforms',
+  it('resolves an earlier same-session phrase miss after a later correct result', () => {
+    const session = sourceSession(
+      'same-session',
+      'greetings_basics',
+      'Polite openers',
+      '2026-05-04T08:00:00.000Z',
+      {
+        accuracy: 50,
+        keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      },
     );
-    expect(topicCandidate?.reasonCodes).toEqual(['learning_journal_mention', 'weakness_mention']);
+
+    const evidence = buildCoverageEvidence({
+      sessions: [session],
+      exerciseResults: [
+        {
+          sessionId: session.sessionId,
+          exerciseId: 'later-correct',
+          orderIndex: 1,
+          isCorrect: true,
+          answerText: 'Excuse me',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: { ...exercise, id: 'later-correct' },
+        },
+        {
+          sessionId: session.sessionId,
+          exerciseId: 'earlier-miss',
+          orderIndex: 0,
+          isCorrect: false,
+          answerText: 'sorry',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: { ...exercise, id: 'earlier-miss' },
+        },
+      ],
+    });
+
+    expect(evidence.reviewCandidates).toEqual([]);
+  });
+
+  it('reopens phrase review for new specific weakness evidence after mastery', () => {
+    const sessions = [
+      sourceSession(
+        'new-weakness',
+        'greetings_basics',
+        'Polite openers',
+        '2026-05-06T08:00:00.000Z',
+        {
+          accuracy: 0,
+          keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+        },
+      ),
+      sourceSession('mastery', 'greetings_basics', 'Polite openers', '2026-05-05T08:00:00.000Z', {
+        accuracy: 100,
+        keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      }),
+      sourceSession(
+        'old-weakness',
+        'greetings_basics',
+        'Polite openers',
+        '2026-05-04T08:00:00.000Z',
+        {
+          accuracy: 0,
+          keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+        },
+      ),
+    ];
+    const result = (sessionId: string, isCorrect: boolean, day: string) => ({
+      sessionId,
+      exerciseId: `${sessionId}-result`,
+      isCorrect,
+      answerText: isCorrect ? 'Excuse me' : 'sorry',
+      createdAt: `2026-05-${day}T08:10:00.000Z`,
+      exercise,
+    });
+
+    const evidence = buildCoverageEvidence({
+      sessions,
+      exerciseResults: [
+        result('old-weakness', false, '04'),
+        result('mastery', true, '05'),
+        result('new-weakness', false, '06'),
+      ],
+    });
+
+    expect(evidence.reviewCandidates).toEqual([
+      expect.objectContaining({
+        type: 'key_phrase',
+        reasonCodes: ['wrong_exercise_result'],
+        evidenceSessionIds: ['new-weakness'],
+      }),
+    ]);
+  });
+
+  it('uses explicit structured review intent while ignoring neutral handoff text', () => {
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        sourceSession('1', 'greetings_basics', 'Polite openers', '2026-05-04T08:00:00.000Z', {
+          keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+          handoffNotes: ['Sumimasen was a positive strength.'],
+          reviewIntents: [
+            {
+              type: 'key_phrase',
+              identity: 'ja:すみません',
+              display: 'すみません (sumimasen)',
+              reason: 'The learner could not produce the phrase in a specific item.',
+              reviewRequested: true,
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(evidence.reviewCandidates).toEqual([
+      expect.objectContaining({
+        type: 'key_phrase',
+        identity: 'ja:すみません',
+        reasonCodes: ['structured_review_intent'],
+        evidenceSessionIds: ['1'],
+      }),
+    ]);
+  });
+
+  it('does not make a whole topic reviewable from one unrelated wrong exercise', () => {
+    const session = sourceSession('1', 'food_dining', 'Ordering food', '2026-05-04T08:00:00.000Z', {
+      accuracy: 90,
+      keyPhraseDetails: [],
+    });
+
+    const evidence = buildCoverageEvidence({
+      sessions: [session],
+      exerciseResults: [
+        {
+          sessionId: session.sessionId,
+          exerciseId: 'unrelated-miss',
+          isCorrect: false,
+          answerText: 'incorrect',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: { ...exercise, id: 'unrelated-miss', japanese: '', romaji: '' },
+        },
+      ],
+    });
+
+    expect(
+      evidence.reviewCandidates.find((candidate) => candidate.type === 'lesson_topic'),
+    ).toBeUndefined();
+  });
+
+  it('requires multiple unresolved item signals before making a topic reviewable', () => {
+    const sessions = [
+      sourceSession('second', 'food_dining', 'Ordering food', '2026-05-05T08:00:00.000Z', {
+        accuracy: 80,
+        keyPhraseDetails: [],
+      }),
+      sourceSession('first', 'food_dining', 'Ordering food', '2026-05-04T08:00:00.000Z', {
+        accuracy: 80,
+        keyPhraseDetails: [],
+      }),
+    ];
+    const exerciseResults = sessions.map((session) => ({
+      sessionId: session.sessionId,
+      exerciseId: `${session.sessionId}-miss`,
+      isCorrect: false,
+      answerText: 'incorrect',
+      createdAt: session.completedAt ?? session.createdAt,
+      exercise: { ...exercise, id: `${session.sessionId}-miss`, japanese: '', romaji: '' },
+    }));
+
+    const oneSignal = buildCoverageEvidence({
+      sessions: [sessions[1]],
+      exerciseResults: [exerciseResults[1]],
+    });
+    const twoSignals = buildCoverageEvidence({ sessions, exerciseResults });
+
+    expect(oneSignal.reviewCandidates).toEqual([]);
+    expect(twoSignals.reviewCandidates).toEqual([
+      expect.objectContaining({
+        type: 'lesson_topic',
+        identity: 'ordering food',
+        evidenceSessionIds: ['first', 'second'],
+      }),
+    ]);
+  });
+
+  it('resolves topic weakness only after a later fully correct session for that topic', () => {
+    const oldWeakness = sourceSession(
+      'old-weakness',
+      'food_dining',
+      'Ordering food',
+      '2026-05-04T08:00:00.000Z',
+      { accuracy: 50, keyPhraseDetails: [] },
+    );
+    const partial = sourceSession(
+      'partial',
+      'food_dining',
+      'Ordering food',
+      '2026-05-05T08:00:00.000Z',
+      { accuracy: 90, keyPhraseDetails: [] },
+    );
+    const mastery = sourceSession(
+      'mastery',
+      'food_dining',
+      'Ordering food',
+      '2026-05-06T08:00:00.000Z',
+      { accuracy: 100, keyPhraseDetails: [] },
+    );
+    const wrongResult = (sessionId: string, exerciseId: string, day: string) => ({
+      sessionId,
+      exerciseId,
+      isCorrect: false,
+      answerText: 'incorrect',
+      createdAt: `2026-05-${day}T08:10:00.000Z`,
+      exercise: { ...exercise, id: exerciseId, japanese: '', romaji: '' },
+    });
+    const oldResults = [
+      wrongResult('old-weakness', 'miss-1', '04'),
+      wrongResult('old-weakness', 'miss-2', '04'),
+    ];
+
+    const unresolved = buildCoverageEvidence({
+      sessions: [partial, oldWeakness],
+      exerciseResults: [...oldResults, wrongResult('partial', 'unrelated-miss', '05')],
+    });
+    const resolved = buildCoverageEvidence({
+      sessions: [mastery, partial, oldWeakness],
+      exerciseResults: [...oldResults, wrongResult('partial', 'unrelated-miss', '05')],
+    });
+
+    expect(unresolved.reviewCandidates).toEqual([
+      expect.objectContaining({
+        type: 'lesson_topic',
+        identity: 'ordering food',
+        evidenceSessionIds: ['old-weakness', 'partial'],
+      }),
+    ]);
+    expect(resolved.reviewCandidates).toEqual([]);
   });
 
   it('does not make every phrase in a low-accuracy session reviewable without item evidence', () => {
@@ -321,6 +572,51 @@ describe('review candidate derivation', () => {
     expect(evidence.reviewCandidates).toEqual([]);
   });
 
+  it('keeps genuine unresolved mixed phrase evidence reviewable', () => {
+    const session = sourceSession(
+      'mixed',
+      'greetings_basics',
+      'Polite openers',
+      '2026-05-04T08:00:00.000Z',
+      {
+        accuracy: 50,
+        keyPhraseDetails: [{ japanese: 'すみません', romaji: 'sumimasen', english: 'Excuse me' }],
+      },
+    );
+
+    const evidence = buildCoverageEvidence({
+      sessions: [session],
+      exerciseResults: [
+        {
+          sessionId: session.sessionId,
+          exerciseId: 'correct-use',
+          isCorrect: true,
+          answerText: 'Excuse me',
+          createdAt: '2026-05-04T08:09:00.000Z',
+          exercise: { ...exercise, id: 'correct-use' },
+        },
+        {
+          sessionId: session.sessionId,
+          exerciseId: 'wrong-use',
+          isCorrect: false,
+          answerText: 'sorry',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: { ...exercise, id: 'wrong-use' },
+        },
+      ],
+    });
+
+    expect(evidence.reviewCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'key_phrase',
+          identity: 'ja:すみません',
+          reasonCodes: ['mixed_exercise_result'],
+        }),
+      ]),
+    );
+  });
+
   it('does not create mention candidates from substring-only matches', () => {
     const evidence = buildCoverageEvidence({
       sessions: [
@@ -330,7 +626,6 @@ describe('review candidate derivation', () => {
           handoffNotes: ['Keep ongoing grammar separate from the previous embargo discussion.'],
         }),
       ],
-      learningJournal: 'Ongoing confidence issue: embargo examples were confusing.',
     });
 
     expect(evidence.reviewCandidates).toEqual([]);
@@ -355,7 +650,22 @@ describe('review candidate derivation', () => {
       ),
     );
 
-    const evidence = buildCoverageEvidence({ sessions });
+    const evidence = buildCoverageEvidence({
+      sessions,
+      exerciseResults: sessions.map((session, index) => ({
+        sessionId: session.sessionId,
+        exerciseId: `exercise-${index}`,
+        isCorrect: false,
+        answerText: 'incorrect',
+        createdAt: session.completedAt ?? session.createdAt,
+        exercise: {
+          ...exercise,
+          id: `exercise-${index}`,
+          japanese: '',
+          romaji: `hyougen ${index}`,
+        },
+      })),
+    });
 
     expect(evidence.coveredTopics).toHaveLength(35);
     expect(evidence.coveredKeyPhrases).toHaveLength(35);
@@ -369,12 +679,20 @@ describe('review candidate derivation', () => {
     const longTopic = `Ordering food ${'with very long context '.repeat(20)}`;
     const longPhrase = `sumimasen ${'with extra spelling detail '.repeat(20)}`;
 
+    const longSession = sourceSession('1', 'food_dining', longTopic, '2026-05-04T08:00:00.000Z', {
+      keyPhraseDetails: [{ romaji: longPhrase, english: 'Excuse me' }],
+    });
     const evidence = buildCoverageEvidence({
-      sessions: [
-        sourceSession('1', 'food_dining', longTopic, '2026-05-04T08:00:00.000Z', {
-          keyPhraseDetails: [{ romaji: longPhrase, english: 'Excuse me' }],
-          handoffNotes: [`Review ${longPhrase} again.`],
-        }),
+      sessions: [longSession],
+      exerciseResults: [
+        {
+          sessionId: longSession.sessionId,
+          exerciseId: 'long-phrase-result',
+          isCorrect: false,
+          answerText: 'incorrect',
+          createdAt: longSession.completedAt ?? longSession.createdAt,
+          exercise: { ...exercise, id: 'long-phrase-result', japanese: '', romaji: longPhrase },
+        },
       ],
     });
 

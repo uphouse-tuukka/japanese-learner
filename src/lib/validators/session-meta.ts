@@ -1,9 +1,17 @@
-import type { SessionKeyPhraseDetail, SessionMeta, SessionMiniLesson } from '$lib/types';
+import type {
+  SessionKeyPhraseDetail,
+  SessionMeta,
+  SessionMiniLesson,
+  SessionReviewIntent,
+} from '$lib/types';
 import { asStringArray, parseJsonObject } from './common';
 
 const MAX_KEY_PHRASE_DETAILS = 10;
 const MAX_KEY_PHRASE_DETAIL_INPUT_ITEMS = 50;
 const MAX_KEY_PHRASE_DETAIL_FIELD_LENGTH = 160;
+const MAX_REVIEW_INTENTS = 5;
+const MAX_REVIEW_INTENT_INPUT_ITEMS = 20;
+const MAX_REVIEW_INTENT_FIELD_LENGTH = 160;
 
 function trimOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
@@ -49,6 +57,48 @@ export function sanitizeKeyPhraseDetails(value: unknown): SessionKeyPhraseDetail
   }
 
   return details;
+}
+
+export function sanitizeReviewIntents(value: unknown): SessionReviewIntent[] {
+  if (!Array.isArray(value)) return [];
+
+  const intents: SessionReviewIntent[] = [];
+  for (const item of value.slice(0, MAX_REVIEW_INTENT_INPUT_ITEMS)) {
+    if (intents.length >= MAX_REVIEW_INTENTS) break;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+
+    const raw = item as Record<string, unknown>;
+    if (
+      (raw.type !== 'key_phrase' && raw.type !== 'lesson_topic') ||
+      raw.reviewRequested !== true
+    ) {
+      continue;
+    }
+
+    const identity =
+      typeof raw.identity === 'string'
+        ? raw.identity.trim().slice(0, MAX_REVIEW_INTENT_FIELD_LENGTH).trimEnd()
+        : '';
+    const display =
+      typeof raw.display === 'string'
+        ? raw.display.trim().slice(0, MAX_REVIEW_INTENT_FIELD_LENGTH).trimEnd()
+        : '';
+    const reason =
+      typeof raw.reason === 'string'
+        ? raw.reason.trim().slice(0, MAX_REVIEW_INTENT_FIELD_LENGTH).trimEnd()
+        : '';
+    if (!identity || !display || !reason) continue;
+
+    intents.push({
+      type: raw.type,
+      identity,
+      display,
+      reason,
+      reviewRequested: true,
+    });
+  }
+
+  return intents;
 }
 
 function parseMiniLesson(value: unknown): SessionMiniLesson | null | undefined {
@@ -111,6 +161,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
   const handoffNotes = asStringArray(parsed.handoffNotes);
   const miniLesson = parseMiniLesson(parsed.miniLesson);
   const keyPhraseDetails = sanitizeKeyPhraseDetails(parsed.keyPhraseDetails);
+  const reviewIntents = sanitizeReviewIntents(parsed.reviewIntents);
 
   return {
     summaryText: parsed.summaryText,
@@ -123,6 +174,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
     weaknesses: asStringArray(parsed.weaknesses),
     nextSteps: nextSteps.length > 0 ? nextSteps : undefined,
     handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
+    reviewIntents: reviewIntents.length > 0 ? reviewIntents : undefined,
     exerciseTypes: asStringArray(parsed.exerciseTypes),
     keyPhrases: asStringArray(parsed.keyPhrases),
     keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,

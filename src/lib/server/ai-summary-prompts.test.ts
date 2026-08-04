@@ -69,6 +69,7 @@ function messageContent(
 function parseCurrentSessionData(userContent: string): {
   accuracy: number;
   lessonTopic: string;
+  lessonKeyPhrases?: Array<Record<string, unknown>>;
   japaneseWritingEnabled: boolean;
   exercises: Array<Record<string, unknown>>;
   results: Array<Record<string, unknown>>;
@@ -80,6 +81,37 @@ function parseCurrentSessionData(userContent: string): {
 }
 
 describe('buildSessionSummaryPrompt', () => {
+  it('defines structured review intent without allowing journal or positive mentions to authorize review', () => {
+    const prompt = buildSessionSummaryPrompt(
+      baseSessionSummaryPromptInput({
+        lessonKeyPhrases: [
+          {
+            japanese: 'お願いします',
+            romaji: 'onegaishimasu',
+            english: 'Please',
+            usage: 'Polite request',
+          },
+        ],
+      }),
+    );
+
+    const system = messageContent(prompt.messages, 'system');
+    expect(system).toContain('review_intents');
+    expect(system).toContain('review_requested');
+    expect(system).toContain('Do not request review from a journal mention');
+    expect(system).toContain('exact current Lesson Topic or Lesson Key Phrase');
+
+    const currentSessionData = parseCurrentSessionData(messageContent(prompt.messages, 'user'));
+    expect(currentSessionData.lessonKeyPhrases).toEqual([
+      {
+        japanese: 'お願いします',
+        romaji: 'onegaishimasu',
+        english: 'Please',
+        usage: 'Polite request',
+      },
+    ]);
+  });
+
   it('computes accuracy and includes current session data with expected answer details', () => {
     const translation = translationExercise();
     const multipleChoice = multipleChoiceExercise();
@@ -218,10 +250,10 @@ describe('buildSessionSummaryPrompt', () => {
     const suppressedSystemPrompt = messageContent(suppressedPrompt.messages, 'system');
 
     expect(normalSystemPrompt).toContain(
-      '7) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
+      '8) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
     );
     expect(suppressedSystemPrompt).toContain(
-      '7) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.',
+      '8) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.',
     );
     expect(suppressedSystemPrompt).not.toContain(
       'Recommend promotion only with consistent mastery',

@@ -246,6 +246,14 @@ export interface LevelUpRecommendation {
   reason: string;
 }
 
+export interface SessionReviewIntent {
+  type: 'key_phrase' | 'lesson_topic';
+  identity: string;
+  display: string;
+  reason: string;
+  reviewRequested: true;
+}
+
 export interface SessionMeta {
   summaryText: string;
   category?: string;
@@ -256,6 +264,7 @@ export interface SessionMeta {
   weaknesses: string[];
   nextSteps?: string[]; // legacy
   handoffNotes?: string[];
+  reviewIntents?: SessionReviewIntent[];
   exerciseTypes: string[];
   keyPhrases: string[];
   keyPhraseDetails?: SessionKeyPhraseDetail[];
