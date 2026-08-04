@@ -154,7 +154,7 @@ export function validateGeneratedSessionPlan(input: {
     ? 'missing'
     : !generatedLearningObjective
       ? 'unrecognized'
-      : generatedLearningObjective.id === selectedLearningObjective?.id
+      : generatedLearningObjective.id === selectedLearningObjective.id
         ? 'recognized_selected'
         : 'recognized_other';
   const rawIntentionalReview = plan.metadata.intentionalReview;
@@ -181,23 +181,15 @@ export function validateGeneratedSessionPlan(input: {
     reasonCodes.push('blocked_category');
   }
 
-  if (coverageEvidence.learningObjectiveSelection.mode === 'canonical') {
-    if (
-      !selectedLearningObjective ||
-      !generatedLearningObjective ||
-      generatedLearningObjective.category !== selectedCategory
-    ) {
-      reasonCodes.push('invalid_learning_objective_identity');
-    } else if (generatedLearningObjective.id !== selectedLearningObjective.id) {
-      const repeatsCoveredObjective = coverageEvidence.coveredLearningObjectives.some(
-        (objective) => objective.id === generatedLearningObjective.id,
-      );
-      reasonCodes.push(
-        repeatsCoveredObjective ? 'repeated_learning_objective' : 'learning_objective_mismatch',
-      );
-    }
-  } else if (generatedLearningObjectiveId) {
+  if (!generatedLearningObjective || generatedLearningObjective.category !== selectedCategory) {
     reasonCodes.push('invalid_learning_objective_identity');
+  } else if (generatedLearningObjective.id !== selectedLearningObjective.id) {
+    const repeatsCoveredObjective = coverageEvidence.coveredLearningObjectives.some(
+      (objective) => objective.id === generatedLearningObjective.id,
+    );
+    reasonCodes.push(
+      repeatsCoveredObjective ? 'repeated_learning_objective' : 'learning_objective_mismatch',
+    );
   }
 
   if (selectedReviewCandidate) {
@@ -227,7 +219,7 @@ export function validateGeneratedSessionPlan(input: {
     ) {
       intentionalReviewStatus = 'candidate_mismatch';
       reasonCodes.push('ineligible_review');
-    } else if (intentionalReviewClaim.learningObjectiveId !== selectedLearningObjective?.id) {
+    } else if (intentionalReviewClaim.learningObjectiveId !== selectedLearningObjective.id) {
       intentionalReviewStatus = 'objective_mismatch';
       reasonCodes.push('ineligible_review');
     } else if (intentionalReviewClaim.transferContextId !== selectedTransferContext?.id) {
@@ -241,12 +233,11 @@ export function validateGeneratedSessionPlan(input: {
       intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');
     } else if (
-      !selectedLearningObjective ||
       plan.lesson.topic !==
-        buildIntentionalReviewLessonTopic(
-          selectedTransferContext,
-          selectedLearningObjective.description,
-        )
+      buildIntentionalReviewLessonTopic(
+        selectedTransferContext,
+        selectedLearningObjective.description,
+      )
     ) {
       intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');
@@ -292,7 +283,7 @@ export function validateGeneratedSessionPlan(input: {
     repeatedNonReviewKeyPhraseCount: uniqueRepeatedNonReviewKeyPhrases.length,
     repeatedNonReviewKeyPhrases: uniqueRepeatedNonReviewKeyPhrases,
     repeatedLessonTopic: repeatedLessonTopic?.topic ?? null,
-    selectedLearningObjectiveId: selectedLearningObjective?.id ?? null,
+    selectedLearningObjectiveId: selectedLearningObjective.id,
     generatedLearningObjectiveId,
     generatedLearningObjectiveStatus,
     intentionalReviewStatus,

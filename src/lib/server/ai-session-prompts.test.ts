@@ -24,6 +24,39 @@ function baseSessionInput() {
     userId: 'user-1',
     userName: 'Test Learner',
     userLevel: 'beginner' as const,
+    coverageEvidence: {
+      source: {
+        totalCompletedAiSessions: 0,
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+      },
+      categoryRotation: {
+        currentCategory: null,
+        currentCategoryStreak: 0,
+        selectedCategory: 'food_dining' as const,
+        selectionReason: 'no_prior_category_beginner_flow' as const,
+        mustRotate: false,
+        allowedCategories: ['food_dining' as const],
+        preferredCategories: ['food_dining' as const],
+        blockedCategories: [],
+      },
+      learningObjectiveSelection: {
+        mode: 'canonical' as const,
+        reason: 'selected_uncovered_objective' as const,
+        objective: {
+          id: 'food_dining.order_food_and_drinks',
+          category: 'food_dining' as const,
+          communicativeGoalKey: 'order_food_and_drinks',
+          description: 'Order food and drinks in a restaurant.',
+          generationGuidance: 'Teach a focused restaurant ordering exchange.',
+        },
+        reviewCandidate: null,
+      },
+      categoryCoverage: [],
+      avoidTopics: [],
+      avoidKeyPhrases: [],
+      reviewCandidates: [],
+    },
   };
 }
 
@@ -98,19 +131,10 @@ describe('ai session prompt builders', () => {
     expect(highPayload.targetExerciseCount).toBe(12);
   });
 
-  it('buildSessionPlanPrompt includes rotation, handoff, and recent cultural-note context without repeating stale notes', () => {
+  it('buildSessionPlanPrompt includes authoritative rotation, handoff, and recent cultural-note context without repeating stale notes', () => {
     const prompt = buildSessionPlanPrompt({
       ...baseSessionInput(),
       exerciseCount: 6,
-      categoryRotation: {
-        currentCategory: 'food_dining',
-        currentCategoryStreak: 3,
-        recentCategories: [
-          { category: 'food_dining', sessionsAgo: 1 },
-          { category: 'transport', sessionsAgo: 2 },
-        ],
-        neverVisited: ['shopping', 'directions'],
-      },
       sessionHistory: [
         {
           date: '2026-05-01',
@@ -170,19 +194,14 @@ describe('ai session prompt builders', () => {
 
     const promptText = systemPrompt(prompt);
 
-    expect(promptText).toContain('TOPIC CATEGORY ROTATION:');
+    expect(promptText).toContain('COVERAGE EVIDENCE — AUTHORITATIVE APP-SIDE RAILS:');
     expect(promptText).toContain(
       'For early sessions, prefer starting with greetings_basics, then travel_essentials, then food_dining, transport, and shopping',
     );
     expect(promptText).toContain(
       'For travel_essentials, teach portable travel literacy rather than scenario leftovers',
     );
-    expect(promptText).toContain('Current category streak: "food_dining" × 3 session(s)');
-    expect(promptText).toContain('MUST switch to a different category — 3 sessions reached.');
-    expect(promptText).toContain(
-      'Recently visited (do NOT return to these yet): food_dining, transport.',
-    );
-    expect(promptText).toContain('Never visited yet (good candidates): shopping, directions.');
+    expect(promptText).toContain('Current category streak: none (first session)');
     expect(promptText).toContain('PRIOR SESSION HANDOFF (internal; soft guidance only):');
     expect(promptText).toContain(
       '[Restaurant requests] weak: counter words; handoff: Practice asking for recommendations.',
@@ -227,9 +246,15 @@ describe('ai session prompt builders', () => {
           blockedCategories: ['food_dining'],
         },
         learningObjectiveSelection: {
-          mode: 'legacy_exact_topic',
-          reason: 'category_not_migrated_compatibility',
-          objective: null,
+          mode: 'canonical',
+          reason: 'selected_uncovered_objective',
+          objective: {
+            id: 'emergencies_health.describe_symptoms_and_severity',
+            category: 'emergencies_health',
+            communicativeGoalKey: 'describe_symptoms_and_severity',
+            description: 'Describe a symptom and communicate how severe or urgent it is.',
+            generationGuidance: 'Teach a focused symptom and severity exchange.',
+          },
           reviewCandidate: null,
         },
         categoryCoverage: [
@@ -316,6 +341,7 @@ describe('ai session prompt builders', () => {
     );
     expect(promptText).toContain('must never create or authorize a Review Candidate');
     expect(promptText).toContain('handoff notes cannot authorize repetition');
+    expect(promptText).not.toContain('compatibility mode');
     expect(promptText).toContain('CURRICULUM VALIDATION FEEDBACK FROM PREVIOUS ATTEMPT:');
     expect(promptText).toContain(
       'Previous generation violated curriculum rails: category_mismatch.',

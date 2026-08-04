@@ -37,12 +37,12 @@ describe('planned Learning Session coverage metadata', () => {
           keyPhrases: completeKeyPhrases,
         },
         exercises: [],
-        learningObjectiveId: ' food_dining.order_item ',
+        learningObjectiveId: ' food_dining.order_food_and_drinks ',
       }),
     ).toEqual({
       version: 1,
       category: 'food_dining',
-      learningObjectiveId: 'food_dining.order_item',
+      learningObjectiveId: 'food_dining.order_food_and_drinks',
       lessonTopic: 'Ordering ramen',
       lessonTreatment: JSON.stringify({
         topic: '  Ordering ramen  ',
@@ -68,6 +68,7 @@ describe('planned Learning Session coverage metadata', () => {
     const validRecord = {
       version: 1,
       category: 'food_dining',
+      learningObjectiveId: 'food_dining.order_food_and_drinks',
       lessonTopic: 'Ordering ramen',
       culturalNote: 'Ticket machines are common.',
       keyPhraseDetails: completeKeyPhrases,
@@ -88,6 +89,24 @@ describe('planned Learning Session coverage metadata', () => {
     ).toBeNull();
     expect(
       parsePlannedSessionCoverage(
+        JSON.stringify({ ...validRecord, learningObjectiveId: undefined }),
+      ),
+    ).toBeNull();
+    expect(
+      parsePlannedSessionCoverage(
+        JSON.stringify({ ...validRecord, learningObjectiveId: 'food_dining.invented' }),
+      ),
+    ).toBeNull();
+    expect(
+      parsePlannedSessionCoverage(
+        JSON.stringify({
+          ...validRecord,
+          learningObjectiveId: 'transport.buy_a_ticket',
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      parsePlannedSessionCoverage(
         JSON.stringify({ ...validRecord, keyPhraseDetails: completeKeyPhrases.slice(0, 2) }),
       ),
     ).toBeNull();
@@ -104,12 +123,14 @@ describe('planned Learning Session coverage metadata', () => {
         keyPhrases: completeKeyPhrases,
       },
       exercises: [],
+      learningObjectiveId: 'food_dining.order_food_and_drinks',
     };
     const oversized = buildPlannedSessionCoverage(baseInput);
     const malformed = parsePlannedSessionCoverage(
       JSON.stringify({
         version: 1,
         category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
         lessonTopic: 'Ordering ramen',
         lessonTreatment: 'x',
         lessonTreatmentComplete: true,

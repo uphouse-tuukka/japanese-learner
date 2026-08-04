@@ -167,12 +167,6 @@ export type SessionPlanPromptInput = {
   sessionHistory?: SessionPlanPromptHistoryEntry[];
   recentAccuracy?: number;
   coveredTopics?: string[];
-  categoryRotation?: {
-    currentCategory: string | null;
-    currentCategoryStreak: number;
-    recentCategories: Array<{ category: string; sessionsAgo: number }>;
-    neverVisited: string[];
-  };
   totalSessionCount?: number;
   performanceInsights?: {
     overallAccuracy: number;
@@ -180,7 +174,7 @@ export type SessionPlanPromptInput = {
     strongExerciseIds: string[];
     recentWrongAnswers: string[];
   };
-  coverageEvidence?: CompactCoverageEvidence;
+  coverageEvidence: CompactCoverageEvidence;
   learningJournal?: string | null;
   curriculumValidationFeedback?: string[];
 };
@@ -224,13 +218,6 @@ function joinList(values: string[]): string {
 
 function formatLearningObjectiveContext(evidence: CompactCoverageEvidence): string[] {
   const selection = evidence.learningObjectiveSelection;
-  if (selection.mode === 'legacy_exact_topic' || !selection.objective) {
-    return [
-      'Learning Objective catalog compatibility mode is active for this Topic Category.',
-      'Do not invent a Learning Objective identity; return top-level learningObjectiveId as null.',
-    ];
-  }
-
   const objective = selection.objective;
   return [
     'LEARNING OBJECTIVE - AUTHORITATIVE APP-SIDE RAIL:',
@@ -277,9 +264,7 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
   ];
 }
 
-function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
-  if (!evidence) return '';
-
+function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence): string {
   const rotation = evidence.categoryRotation;
   const categoryCoverage = evidence.categoryCoverage
     .map((category) => `${category.category}×${category.count} last ${category.lastSeenAt}`)
@@ -501,49 +486,21 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
   const curriculumValidationFeedback = formatCurriculumValidationFeedback(
     input.curriculumValidationFeedback,
   );
-  const categoryRotation = input.categoryRotation;
-  const categoryContext = coverageEvidenceContext
-    ? [
-        `Available categories: ${categoryList}.`,
-        coverageEvidenceContext,
-        EARLY_CATEGORY_FLOW_GUIDANCE,
-        TRAVEL_ESSENTIALS_GUIDANCE,
-      ].join('\n')
-    : categoryRotation
-      ? [
-          'TOPIC CATEGORY ROTATION:',
-          `Available categories: ${categoryList}.`,
-          `Current category streak: ${categoryRotation.currentCategory ? `"${categoryRotation.currentCategory}" × ${categoryRotation.currentCategoryStreak} session(s)` : 'none (first session)'}. `,
-          categoryRotation.currentCategoryStreak >= 3
-            ? `MUST switch to a different category — 3 sessions reached.`
-            : categoryRotation.currentCategoryStreak >= 2
-              ? `You may continue this category one more time or switch — your choice based on learner progress.`
-              : `Continue this category to build depth, or switch if the learner seems ready.`,
-          categoryRotation.recentCategories.length > 0
-            ? `Recently visited (do NOT return to these yet): ${categoryRotation.recentCategories.map((c) => c.category).join(', ')}.`
-            : '',
-          categoryRotation.neverVisited.length > 0
-            ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
-            : '',
-          EARLY_CATEGORY_FLOW_GUIDANCE,
-          TRAVEL_ESSENTIALS_GUIDANCE,
-        ]
-          .filter(Boolean)
-          .join(' ')
-      : '';
-  const selectedLearningObjective =
-    input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
-  const selectedReviewCandidate =
-    input.coverageEvidence?.learningObjectiveSelection.reviewCandidate ?? null;
+  const categoryContext = [
+    `Available categories: ${categoryList}.`,
+    coverageEvidenceContext,
+    EARLY_CATEGORY_FLOW_GUIDANCE,
+    TRAVEL_ESSENTIALS_GUIDANCE,
+  ].join('\n');
+  const selectedTopicCategory = input.coverageEvidence.categoryRotation.selectedCategory;
+  const selectedLearningObjective = input.coverageEvidence.learningObjectiveSelection.objective;
+  const selectedReviewCandidate = input.coverageEvidence.learningObjectiveSelection.reviewCandidate;
   const selectedTransferContext = selectedReviewCandidate
     ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
     : null;
   if (selectedReviewCandidate && !selectedTransferContext) {
     throw new Error('No fresh intentional-review transfer context is available.');
   }
-  const selectedTopicCategory =
-    input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
-
   const priorNotes = sessionHistory
     .slice(0, 3)
     .map((s) => {
@@ -608,7 +565,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '- Avoid repeating recent cultural notes or the same micro-theme (especially repeated sumimasen politeness trivia) unless essential to the new lesson.',
           '',
           '2) Required output structure:',
-          '- learningObjectiveId must exactly follow the authoritative Learning Objective rail above, or be null only when compatibility mode explicitly says so.',
+          '- learningObjectiveId must exactly follow the authoritative Learning Objective rail above.',
           '- intentionalReview must exactly follow the authoritative review rail above. Never claim an unselected Review Candidate.',
           '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
           '- each key phrase: japanese, romaji, english, usage.',
@@ -667,13 +624,11 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           targetExerciseCount,
           requiredOutputContract: {
             learningObjectiveId: {
-              const: selectedLearningObjective?.id ?? null,
-              rule: selectedLearningObjective
-                ? 'Copy this app-selected identity exactly.'
-                : 'Return null because this Topic Category is in compatibility mode.',
+              const: selectedLearningObjective.id,
+              rule: 'Copy this app-selected identity exactly.',
             },
             intentionalReview:
-              selectedReviewCandidate && selectedLearningObjective && selectedTransferContext
+              selectedReviewCandidate && selectedTransferContext
                 ? {
                     type: 'object',
                     required: true,
@@ -696,7 +651,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 rule: 'Copy this app-selected Topic Category exactly.',
               },
               topic: {
-                ...(selectedLearningObjective && selectedTransferContext
+                ...(selectedTransferContext
                   ? {
                       const: buildIntentionalReviewLessonTopic(
                         selectedTransferContext,
@@ -706,16 +661,12 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                     }
                   : {
                       type: 'string',
-                      rule: selectedLearningObjective
-                        ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
-                        : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
+                      rule: `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`,
                     }),
               },
               explanation: {
                 type: 'string',
-                rule: selectedLearningObjective
-                  ? `Teach this objective directly and follow its focused guidance: ${selectedLearningObjective.generationGuidance}`
-                  : `Teach only the fresh Lesson Topic chosen within ${selectedTopicCategory}.`,
+                rule: `Teach this objective directly and follow its focused guidance: ${selectedLearningObjective.generationGuidance}`,
               },
               culturalNote: {
                 type: 'string',
@@ -726,9 +677,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 minItems: 3,
                 maxItems: 5,
                 itemFields: ['japanese', 'romaji', 'english', 'usage'],
-                rule: selectedLearningObjective
-                  ? `Every phrase must directly support ${selectedLearningObjective.id} and obey Coverage Evidence avoid/review rails.`
-                  : 'Every phrase must directly support the fresh Lesson Topic and obey Coverage Evidence avoid/review rails.',
+                rule: `Every phrase must directly support ${selectedLearningObjective.id} and obey Coverage Evidence avoid/review rails.`,
               },
             },
             exercises: {

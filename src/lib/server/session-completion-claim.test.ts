@@ -143,7 +143,7 @@ describe('session completion claims', () => {
       plannedCoverage: {
         version: 1,
         category: 'food_dining',
-        learningObjectiveId: 'food_dining.order_item',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
         lessonTopic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
         keyPhraseDetails: plannedKeyPhraseDetails,
@@ -164,7 +164,7 @@ describe('session completion claims', () => {
       plannedCoverage: {
         version: 1,
         category: 'food_dining',
-        learningObjectiveId: 'food_dining.order_item',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
         lessonTopic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
         keyPhraseDetails: plannedKeyPhraseDetails,

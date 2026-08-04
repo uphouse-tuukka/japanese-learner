@@ -124,6 +124,7 @@ describe('coverage source parsing', () => {
         plannedCoverage: {
           version: 1,
           category: 'greetings_basics',
+          learningObjectiveId: 'greetings_basics.greet_by_time',
           lessonTopic: 'Exchanging origins',
           lessonTreatment: JSON.stringify({
             topic: 'Exchanging origins',

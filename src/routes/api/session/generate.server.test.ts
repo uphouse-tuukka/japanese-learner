@@ -464,12 +464,10 @@ describe('POST /api/session/generate', () => {
         userId: 'user-1',
         exerciseCount: 12,
         japaneseWritingEnabled: false,
-        categoryRotation: expect.objectContaining({
-          neverVisited: expect.arrayContaining([
-            'greetings_basics',
-            'travel_essentials',
-            'food_dining',
-          ]),
+        coverageEvidence: expect.objectContaining({
+          categoryRotation: expect.objectContaining({
+            selectedCategory: 'greetings_basics',
+          }),
         }),
       }),
     );
@@ -564,6 +562,20 @@ describe('POST /api/session/generate', () => {
         selectedCategory: 'greetings_basics',
         selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
         learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+      }),
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      '[api/session/generate] curriculum plan approved',
+      expect.objectContaining({
+        attempt: 1,
+        validationReasonCodes: [],
+        selectedCategory: 'greetings_basics',
+        selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
+        learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        reviewCandidateReasonCodes: [],
+        reviewCandidateResolutionState: 'none_selected',
         parseableCompletedAiSessions: 0,
         ignoredCompletedAiSessions: 0,
       }),
@@ -1338,7 +1350,18 @@ describe('POST /api/session/generate', () => {
       ([message]) => message === '[api/session/generate] curriculum validation failed',
     );
     expect(validationLog?.[1]).toEqual(
-      expect.objectContaining({ generatedLearningObjectiveStatus: 'unrecognized' }),
+      expect.objectContaining({
+        attempt: 1,
+        validationReasonCodes: ['invalid_learning_objective_identity'],
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+        selectedCategory: 'greetings_basics',
+        selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
+        learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        reviewCandidateReasonCodes: [],
+        reviewCandidateResolutionState: 'none_selected',
+        generatedLearningObjectiveStatus: 'unrecognized',
+      }),
     );
     expect(JSON.stringify(validationLog?.[1])).not.toContain('model_invented_goal');
   });

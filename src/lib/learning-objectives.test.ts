@@ -3,7 +3,6 @@ import {
   LEARNING_OBJECTIVES,
   getLearningObjective,
   getLearningObjectivesForCategory,
-  hasCanonicalLearningObjectives,
   validateLearningObjectiveCatalog,
 } from '$lib/learning-objectives';
 import { TOPIC_CATEGORY_KEYS } from '$lib/topic-categories';
@@ -137,7 +136,11 @@ describe('canonical Learning Objective catalog', () => {
   });
 
   it('provides canonical Learning Objectives for every Topic Category', () => {
-    expect(TOPIC_CATEGORY_KEYS.every(hasCanonicalLearningObjectives)).toBe(true);
+    expect(
+      TOPIC_CATEGORY_KEYS.every(
+        (category) => getLearningObjectivesForCategory(category).length > 0,
+      ),
+    ).toBe(true);
   });
 
   it('rejects duplicate identities, category mismatches, and incomplete guidance', () => {

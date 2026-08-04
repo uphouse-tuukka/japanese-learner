@@ -232,7 +232,14 @@ describe('POST /api/session/complete', () => {
       tokenInput: 10,
       tokenOutput: 20,
       summary: null,
-      plannedCoverage: null,
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
+        lessonTopic: 'Ordering Food',
+        culturalNote: 'Use polite request forms with restaurant staff.',
+        keyPhraseDetails: plannedKeyPhraseDetails,
+      },
       createdAt: '2026-01-01T00:00:00.000Z',
       completedAt: CLAIMED_AT,
     });
@@ -716,6 +723,39 @@ describe('POST /api/session/complete', () => {
     );
   });
 
+  it('fails closed before storing results when server-owned coverage metadata is missing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGetSession.mockResolvedValueOnce({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      status: 'completing',
+      model: 'gpt-5.4',
+      tokenInput: 10,
+      tokenOutput: 20,
+      summary: null,
+      plannedCoverage: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      completedAt: CLAIMED_AT,
+    });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Browser-authored fallback must not be accepted',
+      category: 'shopping',
+      culturalNote: 'Browser-authored note',
+      keyPhrases: ['browser phrase'],
+      keyPhraseDetails: [{ japanese: '偽' }],
+    });
+
+    expect(response.status).toBe(500);
+    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
+    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
+    expect(mockResetSessionCompletionClaim).toHaveBeenCalledWith('user-1', 'session-1', CLAIMED_AT);
+  });
+
   it.each([
     ['missing', {}],
     [
@@ -763,7 +803,7 @@ describe('POST /api/session/complete', () => {
         plannedCoverage: {
           version: 1,
           category: 'food_dining',
-          learningObjectiveId: 'food_dining.order_item',
+          learningObjectiveId: 'food_dining.order_food_and_drinks',
           lessonTopic: 'Ordering ramen',
           culturalNote: 'Ticket machines are common.',
           keyPhraseDetails: plannedKeyPhraseDetails,
@@ -788,7 +828,7 @@ describe('POST /api/session/complete', () => {
 
       expect(storedMeta).toMatchObject({
         category: 'food_dining',
-        learningObjectiveId: 'food_dining.order_item',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
         topic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
         keyPhrases: ['ラーメンをください', 'おすすめは何ですか', 'お会計をお願いします'],
@@ -812,6 +852,7 @@ describe('POST /api/session/complete', () => {
       plannedCoverage: {
         version: 1,
         category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_food_and_drinks',
         lessonTopic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
         keyPhraseDetails: plannedKeyPhraseDetails,
@@ -867,45 +908,7 @@ describe('POST /api/session/complete', () => {
     });
   });
 
-  it('keeps the bounded lower-confidence fallback for legacy planned sessions', async () => {
-    mockGetSession.mockResolvedValueOnce({
-      id: 'session-1',
-      userId: 'user-1',
-      mode: 'ai',
-      status: 'completing',
-      model: 'gpt-5.4',
-      tokenInput: 10,
-      tokenOutput: 20,
-      summary: null,
-      plannedCoverage: null,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      completedAt: CLAIMED_AT,
-    });
-
-    const response = await completeSession({
-      userId: 'user-1',
-      sessionId: 'session-1',
-      results: validResults(),
-      lessonTopic: 'Legacy browser topic',
-      category: 'food_dining',
-      culturalNote: 'Legacy browser note',
-      keyPhraseDetails: [{ japanese: 'ください', romaji: 'kudasai' }],
-    });
-
-    expect(response.status).toBe(200);
-    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
-      string,
-      { summary: string; tokenInput: number; tokenOutput: number },
-    ];
-    expect(JSON.parse(completion.summary)).toMatchObject({
-      category: 'food_dining',
-      topic: 'Legacy browser topic',
-      keyPhrases: ['ください'],
-      coverageSource: 'legacy_client_fallback',
-    });
-  });
-
-  it('sanitizes structured key phrase details and derives legacy key phrases from them first', async () => {
+  it('ignores partially malformed browser-authored key phrase details', async () => {
     const response = await completeSession({
       userId: 'user-1',
       sessionId: 'session-1',
@@ -947,26 +950,15 @@ describe('POST /api/session/complete', () => {
     ];
     const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
 
-    expect(storedMeta.keyPhraseDetails).toEqual([
-      {
-        japanese: 'すみません',
-        romaji: 'sumimasen',
-        english: 'Excuse me',
-        usage: 'Getting attention.',
-      },
-      {
-        romaji: 'kore wa',
-        english: 'This is',
-      },
-      {
-        english: 'Thank you.',
-        usage: 'Gratitude.',
-      },
+    expect(storedMeta.keyPhraseDetails).toEqual(plannedKeyPhraseDetails);
+    expect(storedMeta.keyPhrases).toEqual([
+      'ラーメンをください',
+      'おすすめは何ですか',
+      'お会計をお願いします',
     ]);
-    expect(storedMeta.keyPhrases).toEqual(['すみません', 'kore wa', 'Thank you.']);
   });
 
-  it('caps structured key phrase details before storing completion metadata', async () => {
+  it('ignores oversized browser-authored key phrase details', async () => {
     const keyPhraseDetails = Array.from({ length: 12 }, (_, index) => ({
       japanese: `表現${index + 1}`,
       romaji: `hyougen ${index + 1}`,
@@ -989,22 +981,15 @@ describe('POST /api/session/complete', () => {
     ];
     const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
 
-    expect(storedMeta.keyPhraseDetails).toHaveLength(10);
+    expect(storedMeta.keyPhraseDetails).toEqual(plannedKeyPhraseDetails);
     expect(storedMeta.keyPhrases).toEqual([
-      '表現1',
-      '表現2',
-      '表現3',
-      '表現4',
-      '表現5',
-      '表現6',
-      '表現7',
-      '表現8',
-      '表現9',
-      '表現10',
+      'ラーメンをください',
+      'おすすめは何ですか',
+      'お会計をお願いします',
     ]);
   });
 
-  it('bounds structured key phrase detail field lengths before storing completion metadata', async () => {
+  it('ignores overlong browser-authored key phrase detail fields', async () => {
     const longJapanese = `すみません${'あ'.repeat(200)}`;
     const longRomaji = `sumimasen ${'x'.repeat(200)}`;
     const longEnglish = `Excuse me ${'y'.repeat(200)}`;
@@ -1032,18 +1017,15 @@ describe('POST /api/session/complete', () => {
     ];
     const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
 
-    expect(storedMeta.keyPhraseDetails).toEqual([
-      {
-        japanese: longJapanese.slice(0, 160),
-        romaji: longRomaji.slice(0, 160),
-        english: longEnglish.slice(0, 160),
-        usage: longUsage.slice(0, 160),
-      },
+    expect(storedMeta.keyPhraseDetails).toEqual(plannedKeyPhraseDetails);
+    expect(storedMeta.keyPhrases).toEqual([
+      'ラーメンをください',
+      'おすすめは何ですか',
+      'お会計をお願いします',
     ]);
-    expect(storedMeta.keyPhrases).toEqual([longJapanese.slice(0, 160)]);
   });
 
-  it('falls back to legacy request key phrases when structured details are absent or invalid', async () => {
+  it('ignores legacy browser-authored key phrases', async () => {
     const response = await completeSession({
       userId: 'user-1',
       sessionId: 'session-1',
@@ -1060,8 +1042,12 @@ describe('POST /api/session/complete', () => {
     ];
     const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
 
-    expect(storedMeta.keyPhrases).toEqual(['legacy phrase']);
-    expect(storedMeta.keyPhraseDetails).toBeUndefined();
+    expect(storedMeta.keyPhrases).toEqual([
+      'ラーメンをください',
+      'おすすめは何ですか',
+      'お会計をお願いします',
+    ]);
+    expect(storedMeta.keyPhraseDetails).toEqual(plannedKeyPhraseDetails);
   });
 
   it('schedules AI journal updates through the shared background helper', async () => {
@@ -1099,10 +1085,10 @@ describe('POST /api/session/complete', () => {
       currentJournal: null,
       sessionSummary: expect.objectContaining({ summary: 'AI generated summary' }),
       sessionMeta: {
-        category: 'restaurant',
+        category: 'food_dining',
         topic: 'Ordering Food',
         exerciseTypes: ['translation'],
-        keyPhrases: ['konnichiwa'],
+        keyPhrases: ['ラーメンをください', 'おすすめは何ですか', 'お会計をお願いします'],
       },
       userLevel: 'beginner',
     });

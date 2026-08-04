@@ -68,10 +68,11 @@
 
 ### Coverage metadata authority
 
-- A generated Learning Session must durably store its generated Topic Category, Lesson Topic, cultural note, structured Lesson Key Phrases, and optional app-selected Learning Objective identity with the planned server session before responding successfully.
+- A generated Learning Session must durably store its generated Topic Category, canonical app-selected Learning Objective identity, Lesson Topic, cultural note, and structured Lesson Key Phrases with the planned server session before responding successfully.
 - Completion must build Coverage Evidence metadata from the stored generated plan, not from browser-authored lesson fields.
 - Missing, blank, altered, malformed, or resumed browser lesson data must not replace valid server-owned metadata.
-- Legacy planned sessions without stored plan metadata may use the bounded compatibility fallback and must identify the resulting coverage as lower confidence.
+- Completion must fail closed before storing results when valid server-owned planned coverage metadata is unavailable.
+- Legacy completed sessions without a recognized Learning Objective identity remain lower-confidence exact Lesson Topic and Lesson Key Phrase Coverage Evidence.
 - Completion retries must return the stored completion result without repeating coverage, result, token, XP, or journal side effects.
 
 ### Learning Journal lifecycle
@@ -132,7 +133,7 @@
 - The model must copy the selected identity exactly and may vary the Lesson Topic wording without changing that identity.
 - Coverage and validation use the stable identity, so semantic title variants such as saying where the learner is from and introducing their country of origin remain one objective.
 - A mastered objective remains unavailable as fresh coverage across the learner's full parseable history.
-- When a migrated category has no uncovered or review-eligible objective, selection moves deterministically to the next allowed category with viable work.
+- When a category has no uncovered or review-eligible objective, selection moves deterministically to the next allowed category with viable work.
 - Legacy completed sessions without a recognized Learning Objective identity remain exact topic and phrase Coverage Evidence and are not semantically guessed.
 
 ### Level Constraints
@@ -146,7 +147,7 @@
 
 - Never repeat a covered canonical Learning Objective as fresh coverage, regardless of intervening-session count
 - Only the explicitly selected and currently eligible Review Candidate may authorize intentional repetition.
-- Keep exact Lesson Topic avoidance for compatibility categories and legacy history
+- Keep exact Lesson Topic avoidance for lower-confidence legacy completed history
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries
 - Adjust difficulty based on recent accuracy (>80% increase, <50% reinforce)

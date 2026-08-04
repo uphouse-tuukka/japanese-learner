@@ -691,7 +691,3 @@ export function getLearningObjective(id: string): LearningObjective | null {
 export function getLearningObjectivesForCategory(category: TopicCategoryKey): LearningObjective[] {
   return LEARNING_OBJECTIVES.filter((objective) => objective.category === category);
 }
-
-export function hasCanonicalLearningObjectives(category: TopicCategoryKey): boolean {
-  return LEARNING_OBJECTIVES.some((objective) => objective.category === category);
-}
