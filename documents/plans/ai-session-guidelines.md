@@ -74,6 +74,16 @@
 - Legacy planned sessions without stored plan metadata may use the bounded compatibility fallback and must identify the resulting coverage as lower confidence.
 - Completion retries must return the stored completion result without repeating coverage, result, token, XP, or journal side effects.
 
+### Learning Journal lifecycle
+
+- Exact Coverage Evidence remains correct when the advisory Learning Journal is missing, stale, truncated, or fails to update.
+- After session finalization, journal generation, persistence, and provider token accounting must remain inside the supported request lifecycle.
+- Vercel deployments register the guarded journal task with `@vercel/functions` `waitUntil`.
+- Local and other non-Vercel runtimes await the guarded task before returning because they have no supported deferred lifecycle boundary.
+- Journal generation or persistence failure is sanitized and non-fatal after the completed session is durable.
+- Persistence must compare the journal snapshot used for generation with the current stored value, and a stale update must not overwrite newer Learning Journal state.
+- Provider token accounting must still be attempted if journal persistence fails or detects a stale source snapshot.
+
 ### Review Evidence
 
 - Review Candidates must represent current unresolved item-level weakness, not every historical mistake.

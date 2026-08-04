@@ -33,10 +33,11 @@ const {
   mockGetSessionExercises,
   mockGetUserById,
   mockInsertExerciseResults,
+  mockLogError,
   mockProcessSessionCompletion,
+  mockPersistGeneratedJournal,
   mockRecordUsageEvent,
   mockResetSessionCompletionClaim,
-  mockUpdateProgressJournal,
   mockCheckBudget,
   mockRunBackgroundTask,
 } = vi.hoisted(() => ({
@@ -50,10 +51,11 @@ const {
   mockGetSessionExercises: vi.fn(),
   mockGetUserById: vi.fn(),
   mockInsertExerciseResults: vi.fn(),
+  mockLogError: vi.fn(),
   mockProcessSessionCompletion: vi.fn(),
+  mockPersistGeneratedJournal: vi.fn(),
   mockRecordUsageEvent: vi.fn(),
   mockResetSessionCompletionClaim: vi.fn(),
-  mockUpdateProgressJournal: vi.fn(),
   mockCheckBudget: vi.fn(),
   mockRunBackgroundTask: vi.fn(),
 }));
@@ -68,7 +70,6 @@ vi.mock('$lib/server/db', () => ({
   getUserById: mockGetUserById,
   insertExerciseResults: mockInsertExerciseResults,
   resetSessionCompletionClaim: mockResetSessionCompletionClaim,
-  updateProgressJournal: mockUpdateProgressJournal,
 }));
 
 vi.mock('$lib/server/ai', () => ({
@@ -87,6 +88,14 @@ vi.mock('$lib/server/gamification', () => ({
 
 vi.mock('$lib/server/background-task', () => ({
   runBackgroundTask: mockRunBackgroundTask,
+}));
+
+vi.mock('$lib/server/logger', () => ({
+  logError: mockLogError,
+}));
+
+vi.mock('$lib/server/progress-journal', () => ({
+  persistGeneratedJournal: mockPersistGeneratedJournal,
 }));
 
 import { POST } from './complete/+server';
@@ -143,7 +152,7 @@ async function completeSession(
 function expectNoWrites() {
   expect(mockInsertExerciseResults).not.toHaveBeenCalled();
   expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
-  expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+  expect(mockPersistGeneratedJournal).not.toHaveBeenCalled();
   expect(mockClaimSessionCompletion).not.toHaveBeenCalled();
   expect(mockGetUserById).not.toHaveBeenCalled();
   expect(mockGetSessionExercises).not.toHaveBeenCalled();
@@ -175,10 +184,11 @@ describe('POST /api/session/complete', () => {
     mockGetSessionExercises.mockReset();
     mockGetUserById.mockReset();
     mockInsertExerciseResults.mockReset();
+    mockLogError.mockReset();
     mockProcessSessionCompletion.mockReset();
+    mockPersistGeneratedJournal.mockReset();
     mockRecordUsageEvent.mockReset();
     mockResetSessionCompletionClaim.mockReset();
-    mockUpdateProgressJournal.mockReset();
     mockCheckBudget.mockReset();
     mockRunBackgroundTask.mockReset();
 
@@ -261,7 +271,7 @@ describe('POST /api/session/complete', () => {
     mockProcessSessionCompletion.mockResolvedValue({ totalXp: 12 });
     mockRecordUsageEvent.mockResolvedValue(undefined);
     mockResetSessionCompletionClaim.mockResolvedValue(undefined);
-    mockUpdateProgressJournal.mockResolvedValue(undefined);
+    mockPersistGeneratedJournal.mockResolvedValue(undefined);
     mockCheckBudget.mockResolvedValue({ allowed: false, reason: 'budget_unavailable' });
   });
 
@@ -1081,7 +1091,7 @@ describe('POST /api/session/complete', () => {
       sessionId: 'session-1',
       userId: 'user-1',
     });
-    expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+    expect(mockPersistGeneratedJournal).not.toHaveBeenCalled();
 
     await task();
 
@@ -1096,14 +1106,42 @@ describe('POST /api/session/complete', () => {
       },
       userLevel: 'beginner',
     });
-    expect(mockUpdateProgressJournal).toHaveBeenCalledWith('user-1', 'updated progress journal');
-    expect(mockRecordUsageEvent).toHaveBeenCalledWith({
+    expect(mockPersistGeneratedJournal).toHaveBeenCalledWith({
       userId: 'user-1',
       sessionId: 'session-1',
-      model: 'gpt-5.4',
-      tokensIn: 1,
-      tokensOut: 2,
+      currentJournal: null,
+      journal: 'updated progress journal',
+      tokenUsage: {
+        model: 'gpt-5.4',
+        tokensIn: 1,
+        tokensOut: 2,
+      },
     });
+  });
+
+  it('keeps journal scheduling failures non-fatal and uses sanitized logging', async () => {
+    const schedulingError = new Error('deferred lifecycle unavailable');
+    mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+    mockRunBackgroundTask.mockRejectedValueOnce(schedulingError);
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Ordering Food',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, state: 'done' });
+    expect(mockLogError).toHaveBeenCalledWith(
+      'api/session/complete',
+      'journal scheduling failed (non-fatal)',
+      {
+        error: schedulingError,
+        sessionId: 'session-1',
+        userId: 'user-1',
+      },
+    );
   });
 
   it('keeps XP processing failures non-fatal after storing results and completing the record', async () => {

@@ -215,6 +215,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Source files affected: `.gitignore`, `package.json`, `scripts/codegraph-preflight.mjs`, `AGENTS.md`, `documents/CONTRIBUTING.md`, `README.md`
 - Last verified: 2026-05-26
 
+### `documents/decisions/006-durable-learning-journal-updates.md`
+
+- Status: decision
+- Description: Decision to keep post-completion Learning Journal work inside Vercel's supported deferred lifecycle, await it elsewhere, and protect persistence with compare-and-swap semantics.
+- Source files affected: `src/lib/server/background-task.ts`, `src/lib/server/progress-journal.ts`, `src/lib/server/db.ts`, Learning Session and Practice completion routes
+- Last verified: 2026-08-04
+
 ## Analyses
 
 ### `documents/analyses/ai-model-comparison.md`

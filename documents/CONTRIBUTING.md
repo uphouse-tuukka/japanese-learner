@@ -211,7 +211,8 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 3. The completion API claims the planned session as `completing`, then stores exercise results behind that claim.
 4. Learn completion builds or reuses a summary, while Practice completion builds the local practice summary.
 5. The completion record finalizes only if the claim timestamp still matches, which keeps retries idempotent and concurrent completions isolated.
-6. Progress journal updates are scheduled after finalization as non-fatal background work.
+6. Learning Journal updates run after finalization inside Vercel's supported deferred lifecycle, with an awaited fallback on non-Vercel runtimes.
+7. Journal persistence uses the source journal as a compare-and-swap condition so concurrent completions cannot overwrite newer Learning Journal state.
 
 ### Important Files
 
@@ -227,9 +228,11 @@ Local shortcut: run `npm run validate` to run check + lint + test when a full CI
 | Session renderer        | `src/lib/components/SessionRenderer.svelte` |
 | Session summary UI      | `src/lib/components/SessionSummary.svelte`  |
 
-### Progress Journal
+### Learning Journal
 
 Each user has a `progress_journal` TEXT column that holds an AI-maintained cumulative summary of all their learning.
 It is passed to the summary AI so the summary can avoid repeating suggestions.
 It is scheduled for update after a session record is finalized, so failed completion attempts do not enqueue journal side effects.
-Journal generation, token telemetry, and scheduling failures are logged as non-fatal after the completed record is durable.
+On Vercel, the complete guarded update runs through the supported deferred function lifecycle.
+Other runtimes await the same work before returning.
+Journal generation, conditional persistence, token telemetry, and scheduling failures are sanitized and logged as non-fatal after the completed record is durable.
