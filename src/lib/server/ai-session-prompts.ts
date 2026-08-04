@@ -1,5 +1,10 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
+import {
+  buildIntentionalReviewLessonTopic,
+  buildIntentionalReviewTransferTask,
+  selectIntentionalReviewTransferContext,
+} from '$lib/server/session-intentional-review';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
 
 export {
@@ -239,6 +244,39 @@ function formatLearningObjectiveContext(evidence: CompactCoverageEvidence): stri
   ];
 }
 
+function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): string[] {
+  const selection = evidence.learningObjectiveSelection;
+  const candidate = selection.reviewCandidate;
+  if (!candidate || !selection.objective) {
+    return [
+      'INTENTIONAL REVIEW: none selected. Return top-level intentionalReview as null.',
+      'Do not repeat any covered Lesson Key Phrase in lesson.keyPhrases.',
+      'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
+    ];
+  }
+  const transferContext = selectIntentionalReviewTransferContext(candidate);
+  if (!transferContext) {
+    throw new Error('No fresh intentional-review transfer context is available.');
+  }
+  const transferTask = buildIntentionalReviewTransferTask(transferContext);
+  const lessonTopic = buildIntentionalReviewLessonTopic(
+    transferContext,
+    selection.objective.description,
+  );
+
+  return [
+    'INTENTIONAL REVIEW REQUIRED:',
+    `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
+    `Copy transferContextId exactly "${transferContext.id}" and copy intentionalReview.transferTask exactly as "${transferTask}" to ground the review affirmatively in ${transferContext.label}.`,
+    `Copy lesson.topic exactly as "${lessonTopic}" so the review is visibly grounded in the fresh transfer context.`,
+    'Use the app-owned Lesson Topic and transfer task as the concrete setting for the explanation and exercises.',
+    candidate.type === 'key_phrase'
+      ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
+      : 'The selected objective may be reviewed, but every covered Lesson Key Phrase must remain outside lesson.keyPhrases unless that phrase itself is the selected Review Candidate.',
+    'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
+  ];
+}
+
 function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
   if (!evidence) return '';
 
@@ -274,6 +312,7 @@ function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undef
       ? `Blocked Topic Categories: ${rotation.blockedCategories.join(', ')}.`
       : 'Blocked Topic Categories: none.',
     ...formatLearningObjectiveContext(evidence),
+    ...formatIntentionalReviewContext(evidence),
     categoryCoverage ? `Covered category counts: ${categoryCoverage}.` : '',
     avoidTopics
       ? `Avoid covered Lesson Topics unless listed as Review Candidates: ${avoidTopics}.`
@@ -494,6 +533,14 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
       : '';
   const selectedLearningObjective =
     input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
+  const selectedReviewCandidate =
+    input.coverageEvidence?.learningObjectiveSelection.reviewCandidate ?? null;
+  const selectedTransferContext = selectedReviewCandidate
+    ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
+    : null;
+  if (selectedReviewCandidate && !selectedTransferContext) {
+    throw new Error('No fresh intentional-review transfer context is available.');
+  }
   const selectedTopicCategory =
     input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
@@ -539,7 +586,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
         role: 'system',
         content: [
           'You are a Japanese tutor that adapts each session based on learner history.',
-          'Output valid JSON only with top-level keys: learningObjectiveId, lesson, exercises, focus.',
+          'Output valid JSON only with top-level keys: learningObjectiveId, intentionalReview, lesson, exercises, focus.',
           `Current user level: ${input.userLevel}. Apply levelInstructions() as hard constraints for allowed exercise types, difficulty range, and translation directions.`,
           '',
           categoryContext,
@@ -562,6 +609,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '',
           '2) Required output structure:',
           '- learningObjectiveId must exactly follow the authoritative Learning Objective rail above, or be null only when compatibility mode explicitly says so.',
+          '- intentionalReview must exactly follow the authoritative review rail above. Never claim an unselected Review Candidate.',
           '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
           '- each key phrase: japanese, romaji, english, usage.',
           '- every exercise must include: type, title, tags, difficulty, japanese, romaji, englishContext, plus type-specific fields.',
@@ -624,16 +672,44 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 ? 'Copy this app-selected identity exactly.'
                 : 'Return null because this Topic Category is in compatibility mode.',
             },
+            intentionalReview:
+              selectedReviewCandidate && selectedLearningObjective && selectedTransferContext
+                ? {
+                    type: 'object',
+                    required: true,
+                    candidateType: { const: selectedReviewCandidate.type },
+                    candidateIdentity: { const: selectedReviewCandidate.identity },
+                    learningObjectiveId: { const: selectedLearningObjective.id },
+                    transferContextId: { const: selectedTransferContext.id },
+                    transferTask: {
+                      const: buildIntentionalReviewTransferTask(selectedTransferContext),
+                      rule: 'Copy this app-owned affirmative transfer task exactly.',
+                    },
+                  }
+                : {
+                    const: null,
+                    rule: 'No Review Candidate was selected. Return null and do not claim intentional review.',
+                  },
             lesson: {
               category: {
                 const: selectedTopicCategory,
                 rule: 'Copy this app-selected Topic Category exactly.',
               },
               topic: {
-                type: 'string',
-                rule: selectedLearningObjective
-                  ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
-                  : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
+                ...(selectedLearningObjective && selectedTransferContext
+                  ? {
+                      const: buildIntentionalReviewLessonTopic(
+                        selectedTransferContext,
+                        selectedLearningObjective.description,
+                      ),
+                      rule: 'Copy this app-owned context-grounded Lesson Topic exactly.',
+                    }
+                  : {
+                      type: 'string',
+                      rule: selectedLearningObjective
+                        ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
+                        : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
+                    }),
               },
               explanation: {
                 type: 'string',

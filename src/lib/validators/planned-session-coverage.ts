@@ -1,10 +1,11 @@
 import { isTopicCategoryKey } from '$lib/topic-categories';
-import type { KeyPhrase, Lesson, PlannedSessionCoverage } from '$lib/types';
+import type { Exercise, KeyPhrase, Lesson, PlannedSessionCoverage } from '$lib/types';
 import { parseJsonObject } from './common';
 import { sanitizeKeyPhraseDetails } from './session-meta';
 
 const MAX_OBJECTIVE_ID_LENGTH = 160;
 const MAX_LESSON_TOPIC_LENGTH = 240;
+const MAX_LESSON_TREATMENT_LENGTH = 12_000;
 const MAX_CULTURAL_NOTE_LENGTH = 1_000;
 
 function boundedRequiredString(value: unknown, maxLength: number): string | null {
@@ -15,6 +16,16 @@ function boundedRequiredString(value: unknown, maxLength: number): string | null
 
 function boundedOptionalString(value: unknown, maxLength: number): string | undefined {
   return boundedRequiredString(value, maxLength) ?? undefined;
+}
+
+function hasCompleteLessonTreatment(value: string): boolean {
+  const treatment = parseJsonObject(value);
+  return Boolean(
+    treatment &&
+    typeof treatment.topic === 'string' &&
+    typeof treatment.explanation === 'string' &&
+    Array.isArray(treatment.exercises),
+  );
 }
 
 function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage | null {
@@ -44,6 +55,20 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
     culturalNote,
     keyPhraseDetails: keyPhraseDetails as KeyPhrase[],
   };
+  const lessonTreatment = boundedOptionalString(
+    parsed.lessonTreatment,
+    MAX_LESSON_TREATMENT_LENGTH,
+  );
+  if (lessonTreatment) coverage.lessonTreatment = lessonTreatment;
+  if (
+    lessonTreatment &&
+    parsed.lessonTreatmentComplete === true &&
+    typeof parsed.lessonTreatment === 'string' &&
+    parsed.lessonTreatment.trim().length <= MAX_LESSON_TREATMENT_LENGTH &&
+    hasCompleteLessonTreatment(lessonTreatment)
+  ) {
+    coverage.lessonTreatmentComplete = true;
+  }
   const learningObjectiveId = boundedOptionalString(
     parsed.learningObjectiveId,
     MAX_OBJECTIVE_ID_LENGTH,
@@ -54,13 +79,22 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
 
 export function buildPlannedSessionCoverage(input: {
   lesson: Lesson;
+  exercises: Exercise[];
   learningObjectiveId?: unknown;
 }): PlannedSessionCoverage {
+  const lessonTreatment = JSON.stringify({
+    topic: input.lesson.topic,
+    explanation: input.lesson.explanation,
+    exercises: input.exercises,
+  });
   const coverage = normalizePlannedSessionCoverage({
     version: 1,
     category: input.lesson.category,
     learningObjectiveId: input.learningObjectiveId,
     lessonTopic: input.lesson.topic,
+    lessonTreatment,
+    lessonTreatmentComplete:
+      lessonTreatment.length <= MAX_LESSON_TREATMENT_LENGTH ? true : undefined,
     culturalNote: input.lesson.culturalNote,
     keyPhraseDetails: input.lesson.keyPhrases,
   });

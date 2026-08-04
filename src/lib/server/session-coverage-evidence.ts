@@ -11,6 +11,10 @@ import {
 } from '$lib/learning-objectives';
 import type { Exercise, KeyPhrase, Session, SessionKeyPhraseDetail, SessionMeta } from '$lib/types';
 import { parseSessionMeta } from '$lib/validators/session-meta';
+import {
+  detectIntentionalReviewTransferContextIds,
+  type IntentionalReviewTransferContextId,
+} from '$lib/server/session-intentional-review';
 
 const MAX_PROMPT_AVOID_TOPICS = 20;
 const MAX_PROMPT_AVOID_KEY_PHRASES = 30;
@@ -23,6 +27,7 @@ export type CoverageSourceSession = {
   createdAt: string;
   completedAt: string | null;
   meta: SessionMeta;
+  treatmentContextIds?: IntentionalReviewTransferContextId[] | null;
 };
 
 export type CoverageExerciseResult = {
@@ -97,6 +102,8 @@ export type ReviewCandidate = {
   reasonCodes: ReviewCandidateReasonCode[];
   evidenceSessionIds: string[];
   lastSeenAt: string;
+  originalTreatmentContextIds: IntentionalReviewTransferContextId[];
+  treatmentEvidenceComplete: boolean;
 };
 
 export type CategorySelectionReason =
@@ -395,6 +402,11 @@ export function parseCoverageSourceSessions(
       createdAt: session.createdAt,
       completedAt: session.completedAt,
       meta,
+      treatmentContextIds:
+        session.plannedCoverage?.lessonTreatment &&
+        session.plannedCoverage.lessonTreatmentComplete === true
+          ? detectIntentionalReviewTransferContextIds(session.plannedCoverage.lessonTreatment)
+          : null,
     });
   }
 
@@ -936,6 +948,8 @@ function upsertReviewCandidate(
       reasonCodes: new Set([input.reasonCode]),
       evidenceSessionIds: new Set(input.sessionId ? [input.sessionId] : []),
       lastSeenAt: input.seenAt,
+      originalTreatmentContextIds: [],
+      treatmentEvidenceComplete: false,
     });
     return;
   }
@@ -968,6 +982,33 @@ function toReviewCandidates(candidates: Map<string, MutableReviewCandidate>): Re
       evidenceSessionIds: Array.from(candidate.evidenceSessionIds).sort(),
     }))
     .sort(candidateSort);
+}
+
+function attachOriginalTreatmentEvidence(input: {
+  candidate: ReviewCandidate;
+  sessionsById: Map<string, CoverageSourceSession>;
+  coveredTopic: CoveredTopic | undefined;
+  coveredPhrase: CoveredKeyPhrase | undefined;
+}): ReviewCandidate {
+  const treatmentSessionIds =
+    input.candidate.type === 'lesson_topic'
+      ? (input.coveredTopic?.sessionIds ?? [])
+      : (input.coveredPhrase?.sessionIds ?? []);
+  const sourceSessions = treatmentSessionIds
+    .map((sessionId) => input.sessionsById.get(sessionId))
+    .filter((session): session is CoverageSourceSession => Boolean(session));
+  const treatmentEvidenceComplete =
+    sourceSessions.length === treatmentSessionIds.length &&
+    treatmentSessionIds.length > 0 &&
+    sourceSessions.every((session) => Array.isArray(session.treatmentContextIds));
+  const originalTreatmentContextIds = Array.from(
+    new Set(sourceSessions.flatMap((session) => session.treatmentContextIds ?? [])),
+  ).sort();
+  return {
+    ...input.candidate,
+    originalTreatmentContextIds,
+    treatmentEvidenceComplete,
+  };
 }
 
 function reviewCandidateKey(type: ReviewCandidate['type'], identity: string): string {
@@ -1285,9 +1326,21 @@ export function buildCoverageEvidence(input: {
     exerciseResults: input.exerciseResults ?? [],
   });
 
-  const reviewCandidates = toReviewCandidates(candidates).filter(
-    (candidate) => !isResolvedByCanonicalObjectiveMastery(candidate, coveredLearningObjectives),
-  );
+  const sessionsById = new Map(sessions.map((session) => [session.sessionId, session]));
+  const reviewCandidates = toReviewCandidates(candidates)
+    .map((candidate) =>
+      attachOriginalTreatmentEvidence({
+        candidate,
+        sessionsById,
+        coveredTopic:
+          candidate.type === 'lesson_topic' ? topicsByIdentity.get(candidate.identity) : undefined,
+        coveredPhrase:
+          candidate.type === 'key_phrase' ? phrasesByPrimary.get(candidate.identity) : undefined,
+      }),
+    )
+    .filter(
+      (candidate) => !isResolvedByCanonicalObjectiveMastery(candidate, coveredLearningObjectives),
+    );
   const initialCategoryRotation = selectCategory({ sessions, categories, reviewCandidates });
   const { categoryRotation, learningObjectiveSelection } = selectLearningObjective({
     categoryRotation: initialCategoryRotation,

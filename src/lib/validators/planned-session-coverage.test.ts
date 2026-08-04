@@ -36,6 +36,7 @@ describe('planned Learning Session coverage metadata', () => {
           culturalNote: '  Ticket machines are common.  ',
           keyPhrases: completeKeyPhrases,
         },
+        exercises: [],
         learningObjectiveId: ' food_dining.order_item ',
       }),
     ).toEqual({
@@ -43,6 +44,12 @@ describe('planned Learning Session coverage metadata', () => {
       category: 'food_dining',
       learningObjectiveId: 'food_dining.order_item',
       lessonTopic: 'Ordering ramen',
+      lessonTreatment: JSON.stringify({
+        topic: '  Ordering ramen  ',
+        explanation: 'Practice ordering politely.',
+        exercises: [],
+      }),
+      lessonTreatmentComplete: true,
       culturalNote: 'Ticket machines are common.',
       keyPhraseDetails: [
         {
@@ -85,5 +92,34 @@ describe('planned Learning Session coverage metadata', () => {
       ),
     ).toBeNull();
     expect(parsePlannedSessionCoverage(null)).toBeNull();
+  });
+
+  it('marks malformed or truncated lesson treatment as incomplete', () => {
+    const baseInput = {
+      lesson: {
+        topic: 'Ordering ramen',
+        category: 'food_dining',
+        explanation: 'x'.repeat(12_001),
+        culturalNote: 'Ticket machines are common.',
+        keyPhrases: completeKeyPhrases,
+      },
+      exercises: [],
+    };
+    const oversized = buildPlannedSessionCoverage(baseInput);
+    const malformed = parsePlannedSessionCoverage(
+      JSON.stringify({
+        version: 1,
+        category: 'food_dining',
+        lessonTopic: 'Ordering ramen',
+        lessonTreatment: 'x',
+        lessonTreatmentComplete: true,
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: completeKeyPhrases,
+      }),
+    );
+
+    expect(oversized.lessonTreatment).toHaveLength(12_000);
+    expect(oversized.lessonTreatmentComplete).toBeUndefined();
+    expect(malformed?.lessonTreatmentComplete).toBeUndefined();
   });
 });

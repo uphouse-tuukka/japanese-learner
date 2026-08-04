@@ -155,6 +155,9 @@ function baseSessionInput() {
   };
 }
 
+const stationTransferTask =
+  'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+
 // ---------------------------------------------------------------------------
 // generateSessionSummary
 // ---------------------------------------------------------------------------
@@ -630,6 +633,58 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
     });
 
     expect(plan.metadata.learningObjectiveId).toBe('greetings_basics.exchange_origins');
+  });
+
+  it('returns the model intentional review claim in server plan metadata', async () => {
+    mockModelOutput({
+      ...minimalSessionPlanPayload(),
+      learningObjectiveId: 'greetings_basics.exchange_origins',
+      intentionalReview: {
+        candidateType: 'key_phrase',
+        candidateIdentity: 'ja:どちらからですか',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        transferContextId: 'station_encounter',
+        transferTask: stationTransferTask,
+      },
+    });
+
+    const plan = await generateSessionPlan({
+      userId: 'user-1',
+      userName: 'Tester',
+      userLevel: 'beginner',
+      exerciseCount: 4,
+    });
+
+    expect(plan.metadata.intentionalReview).toEqual({
+      candidateType: 'key_phrase',
+      candidateIdentity: 'ja:どちらからですか',
+      learningObjectiveId: 'greetings_basics.exchange_origins',
+      transferContextId: 'station_encounter',
+      transferTask: stationTransferTask,
+    });
+  });
+
+  it('preserves reported token usage when returned session JSON is invalid', async () => {
+    mockResponsesCreate.mockResolvedValueOnce({
+      output_text: '{invalid json',
+      usage: { input_tokens: 17, output_tokens: 9, total_tokens: 26 },
+    });
+
+    await expect(
+      generateSessionPlan({
+        userId: 'user-1',
+        userName: 'Tester',
+        userLevel: 'beginner',
+        exerciseCount: 4,
+      }),
+    ).rejects.toMatchObject({
+      name: 'SessionPlanGenerationError',
+      generationUsage: {
+        model: 'gpt-5.4',
+        input: 17,
+        output: 9,
+      },
+    });
   });
 });
 

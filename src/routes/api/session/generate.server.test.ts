@@ -141,6 +141,11 @@ const generatedPlan = {
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
+const hotelTransferTask =
+  'In a hotel lobby, apply the selected Learning Objective through a new interaction and transfer challenge.';
+const originHotelReviewTopic =
+  'Hotel lobby review: Ask where someone is from and state a country or place of origin.';
+
 const canonicalObjectiveCases = [
   {
     category: 'food_dining',
@@ -247,6 +252,13 @@ function buildSessionSummary(input: {
   keyPhrases?: string[];
   weaknesses?: string[];
   handoffNotes?: string[];
+  reviewIntents?: Array<{
+    type: 'key_phrase' | 'lesson_topic';
+    identity: string;
+    display: string;
+    reason: string;
+    reviewRequested: true;
+  }>;
 }) {
   const keyPhraseDetails = input.keyPhraseDetails ?? [];
   return JSON.stringify({
@@ -259,6 +271,7 @@ function buildSessionSummary(input: {
     weaknesses: input.weaknesses ?? [],
     nextSteps: [],
     handoffNotes: input.handoffNotes ?? [],
+    reviewIntents: input.reviewIntents ?? [],
     exerciseTypes: ['multiple_choice'],
     keyPhrases:
       input.keyPhrases ??
@@ -284,6 +297,14 @@ function buildCompletedAiSession(input: {
   }>;
   weaknesses?: string[];
   handoffNotes?: string[];
+  reviewIntents?: Array<{
+    type: 'key_phrase' | 'lesson_topic';
+    identity: string;
+    display: string;
+    reason: string;
+    reviewRequested: true;
+  }>;
+  lessonTreatment?: string;
 }) {
   return {
     id: input.id,
@@ -294,6 +315,21 @@ function buildCompletedAiSession(input: {
     tokenInput: 10,
     tokenOutput: 20,
     summary: buildSessionSummary(input),
+    plannedCoverage: {
+      version: 1,
+      category: input.category,
+      lessonTopic: input.topic,
+      lessonTreatment:
+        input.lessonTreatment ??
+        JSON.stringify({
+          topic: input.topic,
+          explanation: `Practice ${input.topic} in a neutral indoor setting.`,
+          exercises: [],
+        }),
+      lessonTreatmentComplete: true,
+      culturalNote: 'Test note.',
+      keyPhraseDetails: [],
+    },
     createdAt: input.createdAt,
     completedAt: input.createdAt,
   };
@@ -449,6 +485,12 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'Basic greetings',
+        lessonTreatment: JSON.stringify({
+          topic: lesson.topic,
+          explanation: lesson.explanation,
+          exercises,
+        }),
+        lessonTreatmentComplete: true,
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },
@@ -768,6 +810,223 @@ describe('POST /api/session/generate', () => {
     );
   });
 
+  it('accepts an explicit intentional review of the selected eligible candidate', async () => {
+    const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const greetingObjectives = [
+      ['greetings_basics.greet_by_time', 'Greeting by time'],
+      ['greetings_basics.exchange_names', 'Exchanging names'],
+      ['greetings_basics.exchange_origins', 'Exchanging origins'],
+      ['greetings_basics.ask_and_answer_wellbeing', 'Asking about wellbeing'],
+      ['greetings_basics.use_polite_thanks_and_apologies', 'Polite thanks and apologies'],
+      ['greetings_basics.open_and_close_brief_interactions', 'Opening and closing interactions'],
+    ];
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce(
+      greetingObjectives.flatMap(([learningObjectiveId, topic], index) => [
+        buildCompletedAiSession({
+          id: `travel-${index + 1}`,
+          createdAt: `2026-05-${String(index * 2 + 1).padStart(2, '0')}T08:00:00.000Z`,
+          category: 'travel_essentials',
+          topic: `Travel literacy ${index + 1}`,
+          accuracy: 80,
+        }),
+        buildCompletedAiSession({
+          id: `greeting-${index + 1}`,
+          createdAt: `2026-05-${String(index * 2 + 2).padStart(2, '0')}T08:00:00.000Z`,
+          category: 'greetings_basics',
+          topic,
+          learningObjectiveId,
+          accuracy: 80,
+          reviewIntents:
+            learningObjectiveId === 'greetings_basics.exchange_origins'
+              ? [
+                  {
+                    type: 'lesson_topic',
+                    identity: 'exchanging origins',
+                    display: 'Exchanging origins',
+                    reason: 'The learner still hesitates when asking the reciprocal question.',
+                    reviewRequested: true,
+                  },
+                ]
+              : [],
+          lessonTreatment:
+            learningObjectiveId === 'greetings_basics.exchange_origins'
+              ? JSON.stringify({
+                  topic,
+                  explanation: 'Exchange origins with another passenger inside a railway terminal.',
+                  exercises: [],
+                })
+              : undefined,
+        }),
+      ]),
+    );
+    mockGenerateSessionPlan.mockResolvedValueOnce(
+      buildGeneratedPlan({
+        lesson: { topic: originHotelReviewTopic },
+        metadata: {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          intentionalReview: {
+            candidateType: 'lesson_topic',
+            candidateIdentity: 'exchanging origins',
+            learningObjectiveId: 'greetings_basics.exchange_origins',
+            transferContextId: 'hotel_lobby',
+            transferTask: hotelTransferTask,
+          },
+        },
+      }),
+    );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coverageEvidence: expect.objectContaining({
+          learningObjectiveSelection: expect.objectContaining({
+            reason: 'selected_review_candidate_objective',
+            objective: expect.objectContaining({
+              id: 'greetings_basics.exchange_origins',
+            }),
+            reviewCandidate: expect.objectContaining({
+              type: 'lesson_topic',
+              identity: 'exchanging origins',
+              reasonCodes: ['structured_review_intent'],
+              originalTreatmentContextIds: ['station_encounter'],
+              treatmentEvidenceComplete: true,
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(mockCreateSessionRecord).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      '[api/session/generate] selected curriculum target',
+      expect.objectContaining({
+        reviewCandidateType: 'lesson_topic',
+        reviewCandidateResolutionState: 'eligible_unresolved',
+      }),
+    );
+  });
+
+  it('rejects a neutral journal-only review claim and retries without authorizing repetition', async () => {
+    mockGetUser.mockResolvedValueOnce(
+      buildMockUser({
+        progressJournal: '**Categories & topics covered** - Basic greetings completed.',
+      }),
+    );
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: {
+            learningObjectiveId: 'greetings_basics.greet_by_time',
+            intentionalReview: {
+              candidateType: 'lesson_topic',
+              candidateIdentity: 'basic greetings',
+              learningObjectiveId: 'greetings_basics.greet_by_time',
+              transferContextId: 'station_encounter',
+              transferTask: 'Greet a shopkeeper in the afternoon.',
+            },
+          },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        learningJournal: '**Categories & topics covered** - Basic greetings completed.',
+        coverageEvidence: expect.objectContaining({ reviewCandidates: [] }),
+      }),
+    );
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('ineligible_review'),
+        ]),
+      }),
+    );
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ sessionId: null, tokensIn: 11, tokensOut: 22 }),
+    );
+  });
+
+  it('retries after one repeated non-review Lesson Key Phrase', async () => {
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+      buildCompletedAiSession({
+        id: 'greeting-coverage',
+        createdAt: '2026-05-01T08:00:00.000Z',
+        category: 'greetings_basics',
+        topic: 'Greeting by time',
+        learningObjectiveId: 'greetings_basics.greet_by_time',
+        accuracy: 100,
+        keyPhraseDetails: [keyPhrases[0]!],
+      }),
+    ]);
+    const freshKeyPhrases = [
+      {
+        japanese: 'お名前は何ですか',
+        romaji: 'onamae wa nan desu ka',
+        english: 'What is your name?',
+        usage: 'Ask for a name politely.',
+      },
+      {
+        japanese: 'トゥーッカです',
+        romaji: 'Tuukka desu',
+        english: 'I am Tuukka.',
+        usage: 'State your name.',
+      },
+      {
+        japanese: 'こちらこそ',
+        romaji: 'kochira koso',
+        english: 'Likewise.',
+        usage: 'Return a polite first-meeting sentiment.',
+      },
+    ];
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Exchanging names' },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_names' },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Exchanging names', keyPhrases: freshKeyPhrases },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_names' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('repeated_key_phrases'),
+          expect.stringContaining('Do not repeat any covered Lesson Key Phrase'),
+        ]),
+      }),
+    );
+    expect(mockCreateSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plannedCoverage: expect.objectContaining({ keyPhraseDetails: freshKeyPhrases }),
+      }),
+    );
+  });
+
   it('rejects a paraphrased mastered objective after seven intervening sessions', async () => {
     const masteredPhrase = {
       japanese: 'ください',
@@ -785,6 +1044,15 @@ describe('POST /api/session/generate', () => {
         accuracy: 0,
         weaknesses: ['The origin exchange was difficult.'],
         handoffNotes: ['Review the origin exchange.'],
+        reviewIntents: [
+          {
+            type: 'lesson_topic',
+            identity: 'saying where you are from',
+            display: 'Saying where you are from',
+            reason: 'The learner had not yet mastered the origin exchange.',
+            reviewRequested: true,
+          },
+        ],
         keyPhraseDetails: [masteredPhrase],
       }),
       buildCompletedAiSession({
@@ -856,7 +1124,16 @@ describe('POST /api/session/generate', () => {
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: { topic: 'Introducing your country of origin' },
-          metadata: { learningObjectiveId: 'greetings_basics.exchange_origins' },
+          metadata: {
+            learningObjectiveId: 'greetings_basics.exchange_origins',
+            intentionalReview: {
+              candidateType: 'lesson_topic',
+              candidateIdentity: 'saying where you are from',
+              learningObjectiveId: 'greetings_basics.exchange_origins',
+              transferContextId: 'station_encounter',
+              transferTask: 'Exchange origins with another traveler on a train.',
+            },
+          },
         }),
       )
       .mockResolvedValueOnce(
@@ -887,6 +1164,7 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         curriculumValidationFeedback: expect.arrayContaining([
           expect.stringContaining('repeated_learning_objective'),
+          expect.stringContaining('ineligible_review'),
         ]),
       }),
     );
@@ -998,6 +1276,12 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'First greetings',
+        lessonTreatment: JSON.stringify({
+          topic: 'First greetings',
+          explanation: lesson.explanation,
+          exercises,
+        }),
+        lessonTreatmentComplete: true,
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },
@@ -1098,6 +1382,33 @@ describe('POST /api/session/generate', () => {
       model: 'gpt-5.4',
       tokensIn: 12,
       tokensOut: 23,
+    });
+  });
+
+  it('records returned usage when a model response cannot be normalized before retry', async () => {
+    const rejectedResponseError = Object.assign(new Error('invalid model response'), {
+      generationUsage: { model: 'gpt-5.4', input: 17, output: 9 },
+    });
+    mockGenerateSessionPlan
+      .mockRejectedValueOnce(rejectedResponseError)
+      .mockResolvedValueOnce(generatedPlan);
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
+      userId: 'user-1',
+      sessionId: null,
+      model: 'gpt-5.4',
+      tokensIn: 17,
+      tokensOut: 9,
+    });
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(2, {
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 10,
+      tokensOut: 20,
     });
   });
 
