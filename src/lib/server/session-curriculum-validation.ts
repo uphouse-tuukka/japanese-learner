@@ -5,8 +5,9 @@ import {
   type CoveredKeyPhrase,
   type ReviewCandidate,
 } from '$lib/server/session-coverage-evidence';
-import { getLearningObjective, type LearningObjective } from '$lib/learning-objectives';
+import { getLearningObjective } from '$lib/learning-objectives';
 import {
+  buildIntentionalReviewLessonTopic,
   buildIntentionalReviewTransferTask,
   isIntentionalReviewClaim,
   normalizeIntentionalReviewClaim,
@@ -51,7 +52,6 @@ export type SessionCurriculumValidationDetails = {
     | 'unrelated'
     | 'context_mismatch'
     | 'context_not_grounded'
-    | 'duplicate_treatment'
     | 'eligible';
 };
 
@@ -71,100 +71,6 @@ type GeneratedSessionPlanLike = {
   lesson: Pick<Lesson, 'topic' | 'category' | 'explanation' | 'keyPhrases'>;
   metadata: Record<string, unknown>;
 };
-
-function duplicatesOriginalTreatment(
-  transferTask: string,
-  generatedTopic: string,
-  candidate: ReviewCandidate,
-  objective: LearningObjective | null,
-): boolean {
-  const transferIdentity = normalizeTopicIdentity(transferTask);
-  const generatedTopicIdentity = normalizeTopicIdentity(generatedTopic);
-  if (!transferIdentity || !generatedTopicIdentity) return true;
-  const originalTreatmentIdentities = [
-    candidate.identity,
-    candidate.display,
-    candidate.topicIdentity,
-    candidate.topic,
-    objective?.description,
-    objective?.generationGuidance,
-  ]
-    .map((value) => (typeof value === 'string' ? normalizeTopicIdentity(value) : null))
-    .filter((value): value is string => Boolean(value));
-  return (
-    originalTreatmentIdentities.some((identity) =>
-      materiallyRestatesTreatment(transferIdentity, identity),
-    ) ||
-    originalTreatmentIdentities.some((identity) =>
-      materiallyRestatesTreatment(generatedTopicIdentity, identity),
-    )
-  );
-}
-
-const TREATMENT_STOP_TOKENS = new Set([
-  'again',
-  'another',
-  'during',
-  'drill',
-  'from',
-  'lesson',
-  'more',
-  'once',
-  'person',
-  'practice',
-  'practicing',
-  'repeat',
-  'repeating',
-  'review',
-  'reviewing',
-  'revisit',
-  'revisiting',
-  'say',
-  'saying',
-  'someone',
-  'task',
-  'teach',
-  'that',
-  'this',
-  'while',
-  'with',
-  'you',
-  'your',
-]);
-
-function treatmentContentTokens(identity: string): string[] {
-  return identity
-    .split(' ')
-    .filter((token) => token.length >= 3 && !TREATMENT_STOP_TOKENS.has(token));
-}
-
-function treatmentTokensMatch(left: string, right: string): boolean {
-  return (
-    left === right ||
-    (left.length >= 5 && right.length >= 5 && left.slice(0, 5) === right.slice(0, 5))
-  );
-}
-
-function materiallyRestatesTreatment(value: string, reference: string): boolean {
-  const valueTokens = treatmentContentTokens(value);
-  const referenceTokens = treatmentContentTokens(reference);
-  if (valueTokens.length === 0 || referenceTokens.length === 0) return value === reference;
-
-  const unusedReferenceTokens = [...referenceTokens];
-  let matchingTokenCount = 0;
-  for (const valueToken of valueTokens) {
-    const matchingIndex = unusedReferenceTokens.findIndex((referenceToken) =>
-      treatmentTokensMatch(valueToken, referenceToken),
-    );
-    if (matchingIndex < 0) continue;
-    matchingTokenCount += 1;
-    unusedReferenceTokens.splice(matchingIndex, 1);
-  }
-
-  const overlapRatio = matchingTokenCount / Math.min(valueTokens.length, referenceTokens.length);
-  const novelTokenCount = valueTokens.length - matchingTokenCount;
-  return overlapRatio >= 0.75 && novelTokenCount < 2;
-}
 
 function reviewCandidateMatchesSelectedObjective(
   candidate: ReviewCandidate,
@@ -335,14 +241,14 @@ export function validateGeneratedSessionPlan(input: {
       intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');
     } else if (
-      duplicatesOriginalTreatment(
-        intentionalReviewClaim.transferTask,
-        plan.lesson.topic,
-        selectedReviewCandidate,
-        selectedLearningObjective,
-      )
+      !selectedLearningObjective ||
+      plan.lesson.topic !==
+        buildIntentionalReviewLessonTopic(
+          selectedTransferContext,
+          selectedLearningObjective.description,
+        )
     ) {
-      intentionalReviewStatus = 'duplicate_treatment';
+      intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');
     } else {
       intentionalReviewStatus = 'eligible';

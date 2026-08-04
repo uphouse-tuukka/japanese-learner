@@ -143,6 +143,8 @@ const generatedPlan = {
 
 const stationTransferTask =
   'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+const originStationReviewTopic =
+  'Station encounter review: Ask where someone is from and state a country or place of origin.';
 
 const canonicalObjectiveCases = [
   {
@@ -829,7 +831,7 @@ describe('POST /api/session/generate', () => {
     );
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
-        lesson: { topic: 'Meeting another traveler on a regional train' },
+        lesson: { topic: originStationReviewTopic },
         metadata: {
           learningObjectiveId: 'greetings_basics.exchange_origins',
           intentionalReview: {

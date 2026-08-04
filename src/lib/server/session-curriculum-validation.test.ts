@@ -84,6 +84,10 @@ const baseCoverage = {
 
 const stationTransferTask =
   'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+const originStationReviewTopic =
+  'Station encounter review: Ask where someone is from and state a country or place of origin.';
+const greetingStationReviewTopic =
+  'Station encounter review: Choose and use a basic greeting that fits the time of day.';
 
 function phrase(input: Partial<KeyPhrase>): KeyPhrase {
   return {
@@ -257,6 +261,7 @@ describe('validateGeneratedSessionPlan', () => {
     });
     const explicitReview = validateGeneratedSessionPlan({
       plan: plan({
+        topic: originStationReviewTopic,
         learningObjectiveId: 'greetings_basics.exchange_origins',
         intentionalReview: {
           candidateType: 'lesson_topic',
@@ -423,12 +428,12 @@ describe('validateGeneratedSessionPlan', () => {
     expect(duplicatedLessonTopic.valid).toBe(false);
     if (!duplicatedLessonTopic.valid) {
       expect(duplicatedLessonTopic.reasonCodes).toContain('ineligible_review');
-      expect(duplicatedLessonTopic.details.intentionalReviewStatus).toBe('duplicate_treatment');
+      expect(duplicatedLessonTopic.details.intentionalReviewStatus).toBe('context_not_grounded');
     }
     expect(cosmeticRestatement.valid).toBe(false);
     if (!cosmeticRestatement.valid) {
       expect(cosmeticRestatement.reasonCodes).toContain('ineligible_review');
-      expect(cosmeticRestatement.details.intentionalReviewStatus).toBe('duplicate_treatment');
+      expect(cosmeticRestatement.details.intentionalReviewStatus).toBe('context_not_grounded');
     }
     expect(ungroundedContextClaim.valid).toBe(false);
     if (!ungroundedContextClaim.valid) {
@@ -646,6 +651,7 @@ describe('validateGeneratedSessionPlan', () => {
     } as CoverageEvidence;
     const explicitPhraseReview = validateGeneratedSessionPlan({
       plan: plan({
+        topic: greetingStationReviewTopic,
         keyPhrases: [
           phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
           phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' }),

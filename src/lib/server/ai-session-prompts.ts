@@ -1,6 +1,7 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
 import {
+  buildIntentionalReviewLessonTopic,
   buildIntentionalReviewTransferTask,
   selectIntentionalReviewTransferContext,
 } from '$lib/server/session-intentional-review';
@@ -258,12 +259,17 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
     throw new Error('No fresh intentional-review transfer context is available.');
   }
   const transferTask = buildIntentionalReviewTransferTask(transferContext);
+  const lessonTopic = buildIntentionalReviewLessonTopic(
+    transferContext,
+    selection.objective.description,
+  );
 
   return [
     'INTENTIONAL REVIEW REQUIRED:',
     `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
     `Copy transferContextId exactly "${transferContext.id}" and copy intentionalReview.transferTask exactly as "${transferTask}" to ground the review affirmatively in ${transferContext.label}.`,
-    'Use the app-owned transfer task as the concrete setting for the Lesson Topic, explanation, and exercises.',
+    `Copy lesson.topic exactly as "${lessonTopic}" so the review is visibly grounded in the fresh transfer context.`,
+    'Use the app-owned Lesson Topic and transfer task as the concrete setting for the explanation and exercises.',
     candidate.type === 'key_phrase'
       ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
       : 'The selected objective may be reviewed, but every covered Lesson Key Phrase must remain outside lesson.keyPhrases unless that phrase itself is the selected Review Candidate.',
@@ -690,10 +696,20 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 rule: 'Copy this app-selected Topic Category exactly.',
               },
               topic: {
-                type: 'string',
-                rule: selectedLearningObjective
-                  ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
-                  : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
+                ...(selectedLearningObjective && selectedTransferContext
+                  ? {
+                      const: buildIntentionalReviewLessonTopic(
+                        selectedTransferContext,
+                        selectedLearningObjective.description,
+                      ),
+                      rule: 'Copy this app-owned context-grounded Lesson Topic exactly.',
+                    }
+                  : {
+                      type: 'string',
+                      rule: selectedLearningObjective
+                        ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
+                        : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
+                    }),
               },
               explanation: {
                 type: 'string',

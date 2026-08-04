@@ -12,6 +12,7 @@ export type IntentionalReviewClaim = {
 export type IntentionalReviewTransferContext = {
   id: 'station_encounter' | 'hotel_lobby' | 'shop_counter' | 'street_encounter';
   label: string;
+  topicLabel: string;
   cueTokens: string[];
   requiredTaskPrefix: string;
 };
@@ -20,24 +21,28 @@ const TRANSFER_CONTEXTS: IntentionalReviewTransferContext[] = [
   {
     id: 'station_encounter',
     label: 'a station or train encounter',
+    topicLabel: 'Station encounter review',
     cueTokens: ['station', 'train', 'platform'],
     requiredTaskPrefix: 'At a station,',
   },
   {
     id: 'hotel_lobby',
     label: 'a hotel lobby or reception encounter',
+    topicLabel: 'Hotel lobby review',
     cueTokens: ['hotel', 'lobby', 'reception'],
     requiredTaskPrefix: 'In a hotel lobby,',
   },
   {
     id: 'shop_counter',
     label: 'a shop or store counter encounter',
+    topicLabel: 'Shop counter review',
     cueTokens: ['shop', 'store', 'counter'],
     requiredTaskPrefix: 'At a shop counter,',
   },
   {
     id: 'street_encounter',
     label: 'an outdoor street encounter',
+    topicLabel: 'Street encounter review',
     cueTokens: ['street', 'outdoors', 'sidewalk'],
     requiredTaskPrefix: 'On a city street,',
   },
@@ -135,4 +140,11 @@ export function buildIntentionalReviewTransferTask(
   context: IntentionalReviewTransferContext,
 ): string {
   return `${context.requiredTaskPrefix} apply the selected Learning Objective through a new interaction and transfer challenge.`;
+}
+
+export function buildIntentionalReviewLessonTopic(
+  context: IntentionalReviewTransferContext,
+  objectiveDescription: string,
+): string {
+  return `${context.topicLabel}: ${objectiveDescription}`;
 }
