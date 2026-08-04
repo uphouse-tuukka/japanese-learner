@@ -19,6 +19,7 @@ import {
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { withAbort } from '$lib/server/async';
 import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
+import { logInfo } from '$lib/server/logger';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
@@ -79,6 +80,17 @@ function validationFeedbackForRetry(
   if (validation.reasonCodes.includes('repeated_lesson_topic')) {
     feedback.push('Choose a fresh exact lesson topic unless it is an explicit Review Candidate.');
   }
+  if (
+    validation.reasonCodes.includes('invalid_learning_objective_identity') ||
+    validation.reasonCodes.includes('learning_objective_mismatch') ||
+    validation.reasonCodes.includes('repeated_learning_objective')
+  ) {
+    feedback.push(
+      validation.details.selectedLearningObjectiveId
+        ? `Use Learning Objective identity exactly "${validation.details.selectedLearningObjectiveId}".`
+        : 'Do not invent a Learning Objective identity in compatibility mode.',
+    );
+  }
   if (validation.reasonCodes.includes('repeated_key_phrases')) {
     feedback.push('Use at most one already-covered non-review Lesson Key Phrase.');
   }
@@ -135,6 +147,19 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       totalCompletedAiSessionCount: parsedCoverageSources.totalCompletedAiSessions,
       ignoredCompletedAiSessionCount: parsedCoverageSources.ignoredCompletedAiSessions,
       exerciseResults: completedAiExerciseResults,
+    });
+    logInfo('api/session/generate', 'selected curriculum target', {
+      userId,
+      totalCompletedAiSessions: coverageEvidence.source.totalCompletedAiSessions,
+      parseableCompletedAiSessions: coverageEvidence.source.parseableCompletedAiSessions,
+      ignoredCompletedAiSessions: coverageEvidence.source.ignoredCompletedAiSessions,
+      selectedCategory: coverageEvidence.categoryRotation.selectedCategory,
+      categorySelectionReason: coverageEvidence.categoryRotation.selectionReason,
+      selectedLearningObjectiveId:
+        coverageEvidence.learningObjectiveSelection.objective?.id ?? null,
+      learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
+      reviewCandidateReasonCodes:
+        coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
     });
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
       .map((session): SessionHistoryItem | null => {
@@ -343,6 +368,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               userId,
               reasonCodes: validation.reasonCodes,
               selectedCategory: validation.details.selectedCategory,
+              selectedLearningObjectiveId: validation.details.selectedLearningObjectiveId,
+              generatedLearningObjectiveId: validation.details.generatedLearningObjectiveId,
+              learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
               generatedCategory: validation.details.generatedCategory,
               blockedCategories: validation.details.blockedCategories,
               preferredCategories: validation.details.preferredCategories,
@@ -387,7 +415,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       tokenOutput: plan.tokenUsage.output,
       plannedCoverage: buildPlannedSessionCoverage({
         lesson: plan.lesson,
-        learningObjectiveId: plan.metadata.learningObjectiveId,
+        learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective?.id,
       }),
     });
 

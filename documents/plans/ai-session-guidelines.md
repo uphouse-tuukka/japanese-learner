@@ -110,6 +110,18 @@
 - Teach recognition and comprehension first, then spoken survival phrases.
 - Numbers and core portable basics should lead before dates, forms, contact details, Wi-Fi, and similar later essentials.
 
+### Canonical Learning Objectives
+
+- Greetings & Basics and Travel Essentials use an app-owned catalog of stable Learning Objective identities.
+- Each catalog entry declares its Topic Category, a learner-facing communicative goal, and focused generation guidance.
+- The application deterministically selects an uncovered Learning Objective or a currently eligible review objective after selecting the Topic Category.
+- The model must copy the selected identity exactly and may vary the Lesson Topic wording without changing that identity.
+- Coverage and validation use the stable identity, so semantic title variants such as saying where the learner is from and introducing their country of origin remain one objective.
+- A mastered objective remains unavailable as fresh coverage across the learner's full parseable history.
+- When a migrated category has no uncovered or review-eligible objective, selection moves deterministically to the next allowed category with viable work.
+- Topic Categories not yet present in the catalog keep the lower-confidence exact Lesson Topic compatibility path until their catalog migration is complete.
+- Legacy completed sessions without a recognized Learning Objective identity remain exact topic and phrase Coverage Evidence and are not semantically guessed.
+
 ### Level Constraints
 
 - **absolute_beginner:** multiple_choice + translation (ja→en only), difficulty 1-2
@@ -119,7 +131,8 @@
 
 ### Personalization
 
-- Never repeat topics from last 5 sessions
+- Never repeat a covered canonical Learning Objective as fresh coverage, regardless of intervening-session count
+- Keep exact Lesson Topic avoidance for compatibility categories and legacy history
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries
 - Adjust difficulty based on recent accuracy (>80% increase, <50% reinforce)

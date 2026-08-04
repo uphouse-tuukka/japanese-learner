@@ -226,6 +226,12 @@ describe('ai session prompt builders', () => {
           preferredCategories: ['transport', 'shopping'],
           blockedCategories: ['food_dining'],
         },
+        learningObjectiveSelection: {
+          mode: 'legacy_exact_topic',
+          reason: 'category_not_migrated_compatibility',
+          objective: null,
+          reviewCandidate: null,
+        },
         categoryCoverage: [
           {
             category: 'food_dining',
@@ -328,6 +334,70 @@ describe('ai session prompt builders', () => {
       'Previous generation violated curriculum rails: category_mismatch.',
       'Lesson category must be exactly "transport".',
     ]);
+  });
+
+  it('passes the app-selected Learning Objective as a hard generation rail', () => {
+    const prompt = buildSessionPlanPrompt({
+      ...baseSessionInput(),
+      coverageEvidence: {
+        source: {
+          totalCompletedAiSessions: 1,
+          parseableCompletedAiSessions: 1,
+          ignoredCompletedAiSessions: 0,
+        },
+        categoryRotation: {
+          currentCategory: 'greetings_basics',
+          currentCategoryStreak: 1,
+          selectedCategory: 'greetings_basics',
+          selectionReason: 'continued_current_category_depth',
+          mustRotate: false,
+          allowedCategories: ['greetings_basics', 'travel_essentials'],
+          preferredCategories: ['greetings_basics', 'travel_essentials'],
+          blockedCategories: [],
+        },
+        learningObjectiveSelection: {
+          mode: 'canonical',
+          reason: 'selected_uncovered_objective',
+          objective: {
+            id: 'greetings_basics.exchange_origins',
+            category: 'greetings_basics',
+            description: 'Ask where someone is from and state a country or place of origin.',
+            generationGuidance:
+              'Teach a two-way origin exchange without expanding into a full introduction.',
+          },
+          reviewCandidate: null,
+        },
+        categoryCoverage: [],
+        avoidTopics: [],
+        avoidKeyPhrases: [],
+        reviewCandidates: [],
+      },
+    });
+
+    const promptText = systemPrompt(prompt);
+    const payload = userPayload<{
+      selectedLearningObjective: { id: string; category: string };
+      requiredOutputExample: { learningObjectiveId: string };
+    }>(prompt);
+
+    expect(promptText).toContain(
+      'Learning Objective identity MUST be exactly "greetings_basics.exchange_origins"',
+    );
+    expect(promptText).toContain(
+      'Ask where someone is from and state a country or place of origin.',
+    );
+    expect(promptText).toContain(
+      'Teach a two-way origin exchange without expanding into a full introduction.',
+    );
+    expect(payload.selectedLearningObjective).toEqual(
+      expect.objectContaining({
+        id: 'greetings_basics.exchange_origins',
+        category: 'greetings_basics',
+      }),
+    );
+    expect(payload.requiredOutputExample.learningObjectiveId).toBe(
+      'greetings_basics.exchange_origins',
+    );
   });
 
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {

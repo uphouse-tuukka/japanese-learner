@@ -46,6 +46,7 @@ const SESSION_SUMMARY_MAX_SENTENCES = 3;
 const SESSION_SUMMARY_MAX_WORDS = 60;
 const MAX_SESSION_REVIEW_INTENTS = 5;
 const MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH = 160;
+const MAX_LEARNING_OBJECTIVE_ID_LENGTH = 160;
 
 function splitSentences(text: string): string[] {
   const matches = text.match(/[^.!?。！？]+[.!?。！？]+[”’"')\]]*|[^.!?。！？]+$/gu);
@@ -186,6 +187,7 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
   }
 
   const parsed = JSON.parse(response.output_text) as {
+    learningObjectiveId?: unknown;
     lesson: unknown;
     exercises: unknown[];
     focus: string;
@@ -221,6 +223,10 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
 
   const usage = getUsageFromResponse(response);
   const parsedLesson = parsed.lesson as Record<string, unknown> | null;
+  const learningObjectiveId =
+    typeof parsed.learningObjectiveId === 'string'
+      ? parsed.learningObjectiveId.trim().slice(0, MAX_LEARNING_OBJECTIVE_ID_LENGTH)
+      : '';
 
   const plan: SessionPlan = {
     id: `session-${randomUUID()}`,
@@ -237,6 +243,7 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
     metadata: {
       focus: assertString(parsed.focus, 'focus'),
       category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : undefined,
+      learningObjectiveId: learningObjectiveId || undefined,
       exerciseCount: exercises.length,
       teachingFlow: 'lesson_then_quiz',
       userLevel: input.userLevel,
