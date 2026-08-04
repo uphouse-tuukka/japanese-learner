@@ -251,6 +251,9 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
     ];
   }
   const transferContext = selectIntentionalReviewTransferContext(candidate);
+  if (!transferContext) {
+    throw new Error('No fresh intentional-review transfer context is available.');
+  }
 
   return [
     'INTENTIONAL REVIEW REQUIRED:',
@@ -525,6 +528,9 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
   const selectedTransferContext = selectedReviewCandidate
     ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
     : null;
+  if (selectedReviewCandidate && !selectedTransferContext) {
+    throw new Error('No fresh intentional-review transfer context is available.');
+  }
   const selectedTopicCategory =
     input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
@@ -657,14 +663,14 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 : 'Return null because this Topic Category is in compatibility mode.',
             },
             intentionalReview:
-              selectedReviewCandidate && selectedLearningObjective
+              selectedReviewCandidate && selectedLearningObjective && selectedTransferContext
                 ? {
                     type: 'object',
                     required: true,
                     candidateType: { const: selectedReviewCandidate.type },
                     candidateIdentity: { const: selectedReviewCandidate.identity },
                     learningObjectiveId: { const: selectedLearningObjective.id },
-                    transferContextId: { const: selectedTransferContext?.id },
+                    transferContextId: { const: selectedTransferContext.id },
                     transferTask: {
                       type: 'string',
                       rule: 'Describe a materially fresh context or transfer task that does not duplicate the original lesson treatment.',

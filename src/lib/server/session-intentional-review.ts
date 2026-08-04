@@ -111,7 +111,7 @@ export function selectIntentionalReviewTransferContext(candidate: {
   display: string;
   topicIdentity?: string;
   topic?: string;
-}): IntentionalReviewTransferContext {
+}): IntentionalReviewTransferContext | null {
   const originalWords = new Set(
     normalizedWords(
       [candidate.identity, candidate.display, candidate.topicIdentity, candidate.topic]
@@ -122,7 +122,7 @@ export function selectIntentionalReviewTransferContext(candidate: {
   return (
     TRANSFER_CONTEXTS.find((context) =>
       context.cueTokens.every((token) => !originalWords.has(token)),
-    ) ?? TRANSFER_CONTEXTS[0]!
+    ) ?? null
   );
 }
 

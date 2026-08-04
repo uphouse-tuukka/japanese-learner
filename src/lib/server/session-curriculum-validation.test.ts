@@ -362,6 +362,34 @@ describe('validateGeneratedSessionPlan', () => {
         reviewCandidates: [unrelatedCandidate],
       },
     });
+    const exhaustedContextCandidate = {
+      ...reviewCandidate,
+      identity: 'station train platform hotel lobby reception shop store counter street sidewalk',
+      display: 'Station hotel shop and street origin exchange',
+      topicIdentity: 'station hotel shop street origin exchange',
+      topic: 'Station hotel shop and street origin exchange',
+    };
+    const exhaustedContextReview = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Station origin exchange',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: exhaustedContextCandidate.identity,
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
+          transferTask: 'Exchange origins at a station.',
+        },
+      }),
+      coverageEvidence: {
+        ...coverageWithReview,
+        learningObjectiveSelection: {
+          ...coverageWithReview.learningObjectiveSelection,
+          reviewCandidate: exhaustedContextCandidate,
+        },
+        reviewCandidates: [exhaustedContextCandidate],
+      },
+    });
 
     expect(missingClaim.valid).toBe(false);
     if (!missingClaim.valid) {
@@ -399,6 +427,11 @@ describe('validateGeneratedSessionPlan', () => {
     if (!unrelatedReview.valid) {
       expect(unrelatedReview.reasonCodes).toContain('ineligible_review');
       expect(unrelatedReview.details.intentionalReviewStatus).toBe('unrelated');
+    }
+    expect(exhaustedContextReview.valid).toBe(false);
+    if (!exhaustedContextReview.valid) {
+      expect(exhaustedContextReview.reasonCodes).toContain('ineligible_review');
+      expect(exhaustedContextReview.details.intentionalReviewStatus).toBe('context_mismatch');
     }
   });
 
