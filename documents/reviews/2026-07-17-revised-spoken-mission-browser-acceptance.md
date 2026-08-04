@@ -122,6 +122,19 @@ Stored conversation logs contained only JSON text for retained transcript, asses
 The temporary database, generated acceptance audio, and browser profiles remained outside the repository.
 Application logs contained sanitized operational messages and no raw audio, credentials, full prompts, or complete provider payloads.
 
+## 2026-08-04 integration verification
+
+The integration review found that the mounted acceptance split the audio-first and retry/skip paths across separate tests, and that the original headed-browser record did not explicitly reload an intermediate skipped attempt.
+Both gaps were closed before integration:
+
+- The primary mounted learner-flow test now starts from the briefing, confirms Japanese and romaji are hidden, listens, reveals both written forms, uses the visible Record response action, receives semantic retry coaching, skips, unmounts, resumes at goal 2 with restored retry and skipped history, completes the remaining goals, and reaches the incomplete result.
+- A fresh headed-browser pass used a temporary file-backed database containing a real in-progress restaurant attempt at goal 2 with one semantic Retry event and one durable skipped-goal event.
+- After a full page reload, the mission chooser reported Resume at goal 2. Resuming restored Tried again and Skipped history, the skipped-action explanation, and the previously revealed Japanese and romaji, then focused the Respond goal.
+- The headed page had no horizontal overflow at the inspected 1270 by 577 viewport and emitted no JavaScript or console errors.
+- The focused mounted suite passed all eight tests after the correction.
+
+The temporary database and development runtime remained outside the repository and were removed after verification.
+
 ## Acceptance checklist
 
 - [x] The mounted learner flow covers Independent, Supported, semantic Retry and Skip, Incomplete, and `could_not_assess` behavior.

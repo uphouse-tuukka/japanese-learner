@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type {
   SpokenMissionBriefing,
   SpokenMissionEvidenceResult,
+  SpokenMissionResumeProgress,
   SpokenMissionServerTurn,
   SpokenMissionSkipResponse,
   SpokenMissionStartResponse,
@@ -225,19 +226,23 @@ async function settle(): Promise<void> {
   await tick();
 }
 
-async function withStartedMission(run: () => Promise<void>): Promise<void> {
-  mocks.requestStart.mockResolvedValue(startPayload);
-  const component = mount(SpokenMission, {
+function mountMission(resumable: SpokenMissionResumeProgress | null = null) {
+  return mount(SpokenMission, {
     target: document.body,
     props: {
       missionId: 'mission-order-restaurant',
       userId: 'user-1',
       briefing,
       bestEvidence: 'untried',
-      resumable: null,
+      resumable,
       onChooseWritten: vi.fn(),
     },
   });
+}
+
+async function withStartedMission(run: () => Promise<void>): Promise<void> {
+  mocks.requestStart.mockResolvedValue(startPayload);
+  const component = mountMission();
 
   try {
     button('Start Spoken Mission').click();
@@ -525,7 +530,14 @@ it('keeps technical assessment recovery separate from semantic retry coaching', 
   });
 });
 
-it('continues after a semantic retry is skipped and finishes with an incomplete result', async () => {
+it('runs the complete audio-first retry, skip, resume, and incomplete journey', async () => {
+  mocks.speak.mockImplementation(async (_text, options) => {
+    options?.onPlaybackStart?.();
+  });
+  mocks.requestWrittenSupport.mockResolvedValue({
+    writtenText: firstTurn.npcDialogue,
+    writtenSupportRevealed: true,
+  } satisfies SpokenMissionWrittenSupportResponse);
   mocks.requestTurn
     .mockResolvedValueOnce({
       duplicate: false,
@@ -582,7 +594,7 @@ it('continues after a semantic retry is skipped and finishes with an incomplete 
           feedback: 'The response did not place an order.',
         },
         supportUsed: false,
-        writtenSupportRevealed: false,
+        writtenSupportRevealed: true,
         assessedAt: '2026-07-17T09:00:00.000Z',
       },
       {
@@ -592,7 +604,7 @@ it('continues after a semantic retry is skipped and finishes with an incomplete 
         turnNumber: 1,
         npcDialogue: firstTurn.npcDialogue,
         supportUsed: false,
-        writtenSupportRevealed: false,
+        writtenSupportRevealed: true,
         skippedAt: '2026-07-17T09:01:00.000Z',
       },
     ],
@@ -606,8 +618,32 @@ it('continues after a semantic retry is skipped and finishes with an incomplete 
         resolveSkip = resolve;
       }),
   );
+  mocks.requestStart.mockResolvedValueOnce(startPayload);
 
-  await withStartedMission(async () => {
+  let component = mountMission();
+  try {
+    button('Start Spoken Mission').click();
+    await settle();
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.japanese);
+    expect(document.body.textContent).not.toContain(firstTurn.npcDialogue.romaji);
+
+    button('Listen').click();
+    await settle();
+    expect(mocks.speak).toHaveBeenCalledWith(
+      firstTurn.npcDialogue.japanese,
+      expect.objectContaining({ preferBrowser: false }),
+    );
+    expect(button('Replay Japanese')).toBeDefined();
+    expect(mocks.recorderStart).not.toHaveBeenCalled();
+
+    button('Reveal written text').click();
+    await settle();
+    expect(document.body.textContent).toContain(firstTurn.npcDialogue.japanese);
+    expect(document.body.textContent).toContain(firstTurn.npcDialogue.romaji);
+
+    button('Record response').click();
+    await settle();
+    expect(mocks.recorderStart).toHaveBeenCalledTimes(1);
     mocks.onRecordingReady?.({ audio: new Blob(['first']), mimeType: 'audio/webm' });
     await settle();
     expect(document.body.textContent).toContain('ラーメンを一つお願いします。');
@@ -645,17 +681,43 @@ it('continues after a semantic retry is skipped and finishes with an incomplete 
     expect(document.body.textContent).toContain('Skipped');
     expect(document.activeElement?.textContent).toContain('Respond');
 
+    await unmount(component);
+    document.body.replaceChildren();
+    mocks.requestStart.mockResolvedValueOnce({
+      ...startPayload,
+      turn: secondTurn,
+      history: skipPayload.history,
+      resumed: true,
+    });
+    component = mountMission({ currentTurn: 2, completedGoalCount: 0 });
+    button('Resume goal 2').click();
+    await settle();
+
+    expect(mocks.requestStart).toHaveBeenLastCalledWith(
+      expect.objectContaining({ startOver: false }),
+    );
+    expect(document.body.textContent).toContain('Goal 2 of 3');
+    expect(document.body.textContent).toContain('Tried again');
+    expect(document.body.textContent).toContain('Skipped');
+    expect(document.body.textContent).toContain('Goal skipped after an incorrect response.');
+
+    button('Record response').click();
+    await settle();
     mocks.onRecordingReady?.({ audio: new Blob(['second']), mimeType: 'audio/webm' });
     await settle();
     button('Continue').click();
     await settle();
     expect(document.body.textContent).toContain('Goal 3 of 3');
 
+    button('Record response').click();
+    await settle();
     mocks.onRecordingReady?.({ audio: new Blob(['third']), mimeType: 'audio/webm' });
     await settle();
     expect(document.body.textContent).toContain('Incomplete attempt');
     expect(document.body.textContent).toContain('Your previous best evidence is unchanged.');
     expect(document.activeElement?.textContent).toContain('Incomplete attempt');
     expect(button('Try again')).toBeDefined();
-  });
+  } finally {
+    await unmount(component);
+  }
 });
