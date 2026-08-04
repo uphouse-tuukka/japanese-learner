@@ -1,5 +1,6 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
+import { selectIntentionalReviewTransferContext } from '$lib/server/session-intentional-review';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
 
 export {
@@ -249,10 +250,12 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
       'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
     ];
   }
+  const transferContext = selectIntentionalReviewTransferContext(candidate);
 
   return [
     'INTENTIONAL REVIEW REQUIRED:',
     `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
+    `Copy transferContextId exactly "${transferContext.id}" and ground the generated Lesson Topic, explanation, or transfer task in ${transferContext.label}.`,
     'Describe a materially fresh context or transfer task in intentionalReview.transferTask. It must not duplicate the original lesson treatment.',
     candidate.type === 'key_phrase'
       ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
@@ -519,6 +522,9 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
     input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
   const selectedReviewCandidate =
     input.coverageEvidence?.learningObjectiveSelection.reviewCandidate ?? null;
+  const selectedTransferContext = selectedReviewCandidate
+    ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
+    : null;
   const selectedTopicCategory =
     input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
@@ -658,6 +664,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                     candidateType: { const: selectedReviewCandidate.type },
                     candidateIdentity: { const: selectedReviewCandidate.identity },
                     learningObjectiveId: { const: selectedLearningObjective.id },
+                    transferContextId: { const: selectedTransferContext?.id },
                     transferTask: {
                       type: 'string',
                       rule: 'Describe a materially fresh context or transfer task that does not duplicate the original lesson treatment.',

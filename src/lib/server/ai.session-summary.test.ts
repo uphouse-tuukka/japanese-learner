@@ -640,6 +640,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
         candidateType: 'key_phrase',
         candidateIdentity: 'ja:どちらからですか',
         learningObjectiveId: 'greetings_basics.exchange_origins',
+        transferContextId: 'station_encounter',
         transferTask: 'Exchange origins with another traveler while waiting for a train.',
       },
     });
@@ -655,6 +656,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       candidateType: 'key_phrase',
       candidateIdentity: 'ja:どちらからですか',
       learningObjectiveId: 'greetings_basics.exchange_origins',
+      transferContextId: 'station_encounter',
       transferTask: 'Exchange origins with another traveler while waiting for a train.',
     });
   });

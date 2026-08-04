@@ -98,6 +98,7 @@
 - The curriculum validator must independently confirm that the claimed Review Candidate remains present in current chronological Review Evidence and belongs to the selected Learning Objective.
 - Missing, stale, resolved, unrelated, journal-only, or mismatched review claims must fail curriculum validation with the stable `ineligible_review` reason code.
 - Intentional review must use a materially fresh Lesson Topic and transfer task rather than duplicating the original treatment.
+- The application must select a stable fresh transfer-context rail that was absent from the original treatment, and the generated Lesson Topic, explanation, or transfer task must visibly ground the review in that context.
 
 ### Lessons
 

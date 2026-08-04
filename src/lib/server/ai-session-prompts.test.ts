@@ -482,6 +482,7 @@ describe('ai session prompt builders', () => {
           candidateType: { const: string };
           candidateIdentity: { const: string };
           learningObjectiveId: { const: string };
+          transferContextId: { const: string };
           transferTask: { rule: string };
         };
       };
@@ -500,6 +501,7 @@ describe('ai session prompt builders', () => {
       candidateType: { const: 'key_phrase' },
       candidateIdentity: { const: 'ja:どちらからですか' },
       learningObjectiveId: { const: 'greetings_basics.exchange_origins' },
+      transferContextId: { const: 'station_encounter' },
       transferTask: { rule: expect.stringContaining('fresh context or transfer task') },
     });
   });

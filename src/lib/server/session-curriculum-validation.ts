@@ -7,8 +7,10 @@ import {
 } from '$lib/server/session-coverage-evidence';
 import { getLearningObjective, type LearningObjective } from '$lib/learning-objectives';
 import {
+  intentionalReviewTransferContextIsGrounded,
   isIntentionalReviewClaim,
   normalizeIntentionalReviewClaim,
+  selectIntentionalReviewTransferContext,
 } from '$lib/server/session-intentional-review';
 import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/topic-categories';
 import type { Lesson } from '$lib/types';
@@ -47,6 +49,8 @@ export type SessionCurriculumValidationDetails = {
     | 'objective_mismatch'
     | 'stale_or_resolved'
     | 'unrelated'
+    | 'context_mismatch'
+    | 'context_not_grounded'
     | 'duplicate_treatment'
     | 'eligible';
 };
@@ -64,7 +68,7 @@ export type SessionCurriculumValidationResult =
     };
 
 type GeneratedSessionPlanLike = {
-  lesson: Pick<Lesson, 'topic' | 'category' | 'keyPhrases'>;
+  lesson: Pick<Lesson, 'topic' | 'category' | 'explanation' | 'keyPhrases'>;
   metadata: Record<string, unknown>;
 };
 
@@ -253,6 +257,9 @@ export function validateGeneratedSessionPlan(input: {
     ? normalizedIntentionalReview
     : null;
   const selectedReviewCandidate = coverageEvidence.learningObjectiveSelection.reviewCandidate;
+  const selectedTransferContext = selectedReviewCandidate
+    ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
+    : null;
   let intentionalReviewStatus: SessionCurriculumValidationDetails['intentionalReviewStatus'] =
     'not_applicable';
   const reasonCodes: SessionCurriculumValidationReasonCode[] = [];
@@ -316,6 +323,18 @@ export function validateGeneratedSessionPlan(input: {
       reasonCodes.push('ineligible_review');
     } else if (intentionalReviewClaim.learningObjectiveId !== selectedLearningObjective?.id) {
       intentionalReviewStatus = 'objective_mismatch';
+      reasonCodes.push('ineligible_review');
+    } else if (intentionalReviewClaim.transferContextId !== selectedTransferContext?.id) {
+      intentionalReviewStatus = 'context_mismatch';
+      reasonCodes.push('ineligible_review');
+    } else if (
+      !selectedTransferContext ||
+      !intentionalReviewTransferContextIsGrounded(
+        selectedTransferContext,
+        [plan.lesson.topic, plan.lesson.explanation, intentionalReviewClaim.transferTask].join(' '),
+      )
+    ) {
+      intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');
     } else if (
       duplicatesOriginalTreatment(

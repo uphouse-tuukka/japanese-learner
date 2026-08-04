@@ -259,6 +259,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
           transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
@@ -266,11 +267,13 @@ describe('validateGeneratedSessionPlan', () => {
     });
     const duplicatedTreatment = validateGeneratedSessionPlan({
       plan: plan({
+        topic: 'Station review of origins',
         learningObjectiveId: 'greetings_basics.exchange_origins',
         intentionalReview: {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
           transferTask: 'Saying where you are from',
         },
       }),
@@ -284,6 +287,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
           transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
@@ -297,7 +301,22 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
-          transferTask: 'Repeat the origin exchange once more.',
+          transferContextId: 'station_encounter',
+          transferTask: 'Repeat the origin exchange once more at the station.',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
+    const ungroundedContextClaim = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Talking about homeland',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
+          transferTask: 'Practice asking where they come from.',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -309,6 +328,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
           transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
@@ -329,6 +349,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'lesson_topic',
           candidateIdentity: 'exchanging names',
           learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
           transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
@@ -363,6 +384,11 @@ describe('validateGeneratedSessionPlan', () => {
     if (!cosmeticRestatement.valid) {
       expect(cosmeticRestatement.reasonCodes).toContain('ineligible_review');
       expect(cosmeticRestatement.details.intentionalReviewStatus).toBe('duplicate_treatment');
+    }
+    expect(ungroundedContextClaim.valid).toBe(false);
+    if (!ungroundedContextClaim.valid) {
+      expect(ungroundedContextClaim.reasonCodes).toContain('ineligible_review');
+      expect(ungroundedContextClaim.details.intentionalReviewStatus).toBe('context_not_grounded');
     }
     expect(staleCandidate.valid).toBe(false);
     if (!staleCandidate.valid) {
@@ -573,6 +599,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateType: 'key_phrase',
           candidateIdentity: 'ja:すみません',
           learningObjectiveId: 'greetings_basics.greet_by_time',
+          transferContextId: 'station_encounter',
           transferTask: 'Choose a greeting while asking a station attendant for help.',
         },
       }),
