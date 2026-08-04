@@ -25,6 +25,7 @@ const baseCoverage = {
     objective: {
       id: 'greetings_basics.greet_by_time',
       category: 'greetings_basics',
+      communicativeGoalKey: 'greet_by_time',
       description: 'Choose and use a basic greeting that fits the time of day.',
       generationGuidance: 'Teach an appropriate time-of-day greeting.',
     },
@@ -206,10 +207,10 @@ describe('validateGeneratedSessionPlan', () => {
       ...baseCoverage,
       categoryRotation: {
         ...baseCoverage.categoryRotation,
-        currentCategory: 'food_dining',
-        selectedCategory: 'food_dining',
-        allowedCategories: ['food_dining'],
-        preferredCategories: ['food_dining'],
+        currentCategory: 'emergencies_health',
+        selectedCategory: 'emergencies_health',
+        allowedCategories: ['emergencies_health'],
+        preferredCategories: ['emergencies_health'],
         blockedCategories: [],
       },
       learningObjectiveSelection: {
@@ -218,29 +219,40 @@ describe('validateGeneratedSessionPlan', () => {
         objective: null,
         reviewCandidate: null,
       },
+      coveredTopics: [
+        {
+          identity: 'finding a pharmacy',
+          topic: 'Finding a pharmacy',
+          category: 'emergencies_health',
+          count: 1,
+          sessionIds: ['session-health'],
+          firstSeenAt: '2026-05-20T08:00:00.000Z',
+          lastSeenAt: '2026-05-20T08:00:00.000Z',
+        },
+      ],
     } as CoverageEvidence;
 
     const fresh = validateGeneratedSessionPlan({
       plan: plan({
-        category: 'food_dining',
-        topic: 'Paying at a restaurant',
+        category: 'emergencies_health',
+        topic: 'Asking for cold medicine',
         learningObjectiveId: null,
       }),
       coverageEvidence: compatibilityCoverage,
     });
     const repeated = validateGeneratedSessionPlan({
       plan: plan({
-        category: 'food_dining',
-        topic: 'Ordering food',
+        category: 'emergencies_health',
+        topic: 'Finding a pharmacy',
         learningObjectiveId: null,
       }),
       coverageEvidence: compatibilityCoverage,
     });
     const inventedObjective = validateGeneratedSessionPlan({
       plan: plan({
-        category: 'food_dining',
-        topic: 'Paying at a restaurant',
-        learningObjectiveId: 'food_dining.model_invented_goal',
+        category: 'emergencies_health',
+        topic: 'Asking for cold medicine',
+        learningObjectiveId: 'emergencies_health.model_invented_goal',
       }),
       coverageEvidence: compatibilityCoverage,
     });

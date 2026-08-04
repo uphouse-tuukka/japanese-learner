@@ -219,11 +219,11 @@ describe('ai session prompt builders', () => {
         categoryRotation: {
           currentCategory: 'food_dining',
           currentCategoryStreak: 3,
-          selectedCategory: 'transport',
+          selectedCategory: 'emergencies_health',
           selectionReason: 'mandatory_rotation_after_three_session_streak',
           mustRotate: true,
-          allowedCategories: ['transport', 'shopping'],
-          preferredCategories: ['transport', 'shopping'],
+          allowedCategories: ['emergencies_health', 'social_conversation'],
+          preferredCategories: ['emergencies_health', 'social_conversation'],
           blockedCategories: ['food_dining'],
         },
         learningObjectiveSelection: {
@@ -278,7 +278,7 @@ describe('ai session prompt builders', () => {
         'The learner understands greetings, but still hesitates when using ください (kudasai) in requests.',
       curriculumValidationFeedback: [
         'Previous generation violated curriculum rails: category_mismatch.',
-        'Lesson category must be exactly "transport".',
+        'Lesson category must be exactly "emergencies_health".',
       ],
     });
 
@@ -300,8 +300,8 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'For early sessions, prefer starting with greetings_basics, then travel_essentials, then food_dining, transport, and shopping',
     );
-    expect(promptText).toContain('Target Topic Category: "transport"');
-    expect(promptText).toContain('Lesson category MUST be exactly "transport".');
+    expect(promptText).toContain('Target Topic Category: "emergencies_health"');
+    expect(promptText).toContain('Lesson category MUST be exactly "emergencies_health".');
     expect(promptText).toContain('Blocked Topic Categories: food_dining.');
     expect(promptText).toContain(
       'Avoid covered Lesson Key Phrases unless listed as Review Candidates:',
@@ -321,7 +321,9 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'Revise the next attempt to satisfy these app-side rails exactly.',
     );
-    expect(payload.user.coverageEvidence.categoryRotation.selectedCategory).toBe('transport');
+    expect(payload.user.coverageEvidence.categoryRotation.selectedCategory).toBe(
+      'emergencies_health',
+    );
     expect(payload.user.coverageEvidence.categoryRotation.blockedCategories).toEqual([
       'food_dining',
     ]);
@@ -332,7 +334,7 @@ describe('ai session prompt builders', () => {
     );
     expect(payload.user.curriculumValidationFeedback).toEqual([
       'Previous generation violated curriculum rails: category_mismatch.',
-      'Lesson category must be exactly "transport".',
+      'Lesson category must be exactly "emergencies_health".',
     ]);
   });
 
@@ -361,6 +363,7 @@ describe('ai session prompt builders', () => {
           objective: {
             id: 'greetings_basics.exchange_origins',
             category: 'greetings_basics',
+            communicativeGoalKey: 'exchange_origins',
             description: 'Ask where someone is from and state a country or place of origin.',
             generationGuidance:
               'Teach a two-way origin exchange without expanding into a full introduction.',

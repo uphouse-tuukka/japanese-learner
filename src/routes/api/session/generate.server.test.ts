@@ -141,6 +141,49 @@ const generatedPlan = {
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
+const coreTravelObjectiveCases = [
+  {
+    category: 'food_dining',
+    masteredObjectiveId: 'food_dining.order_food_and_drinks',
+    masteredTopic: 'Ordering a meal and drinks',
+    paraphrasedTopic: 'Placing a restaurant food and beverage order',
+    freshObjectiveId: 'food_dining.ask_about_menu_items',
+    freshTopic: 'Asking what a menu item contains',
+  },
+  {
+    category: 'transport',
+    masteredObjectiveId: 'transport.buy_a_ticket',
+    masteredTopic: 'Buying a train ticket',
+    paraphrasedTopic: 'Purchasing the fare for a journey',
+    freshObjectiveId: 'transport.find_the_correct_platform_or_stop',
+    freshTopic: 'Finding the right departure platform',
+  },
+  {
+    category: 'shopping',
+    masteredObjectiveId: 'shopping.ask_for_and_find_an_item',
+    masteredTopic: 'Finding an item in a shop',
+    paraphrasedTopic: 'Asking where a product is stocked',
+    freshObjectiveId: 'shopping.ask_and_understand_a_price',
+    freshTopic: 'Checking the price of an item',
+  },
+  {
+    category: 'directions',
+    masteredObjectiveId: 'directions.ask_the_way_to_a_destination',
+    masteredTopic: 'Asking the way to a landmark',
+    paraphrasedTopic: 'Requesting directions to a destination',
+    freshObjectiveId: 'directions.understand_route_instructions',
+    freshTopic: 'Following spoken turn-by-turn directions',
+  },
+  {
+    category: 'hotel_accommodation',
+    masteredObjectiveId: 'hotel_accommodation.check_in_with_a_reservation',
+    masteredTopic: 'Checking in with a hotel booking',
+    paraphrasedTopic: 'Arriving and registering for a reserved room',
+    freshObjectiveId: 'hotel_accommodation.check_out_and_settle_charges',
+    freshTopic: 'Checking out and confirming the final bill',
+  },
+] as const;
+
 function buildGeneratedPlan(
   overrides: {
     lesson?: Partial<typeof lesson>;
@@ -453,30 +496,111 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it('rejects and does not persist a model-invented identity in compatibility categories', async () => {
+  it.each(coreTravelObjectiveCases)(
+    'rejects a semantic repeat and persists fresh Category Depth for $category',
+    async ({
+      category,
+      masteredObjectiveId,
+      masteredTopic,
+      paraphrasedTopic,
+      freshObjectiveId,
+      freshTopic,
+    }) => {
+      const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+        buildCompletedAiSession({
+          id: `${category}-mastery`,
+          createdAt: '2026-05-03T08:00:00.000Z',
+          category,
+          topic: masteredTopic,
+          learningObjectiveId: masteredObjectiveId,
+          accuracy: 100,
+        }),
+      ]);
+      mockGenerateSessionPlan
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { category, topic: paraphrasedTopic },
+            metadata: { learningObjectiveId: masteredObjectiveId },
+          }),
+        )
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { category, topic: freshTopic },
+            metadata: { learningObjectiveId: freshObjectiveId },
+          }),
+        );
+
+      const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+      expect(response.status).toBe(200);
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+      expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          coverageEvidence: expect.objectContaining({
+            learningObjectiveSelection: expect.objectContaining({
+              mode: 'canonical',
+              reason: 'selected_uncovered_objective',
+              objective: expect.objectContaining({ id: freshObjectiveId, category }),
+            }),
+          }),
+        }),
+      );
+      expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          curriculumValidationFeedback: expect.arrayContaining([
+            expect.stringContaining('repeated_learning_objective'),
+          ]),
+        }),
+      );
+      expect(mockCreateSessionRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plannedCoverage: expect.objectContaining({
+            category,
+            learningObjectiveId: freshObjectiveId,
+            lessonTopic: freshTopic,
+          }),
+        }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        '[api/session/generate] selected curriculum target',
+        expect.objectContaining({
+          selectedCategory: category,
+          selectedLearningObjectiveId: freshObjectiveId,
+          learningObjectiveSelectionReason: 'selected_uncovered_objective',
+          parseableCompletedAiSessions: 1,
+          ignoredCompletedAiSessions: 0,
+        }),
+      );
+    },
+  );
+
+  it('rejects and does not persist a model-invented identity in remaining compatibility categories', async () => {
     mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
       buildCompletedAiSession({
-        id: 'food-1',
+        id: 'health-1',
         createdAt: '2026-05-03T08:00:00.000Z',
-        category: 'food_dining',
-        topic: 'Ordering food',
+        category: 'emergencies_health',
+        topic: 'Finding a pharmacy',
       }),
     ]);
     mockGenerateSessionPlan
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: {
-            topic: 'Paying at a restaurant',
-            category: 'food_dining',
+            topic: 'Asking for cold medicine',
+            category: 'emergencies_health',
           },
-          metadata: { learningObjectiveId: 'food_dining.model_invented_goal' },
+          metadata: { learningObjectiveId: 'emergencies_health.model_invented_goal' },
         }),
       )
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: {
-            topic: 'Paying at a restaurant',
-            category: 'food_dining',
+            topic: 'Asking for cold medicine',
+            category: 'emergencies_health',
           },
           metadata: {},
         }),
@@ -563,8 +687,8 @@ describe('POST /api/session/generate', () => {
     ]);
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
-        lesson: { topic: 'Restaurant payment', category: 'food_dining' },
-        metadata: {},
+        lesson: { topic: 'Ordering a set meal', category: 'food_dining' },
+        metadata: { learningObjectiveId: 'food_dining.order_food_and_drinks' },
       }),
     );
 
@@ -586,6 +710,13 @@ describe('POST /api/session/generate', () => {
             currentCategoryStreak: 2,
             selectedCategory: 'food_dining',
             selectionReason: 'continued_current_category_for_review_candidate',
+          }),
+          learningObjectiveSelection: expect.objectContaining({
+            mode: 'canonical',
+            reason: 'selected_uncovered_objective',
+            objective: expect.objectContaining({
+              id: 'food_dining.order_food_and_drinks',
+            }),
           }),
           avoidKeyPhrases: expect.arrayContaining([
             expect.objectContaining({ display: 'ください (kudasai)' }),
