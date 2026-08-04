@@ -64,12 +64,33 @@ vi.mock('$lib/server/users', () => ({
 
 import { POST } from './generate/+server';
 
+const keyPhrases = [
+  {
+    japanese: 'こんにちは',
+    romaji: 'konnichiwa',
+    english: 'Hello',
+    usage: 'Use as a daytime greeting.',
+  },
+  {
+    japanese: 'はじめまして',
+    romaji: 'hajimemashite',
+    english: 'Nice to meet you',
+    usage: 'Use when meeting someone for the first time.',
+  },
+  {
+    japanese: 'よろしくお願いします',
+    romaji: 'yoroshiku onegaishimasu',
+    english: 'Please treat me kindly',
+    usage: 'Use to close a first introduction politely.',
+  },
+];
+
 const lesson = {
   topic: 'Basic greetings',
   category: 'greetings_basics',
   explanation: 'Learn a few polite greeting phrases.',
   culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
-  keyPhrases: [],
+  keyPhrases,
 };
 
 const alternateCategoryLesson = {
@@ -350,7 +371,7 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         lessonTopic: 'Basic greetings',
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
-        keyPhraseDetails: [],
+        keyPhraseDetails: keyPhrases,
       },
     });
     expect(mockAttachExercisesToSession).toHaveBeenCalledWith('session-1', exercises);
@@ -614,7 +635,7 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         lessonTopic: 'First greetings',
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
-        keyPhraseDetails: [],
+        keyPhraseDetails: keyPhrases,
       },
     });
     expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {

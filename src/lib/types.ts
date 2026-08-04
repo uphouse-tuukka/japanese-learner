@@ -190,7 +190,7 @@ export interface SessionKeyPhraseDetail {
 
 export interface PlannedSessionCoverage {
   version: 1;
-  category: string;
+  category: import('$lib/server/topic-categories').TopicCategoryKey;
   learningObjectiveId?: string;
   lessonTopic: string;
   culturalNote: string;

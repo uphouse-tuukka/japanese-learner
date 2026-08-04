@@ -40,6 +40,27 @@ const exercise = {
   explanation: 'こんにちは is a common greeting.',
 } satisfies Exercise;
 
+const plannedKeyPhraseDetails = [
+  {
+    japanese: 'ラーメンをください',
+    romaji: 'raamen o kudasai',
+    english: 'Ramen, please.',
+    usage: 'Use while ordering.',
+  },
+  {
+    japanese: 'おすすめは何ですか',
+    romaji: 'osusume wa nan desu ka',
+    english: 'What do you recommend?',
+    usage: 'Use to ask for a recommendation.',
+  },
+  {
+    japanese: 'お会計をお願いします',
+    romaji: 'okaikei o onegaishimasu',
+    english: 'The bill, please.',
+    usage: 'Use when ready to pay.',
+  },
+];
+
 async function loadDb() {
   vi.resetModules();
   dbHarness.client = createClient({ url: 'file::memory:' });
@@ -125,7 +146,7 @@ describe('session completion claims', () => {
         learningObjectiveId: 'food_dining.order_item',
         lessonTopic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
-        keyPhraseDetails: [{ japanese: 'ラーメンをください', romaji: 'raamen o kudasai' }],
+        keyPhraseDetails: plannedKeyPhraseDetails,
       },
     });
 
@@ -146,7 +167,7 @@ describe('session completion claims', () => {
         learningObjectiveId: 'food_dining.order_item',
         lessonTopic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
-        keyPhraseDetails: [{ japanese: 'ラーメンをください', romaji: 'raamen o kudasai' }],
+        keyPhraseDetails: plannedKeyPhraseDetails,
       },
     });
   });

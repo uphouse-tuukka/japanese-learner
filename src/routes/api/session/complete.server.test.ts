@@ -1,6 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CLAIMED_AT = '2026-01-01T00:00:00.000Z';
+const plannedKeyPhraseDetails = [
+  {
+    japanese: 'ラーメンをください',
+    romaji: 'raamen o kudasai',
+    english: 'Ramen, please.',
+    usage: 'Use while ordering.',
+  },
+  {
+    japanese: 'おすすめは何ですか',
+    romaji: 'osusume wa nan desu ka',
+    english: 'What do you recommend?',
+    usage: 'Use to ask for a recommendation.',
+  },
+  {
+    japanese: 'お会計をお願いします',
+    romaji: 'okaikei o onegaishimasu',
+    english: 'The bill, please.',
+    usage: 'Use when ready to pay.',
+  },
+];
 
 const {
   mockClaimSessionCompletion,
@@ -735,14 +755,7 @@ describe('POST /api/session/complete', () => {
           learningObjectiveId: 'food_dining.order_item',
           lessonTopic: 'Ordering ramen',
           culturalNote: 'Ticket machines are common.',
-          keyPhraseDetails: [
-            {
-              japanese: 'ラーメンをください',
-              romaji: 'raamen o kudasai',
-              english: 'Ramen, please.',
-              usage: 'Use while ordering.',
-            },
-          ],
+          keyPhraseDetails: plannedKeyPhraseDetails,
         },
         createdAt: '2026-01-01T00:00:00.000Z',
         completedAt: CLAIMED_AT,
@@ -767,15 +780,8 @@ describe('POST /api/session/complete', () => {
         learningObjectiveId: 'food_dining.order_item',
         topic: 'Ordering ramen',
         culturalNote: 'Ticket machines are common.',
-        keyPhrases: ['ラーメンをください'],
-        keyPhraseDetails: [
-          {
-            japanese: 'ラーメンをください',
-            romaji: 'raamen o kudasai',
-            english: 'Ramen, please.',
-            usage: 'Use while ordering.',
-          },
-        ],
+        keyPhrases: ['ラーメンをください', 'おすすめは何ですか', 'お会計をお願いします'],
+        keyPhraseDetails: plannedKeyPhraseDetails,
         coverageSource: 'server_generated_plan',
       });
     },
