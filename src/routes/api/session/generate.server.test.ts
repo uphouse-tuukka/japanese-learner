@@ -141,7 +141,7 @@ const generatedPlan = {
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
-const coreTravelObjectiveCases = [
+const canonicalObjectiveCases = [
   {
     category: 'food_dining',
     masteredObjectiveId: 'food_dining.order_food_and_drinks',
@@ -181,6 +181,38 @@ const coreTravelObjectiveCases = [
     paraphrasedTopic: 'Arriving and registering for a reserved room',
     freshObjectiveId: 'hotel_accommodation.check_out_and_settle_charges',
     freshTopic: 'Checking out and confirming the final bill',
+  },
+  {
+    category: 'emergencies_health',
+    masteredObjectiveId: 'emergencies_health.describe_symptoms_and_severity',
+    masteredTopic: 'Describing an illness and how serious it feels',
+    paraphrasedTopic: 'Explaining symptoms and their severity',
+    freshObjectiveId: 'emergencies_health.ask_a_pharmacist_for_medicine',
+    freshTopic: 'Asking a pharmacist for suitable medicine',
+  },
+  {
+    category: 'social_conversation',
+    masteredObjectiveId: 'social_conversation.expand_a_self_introduction',
+    masteredTopic: 'Sharing more about yourself after meeting someone',
+    paraphrasedTopic: 'Expanding a brief personal introduction',
+    freshObjectiveId: 'social_conversation.discuss_hobbies_and_interests',
+    freshTopic: 'Talking about hobbies and interests',
+  },
+  {
+    category: 'sightseeing_culture',
+    masteredObjectiveId: 'sightseeing_culture.confirm_admission_and_opening_details',
+    masteredTopic: 'Checking attraction entry and opening details',
+    paraphrasedTopic: 'Confirming when and how to enter a cultural site',
+    freshObjectiveId: 'sightseeing_culture.ask_about_a_landmark_or_exhibit',
+    freshTopic: 'Asking what an exhibit represents',
+  },
+  {
+    category: 'bars_nightlife',
+    masteredObjectiveId: 'bars_nightlife.choose_a_drink_and_serving_style',
+    masteredTopic: 'Choosing a drink and how it is served',
+    paraphrasedTopic: 'Selecting a beverage and preferred serving style',
+    freshObjectiveId: 'bars_nightlife.request_a_non_alcoholic_option',
+    freshTopic: 'Requesting a non-alcoholic drink',
   },
 ] as const;
 
@@ -496,7 +528,7 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it.each(coreTravelObjectiveCases)(
+  it.each(canonicalObjectiveCases)(
     'rejects a semantic repeat and persists fresh Category Depth for $category',
     async ({
       category,
@@ -577,7 +609,7 @@ describe('POST /api/session/generate', () => {
     },
   );
 
-  it('rejects and does not persist a model-invented identity in remaining compatibility categories', async () => {
+  it('rejects a model-invented identity in a newly migrated category', async () => {
     mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
       buildCompletedAiSession({
         id: 'health-1',
@@ -590,7 +622,7 @@ describe('POST /api/session/generate', () => {
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: {
-            topic: 'Asking for cold medicine',
+            topic: 'Describing cold symptoms and their severity',
             category: 'emergencies_health',
           },
           metadata: { learningObjectiveId: 'emergencies_health.model_invented_goal' },
@@ -599,10 +631,12 @@ describe('POST /api/session/generate', () => {
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: {
-            topic: 'Asking for cold medicine',
+            topic: 'Describing cold symptoms and their severity',
             category: 'emergencies_health',
           },
-          metadata: {},
+          metadata: {
+            learningObjectiveId: 'emergencies_health.describe_symptoms_and_severity',
+          },
         }),
       );
 
@@ -612,8 +646,9 @@ describe('POST /api/session/generate', () => {
     expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
     expect(mockCreateSessionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        plannedCoverage: expect.not.objectContaining({
-          learningObjectiveId: expect.anything(),
+        plannedCoverage: expect.objectContaining({
+          category: 'emergencies_health',
+          learningObjectiveId: 'emergencies_health.describe_symptoms_and_severity',
         }),
       }),
     );

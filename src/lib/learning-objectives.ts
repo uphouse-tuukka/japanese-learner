@@ -401,6 +401,233 @@ const CATALOG = [
     generationGuidance:
       'Teach asking to change one booking detail such as the date, number of nights, room type, or guest count and understanding whether it is possible. Do not duplicate ordinary check-in.',
   },
+  {
+    id: 'emergencies_health.describe_symptoms_and_severity',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'describe_symptoms_and_severity',
+    description: 'Describe a symptom and communicate how severe or urgent it is.',
+    generationGuidance:
+      'Teach a focused health exchange for naming one or two symptoms, when they began, and whether they are mild, severe, or worsening. Keep medicine requests, medical registration, and emergency calling outside the main task.',
+  },
+  {
+    id: 'emergencies_health.ask_a_pharmacist_for_medicine',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'ask_a_pharmacist_for_medicine',
+    description:
+      'Ask a pharmacist for suitable non-emergency medicine and understand basic directions.',
+    generationGuidance:
+      'Teach a pharmacy exchange that connects a specific minor symptom to a medicine request and one basic dosage or caution. Do not turn the lesson into diagnosing a serious condition or arranging a doctor visit.',
+  },
+  {
+    id: 'emergencies_health.seek_medical_care',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'seek_medical_care',
+    description: 'Ask where and how to receive non-emergency medical care.',
+    generationGuidance:
+      'Teach asking for a clinic, hospital, or doctor and understanding an immediate access step such as where to go, whether an appointment is needed, or when care is available. Keep symptom detail and emergency dispatch distinct.',
+  },
+  {
+    id: 'emergencies_health.call_emergency_services',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'call_emergency_services',
+    description: 'Call emergency services and state the emergency and location.',
+    generationGuidance:
+      'Teach a concise urgent call that identifies whether an ambulance, fire service, or police response is needed, describes the immediate emergency, and gives a usable location. Do not dilute the task into ordinary medical advice.',
+  },
+  {
+    id: 'emergencies_health.ask_for_help_after_an_accident',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'ask_for_help_after_an_accident',
+    description: 'Get immediate help at the scene of an accident or injury.',
+    generationGuidance:
+      'Teach an in-person safety exchange for alerting someone to an accident or injury, checking immediate safety, and asking them to summon help. Keep the goal on scene communication rather than rehearsing a full emergency-services call.',
+  },
+  {
+    id: 'emergencies_health.report_lost_or_stolen_property',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'report_lost_or_stolen_property',
+    description: 'Report lost or stolen property to staff or police.',
+    generationGuidance:
+      'Teach stating what important item is missing, where and when it was last seen, and whether it may have been stolen. Include the next reporting step without turning the lesson into ordinary lost-and-found directions.',
+  },
+  {
+    id: 'emergencies_health.provide_critical_personal_and_medical_details',
+    category: 'emergencies_health',
+    communicativeGoalKey: 'provide_critical_personal_and_medical_details',
+    description:
+      'Provide essential identity, allergy, medication, or emergency-contact details during care.',
+    generationGuidance:
+      'Teach answering a small set of urgent intake questions about identity, allergies, current medicine, or an emergency contact. Keep this distinct from general contact-detail practice and from describing the current symptoms.',
+  },
+  {
+    id: 'social_conversation.expand_a_self_introduction',
+    category: 'social_conversation',
+    communicativeGoalKey: 'expand_a_self_introduction',
+    description:
+      'Expand a basic introduction with personal context relevant to a social encounter.',
+    generationGuidance:
+      'Assume the learner can already exchange names and origins. Teach adding one or two socially useful details such as occupation, studies, travel purpose, or companions, then asking a matching follow-up. Do not reteach the basic name or country exchange as the objective.',
+  },
+  {
+    id: 'social_conversation.discuss_hobbies_and_interests',
+    category: 'social_conversation',
+    communicativeGoalKey: 'discuss_hobbies_and_interests',
+    description: 'Ask about hobbies or interests and share a personal interest.',
+    generationGuidance:
+      'Teach a two-way exchange about one leisure interest, including a natural follow-up about frequency, experience, or preference. Keep travel itinerary and invitations to make plans outside the main goal.',
+  },
+  {
+    id: 'social_conversation.make_weather_small_talk',
+    category: 'social_conversation',
+    communicativeGoalKey: 'make_weather_small_talk',
+    description: 'Open and sustain brief small talk about the weather or season.',
+    generationGuidance:
+      'Teach using the current weather or season to make a comment, agree or react, and add one simple follow-up. The goal is sustaining small talk, not learning a list of weather words or making travel plans.',
+  },
+  {
+    id: 'social_conversation.talk_about_travel_plans_and_experiences',
+    category: 'social_conversation',
+    communicativeGoalKey: 'talk_about_travel_plans_and_experiences',
+    description: 'Exchange simple information about travel plans or recent experiences.',
+    generationGuidance:
+      'Teach saying where the learner plans to go or what they recently did and asking the other person a related question. Keep directions, ticketing, and attraction details as context rather than the communicative task.',
+  },
+  {
+    id: 'social_conversation.give_and_respond_to_compliments',
+    category: 'social_conversation',
+    communicativeGoalKey: 'give_and_respond_to_compliments',
+    description: 'Give a natural compliment and respond modestly or appreciatively.',
+    generationGuidance:
+      'Teach one socially appropriate compliment about an item, skill, or choice and a brief natural response. Keep thanks as part of the response, not as a standalone politeness lesson.',
+  },
+  {
+    id: 'social_conversation.invite_and_respond_to_social_plans',
+    category: 'social_conversation',
+    communicativeGoalKey: 'invite_and_respond_to_social_plans',
+    description: 'Make a simple social invitation and accept, decline, or suggest another time.',
+    generationGuidance:
+      'Teach proposing one shared activity, checking availability, and giving a clear acceptance, polite decline, or alternative. Keep schedule vocabulary bounded to what the invitation requires.',
+  },
+  {
+    id: 'social_conversation.express_preferences_and_find_common_ground',
+    category: 'social_conversation',
+    communicativeGoalKey: 'express_preferences_and_find_common_ground',
+    description: 'Compare simple preferences and identify a shared interest.',
+    generationGuidance:
+      'Teach asking and answering which of two familiar options someone prefers, reacting to agreement or difference, and identifying common ground. Do not turn the exchange into shopping comparison or ordering.',
+  },
+  {
+    id: 'sightseeing_culture.confirm_admission_and_opening_details',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'confirm_admission_and_opening_details',
+    description: 'Confirm whether an attraction is open and how to enter.',
+    generationGuidance:
+      "Teach checking one attraction's opening status or hours, admission requirement, and where to enter or obtain access. Keep transport tickets, broad time literacy, and route finding outside the main goal.",
+  },
+  {
+    id: 'sightseeing_culture.ask_about_a_landmark_or_exhibit',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'ask_about_a_landmark_or_exhibit',
+    description: 'Ask what a landmark, object, or exhibit is and understand a short explanation.',
+    generationGuidance:
+      'Teach asking the identity, meaning, age, or significance of one visible cultural object or place and understanding a concise answer. Keep museum navigation and general recommendations distinct.',
+  },
+  {
+    id: 'sightseeing_culture.request_and_give_photo_help',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'request_and_give_photo_help',
+    description: 'Ask someone to take a photo and respond to a similar request.',
+    generationGuidance:
+      'Teach a polite two-way photo exchange, including asking for help, handing over a device, and confirming framing or completion. Keep site photography rules outside the main objective.',
+  },
+  {
+    id: 'sightseeing_culture.follow_site_etiquette_and_restrictions',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'follow_site_etiquette_and_restrictions',
+    description: 'Ask about and follow etiquette or restrictions at a cultural site.',
+    generationGuidance:
+      'Teach checking and understanding one or two behavior rules about shoes, silence, photography, purification, queues, or restricted areas. Focus on culturally respectful action rather than generic sign recognition.',
+  },
+  {
+    id: 'sightseeing_culture.join_a_tour_or_cultural_activity',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'join_a_tour_or_cultural_activity',
+    description: 'Ask to join a guided tour, demonstration, or cultural activity.',
+    generationGuidance:
+      'Teach checking availability, language, start point, or one participation requirement for a specific tour, workshop, ceremony, or demonstration. Keep ordinary attraction admission and schedule literacy distinct.',
+  },
+  {
+    id: 'sightseeing_culture.ask_for_sightseeing_recommendations',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'ask_for_sightseeing_recommendations',
+    description: 'Ask for a sightseeing recommendation that matches an interest or constraint.',
+    generationGuidance:
+      'Teach asking a local or visitor-information worker for one attraction suited to a stated interest, available time, or weather condition and understanding the reason for the recommendation. Do not make directions the main task.',
+  },
+  {
+    id: 'sightseeing_culture.understand_an_attraction_announcement',
+    category: 'sightseeing_culture',
+    communicativeGoalKey: 'understand_an_attraction_announcement',
+    description: 'Understand and respond to a short announcement at an attraction.',
+    generationGuidance:
+      'Teach extracting the practical action from one venue announcement such as an exhibit closing, tour gathering, temporary restriction, or schedule change. Keep the lesson specific to visitor action rather than broad public-sign literacy.',
+  },
+  {
+    id: 'bars_nightlife.choose_a_drink_and_serving_style',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'choose_a_drink_and_serving_style',
+    description: 'Choose a drink and specify a common serving style in a nightlife venue.',
+    generationGuidance:
+      'Teach asking about one drink and selecting a relevant serving style such as draft, bottled, hot, cold, neat, on the rocks, or with a mixer. The serving decision must be central so this is not merely restaurant ordering in a bar setting.',
+  },
+  {
+    id: 'bars_nightlife.request_a_non_alcoholic_option',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'request_a_non_alcoholic_option',
+    description: 'Ask for a non-alcoholic option or clearly decline alcohol.',
+    generationGuidance:
+      'Teach checking whether a drink contains alcohol, requesting an alcohol-free alternative, or declining a refill without ambiguity. Keep dietary restrictions and generic polite refusal outside the main goal.',
+  },
+  {
+    id: 'bars_nightlife.join_a_toast_and_drinking_round',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'join_a_toast_and_drinking_round',
+    description: 'Participate appropriately in a toast or shared drinking round.',
+    generationGuidance:
+      'Teach recognizing the cue for a toast, responding naturally, and handling one shared-round question such as whether the learner wants another drink. Focus on participation and etiquette rather than placing an initial order.',
+  },
+  {
+    id: 'bars_nightlife.understand_cover_charge_and_tab',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'understand_cover_charge_and_tab',
+    description: 'Ask about a cover charge, table charge, or running tab and settle it correctly.',
+    generationGuidance:
+      'Teach clarifying one nightlife-specific charge or payment arrangement and understanding whether payment is per person, at the table, or at the end. Do not reduce the goal to requesting an ordinary restaurant bill.',
+  },
+  {
+    id: 'bars_nightlife.request_and_manage_karaoke_songs',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'request_and_manage_karaoke_songs',
+    description: 'Request a karaoke song and manage turn-taking or controls.',
+    generationGuidance:
+      'Teach asking how to find or enter a song, confirming whose turn it is, and handling one simple control or request. Keep general music preferences as supporting context rather than the goal.',
+  },
+  {
+    id: 'bars_nightlife.respond_to_last_order_or_closing_time',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'respond_to_last_order_or_closing_time',
+    description: 'Understand last-order or closing-time information and respond appropriately.',
+    generationGuidance:
+      'Teach recognizing a last-order or closing announcement, deciding whether to request one final item, and confirming the next payment or departure step. Keep ordinary clock-time practice and transport planning outside the main objective.',
+  },
+  {
+    id: 'bars_nightlife.accept_or_decline_a_nightlife_invitation',
+    category: 'bars_nightlife',
+    communicativeGoalKey: 'accept_or_decline_a_nightlife_invitation',
+    description: 'Accept, decline, or limit participation in a nightlife outing or after-party.',
+    generationGuidance:
+      'Teach responding to an invitation to an izakaya, karaoke venue, second gathering, or after-party, including a clear limit or polite exit when needed. Keep generic daytime social planning outside the central task.',
+  },
 ] as const satisfies readonly LearningObjective[];
 
 export function validateLearningObjectiveCatalog(

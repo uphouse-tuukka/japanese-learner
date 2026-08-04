@@ -6,6 +6,7 @@ import {
   hasCanonicalLearningObjectives,
   validateLearningObjectiveCatalog,
 } from '$lib/learning-objectives';
+import { TOPIC_CATEGORY_KEYS } from '$lib/topic-categories';
 
 describe('canonical Learning Objective catalog', () => {
   it('defines ordered, app-owned objectives for the migrated Topic Categories', () => {
@@ -16,6 +17,10 @@ describe('canonical Learning Objective catalog', () => {
     const shopping = getLearningObjectivesForCategory('shopping');
     const directions = getLearningObjectivesForCategory('directions');
     const hotelAccommodation = getLearningObjectivesForCategory('hotel_accommodation');
+    const emergenciesHealth = getLearningObjectivesForCategory('emergencies_health');
+    const socialConversation = getLearningObjectivesForCategory('social_conversation');
+    const sightseeingCulture = getLearningObjectivesForCategory('sightseeing_culture');
+    const barsNightlife = getLearningObjectivesForCategory('bars_nightlife');
 
     expect(greetings.map((objective) => objective.id)).toEqual([
       'greetings_basics.greet_by_time',
@@ -80,6 +85,42 @@ describe('canonical Learning Objective catalog', () => {
       'hotel_accommodation.store_luggage',
       'hotel_accommodation.change_a_reservation_or_stay',
     ]);
+    expect(emergenciesHealth.map((objective) => objective.id)).toEqual([
+      'emergencies_health.describe_symptoms_and_severity',
+      'emergencies_health.ask_a_pharmacist_for_medicine',
+      'emergencies_health.seek_medical_care',
+      'emergencies_health.call_emergency_services',
+      'emergencies_health.ask_for_help_after_an_accident',
+      'emergencies_health.report_lost_or_stolen_property',
+      'emergencies_health.provide_critical_personal_and_medical_details',
+    ]);
+    expect(socialConversation.map((objective) => objective.id)).toEqual([
+      'social_conversation.expand_a_self_introduction',
+      'social_conversation.discuss_hobbies_and_interests',
+      'social_conversation.make_weather_small_talk',
+      'social_conversation.talk_about_travel_plans_and_experiences',
+      'social_conversation.give_and_respond_to_compliments',
+      'social_conversation.invite_and_respond_to_social_plans',
+      'social_conversation.express_preferences_and_find_common_ground',
+    ]);
+    expect(sightseeingCulture.map((objective) => objective.id)).toEqual([
+      'sightseeing_culture.confirm_admission_and_opening_details',
+      'sightseeing_culture.ask_about_a_landmark_or_exhibit',
+      'sightseeing_culture.request_and_give_photo_help',
+      'sightseeing_culture.follow_site_etiquette_and_restrictions',
+      'sightseeing_culture.join_a_tour_or_cultural_activity',
+      'sightseeing_culture.ask_for_sightseeing_recommendations',
+      'sightseeing_culture.understand_an_attraction_announcement',
+    ]);
+    expect(barsNightlife.map((objective) => objective.id)).toEqual([
+      'bars_nightlife.choose_a_drink_and_serving_style',
+      'bars_nightlife.request_a_non_alcoholic_option',
+      'bars_nightlife.join_a_toast_and_drinking_round',
+      'bars_nightlife.understand_cover_charge_and_tab',
+      'bars_nightlife.request_and_manage_karaoke_songs',
+      'bars_nightlife.respond_to_last_order_or_closing_time',
+      'bars_nightlife.accept_or_decline_a_nightlife_invitation',
+    ]);
     expect(LEARNING_OBJECTIVES.every((objective) => objective.description.trim())).toBe(true);
     expect(LEARNING_OBJECTIVES.every((objective) => objective.generationGuidance.trim())).toBe(
       true,
@@ -95,18 +136,8 @@ describe('canonical Learning Objective catalog', () => {
     );
   });
 
-  it('keeps only the remaining categories on the explicit compatibility path', () => {
-    expect(hasCanonicalLearningObjectives('greetings_basics')).toBe(true);
-    expect(hasCanonicalLearningObjectives('travel_essentials')).toBe(true);
-    expect(hasCanonicalLearningObjectives('food_dining')).toBe(true);
-    expect(hasCanonicalLearningObjectives('transport')).toBe(true);
-    expect(hasCanonicalLearningObjectives('shopping')).toBe(true);
-    expect(hasCanonicalLearningObjectives('directions')).toBe(true);
-    expect(hasCanonicalLearningObjectives('hotel_accommodation')).toBe(true);
-    expect(hasCanonicalLearningObjectives('emergencies_health')).toBe(false);
-    expect(hasCanonicalLearningObjectives('social_conversation')).toBe(false);
-    expect(hasCanonicalLearningObjectives('sightseeing_culture')).toBe(false);
-    expect(hasCanonicalLearningObjectives('bars_nightlife')).toBe(false);
+  it('provides canonical Learning Objectives for every Topic Category', () => {
+    expect(TOPIC_CATEGORY_KEYS.every(hasCanonicalLearningObjectives)).toBe(true);
   });
 
   it('rejects duplicate identities, category mismatches, and incomplete guidance', () => {
