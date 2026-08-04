@@ -103,6 +103,64 @@ describe('coverage source parsing', () => {
     });
     expect(evidence.coveredTopics.map((topic) => topic.topic)).toContain('Topic 12');
   });
+
+  it('derives semantic context evidence from the persisted complete lesson treatment', () => {
+    const summary = JSON.stringify(
+      meta({
+        topic: 'Exchanging origins',
+        reviewIntents: [
+          {
+            type: 'lesson_topic',
+            identity: 'exchanging origins',
+            display: 'Exchanging origins',
+            reason: 'The learner still hesitates with the reciprocal question.',
+            reviewRequested: true,
+          },
+        ],
+      }),
+    );
+    const parsed = parseCoverageSourceSessions([
+      storedSession('1', summary, {
+        plannedCoverage: {
+          version: 1,
+          category: 'greetings_basics',
+          lessonTopic: 'Exchanging origins',
+          lessonTreatment: JSON.stringify({
+            topic: 'Exchanging origins',
+            explanation: 'Talk with another passenger inside a railway terminal.',
+            exercises: [],
+          }),
+          culturalNote: 'Ask politely.',
+          keyPhraseDetails: [
+            {
+              japanese: 'どちらからですか',
+              romaji: 'dochira kara desu ka',
+              english: 'Where are you from?',
+              usage: 'Ask about origin.',
+            },
+            {
+              japanese: 'フィンランドからです',
+              romaji: 'finrando kara desu',
+              english: 'I am from Finland.',
+              usage: 'State your origin.',
+            },
+            {
+              japanese: 'あなたは',
+              romaji: 'anata wa',
+              english: 'And you?',
+              usage: 'Return the question.',
+            },
+          ],
+        },
+      }),
+    ]);
+    const evidence = buildCoverageEvidence({ sessions: parsed.sessions });
+
+    expect(evidence.reviewCandidates[0]).toMatchObject({
+      originalTreatmentContextIds: ['station_encounter'],
+      treatmentEvidenceComplete: true,
+    });
+  });
 });
 
 describe('coverage identity normalization', () => {

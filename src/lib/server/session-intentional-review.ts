@@ -17,6 +17,8 @@ export type IntentionalReviewTransferContext = {
   requiredTaskPrefix: string;
 };
 
+export type IntentionalReviewTransferContextId = IntentionalReviewTransferContext['id'];
+
 const TRANSFER_CONTEXTS: IntentionalReviewTransferContext[] = [
   {
     id: 'station_encounter',
@@ -47,6 +49,30 @@ const TRANSFER_CONTEXTS: IntentionalReviewTransferContext[] = [
     requiredTaskPrefix: 'On a city street,',
   },
 ];
+
+const TRANSFER_CONTEXT_ALIASES: Record<IntentionalReviewTransferContextId, string[]> = {
+  station_encounter: [
+    'station',
+    'train',
+    'platform',
+    'railway',
+    'railroad',
+    'railway terminal',
+    'rail terminal',
+    'carriage',
+  ],
+  hotel_lobby: ['hotel', 'lobby', 'reception', 'front desk', 'check in desk', 'inn', 'ryokan'],
+  shop_counter: ['shop', 'store', 'counter', 'cashier', 'checkout', 'retail', 'boutique'],
+  street_encounter: [
+    'street',
+    'outdoors',
+    'sidewalk',
+    'pavement',
+    'roadside',
+    'intersection',
+    'pedestrian',
+  ],
+};
 
 type InvalidIntentionalReviewClaim = { invalid: true };
 
@@ -116,12 +142,30 @@ function normalizedWords(value: string): string[] {
     .filter(Boolean);
 }
 
+function normalizedText(value: string): string {
+  return ` ${normalizedWords(value).join(' ')} `;
+}
+
+export function detectIntentionalReviewTransferContextIds(
+  treatmentText: string,
+): IntentionalReviewTransferContextId[] {
+  const normalizedTreatment = normalizedText(treatmentText);
+  return TRANSFER_CONTEXTS.filter((context) =>
+    TRANSFER_CONTEXT_ALIASES[context.id].some((alias) =>
+      normalizedTreatment.includes(normalizedText(alias)),
+    ),
+  ).map((context) => context.id);
+}
+
 export function selectIntentionalReviewTransferContext(candidate: {
   identity: string;
   display: string;
   topicIdentity?: string;
   topic?: string;
+  originalTreatmentContextIds?: IntentionalReviewTransferContextId[];
+  treatmentEvidenceComplete?: boolean;
 }): IntentionalReviewTransferContext | null {
+  if (candidate.treatmentEvidenceComplete === false) return null;
   const originalWords = new Set(
     normalizedWords(
       [candidate.identity, candidate.display, candidate.topicIdentity, candidate.topic]
@@ -130,8 +174,10 @@ export function selectIntentionalReviewTransferContext(candidate: {
     ),
   );
   return (
-    TRANSFER_CONTEXTS.find((context) =>
-      context.cueTokens.every((token) => !originalWords.has(token)),
+    TRANSFER_CONTEXTS.find(
+      (context) =>
+        !candidate.originalTreatmentContextIds?.includes(context.id) &&
+        context.cueTokens.every((token) => !originalWords.has(token)),
     ) ?? null
   );
 }

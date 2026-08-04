@@ -193,6 +193,8 @@ export interface PlannedSessionCoverage {
   category: import('$lib/topic-categories').TopicCategoryKey;
   learningObjectiveId?: string;
   lessonTopic: string;
+  /** Bounded server-generated lesson and exercise text used only for review-context freshness. */
+  lessonTreatment?: string;
   culturalNote: string;
   keyPhraseDetails: KeyPhrase[];
 }

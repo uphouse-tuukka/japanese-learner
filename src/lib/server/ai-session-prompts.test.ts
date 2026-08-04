@@ -271,6 +271,8 @@ describe('ai session prompt builders', () => {
             reasonCodes: ['wrong_exercise_result'],
             evidenceSessionIds: ['session-2'],
             lastSeenAt: '2026-05-03T08:00:00.000Z',
+            originalTreatmentContextIds: [],
+            treatmentEvidenceComplete: false,
           },
         ],
       },
@@ -437,6 +439,8 @@ describe('ai session prompt builders', () => {
       reasonCodes: ['wrong_exercise_result' as const],
       evidenceSessionIds: ['session-origin'],
       lastSeenAt: '2026-05-03T08:00:00.000Z',
+      originalTreatmentContextIds: [],
+      treatmentEvidenceComplete: true,
     };
     const prompt = buildSessionPlanPrompt({
       ...baseSessionInput(),

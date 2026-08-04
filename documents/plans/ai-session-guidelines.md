@@ -99,6 +99,8 @@
 - Missing, stale, resolved, unrelated, journal-only, or mismatched review claims must fail curriculum validation with the stable `ineligible_review` reason code.
 - Intentional review must use a materially fresh Lesson Topic and transfer task rather than duplicating the original treatment.
 - The application must select a stable fresh transfer-context rail that was absent from the original treatment and construct the complete affirmative transfer task and context-grounded Lesson Topic that the generated plan must copy exactly.
+- Planned Learning Session coverage must retain bounded server-generated lesson and exercise treatment text so the application can derive semantic context evidence for later review.
+- Intentional review must fail closed when complete original treatment evidence is unavailable or every app-owned transfer context overlaps it.
 
 ### Lessons
 

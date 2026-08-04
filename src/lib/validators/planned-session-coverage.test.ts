@@ -36,6 +36,7 @@ describe('planned Learning Session coverage metadata', () => {
           culturalNote: '  Ticket machines are common.  ',
           keyPhrases: completeKeyPhrases,
         },
+        exercises: [],
         learningObjectiveId: ' food_dining.order_item ',
       }),
     ).toEqual({
@@ -43,6 +44,11 @@ describe('planned Learning Session coverage metadata', () => {
       category: 'food_dining',
       learningObjectiveId: 'food_dining.order_item',
       lessonTopic: 'Ordering ramen',
+      lessonTreatment: JSON.stringify({
+        topic: '  Ordering ramen  ',
+        explanation: 'Practice ordering politely.',
+        exercises: [],
+      }),
       culturalNote: 'Ticket machines are common.',
       keyPhraseDetails: [
         {

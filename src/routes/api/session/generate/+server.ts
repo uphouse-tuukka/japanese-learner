@@ -454,6 +454,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       tokenOutput: plan.tokenUsage.output,
       plannedCoverage: buildPlannedSessionCoverage({
         lesson: plan.lesson,
+        exercises: plan.exercises,
         learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective?.id,
       }),
     });

@@ -141,10 +141,10 @@ const generatedPlan = {
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
-const stationTransferTask =
-  'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
-const originStationReviewTopic =
-  'Station encounter review: Ask where someone is from and state a country or place of origin.';
+const hotelTransferTask =
+  'In a hotel lobby, apply the selected Learning Objective through a new interaction and transfer challenge.';
+const originHotelReviewTopic =
+  'Hotel lobby review: Ask where someone is from and state a country or place of origin.';
 
 const canonicalObjectiveCases = [
   {
@@ -304,6 +304,7 @@ function buildCompletedAiSession(input: {
     reason: string;
     reviewRequested: true;
   }>;
+  lessonTreatment?: string;
 }) {
   return {
     id: input.id,
@@ -314,6 +315,20 @@ function buildCompletedAiSession(input: {
     tokenInput: 10,
     tokenOutput: 20,
     summary: buildSessionSummary(input),
+    plannedCoverage: {
+      version: 1,
+      category: input.category,
+      lessonTopic: input.topic,
+      lessonTreatment:
+        input.lessonTreatment ??
+        JSON.stringify({
+          topic: input.topic,
+          explanation: `Practice ${input.topic} in a neutral indoor setting.`,
+          exercises: [],
+        }),
+      culturalNote: 'Test note.',
+      keyPhraseDetails: [],
+    },
     createdAt: input.createdAt,
     completedAt: input.createdAt,
   };
@@ -469,6 +484,11 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'Basic greetings',
+        lessonTreatment: JSON.stringify({
+          topic: lesson.topic,
+          explanation: lesson.explanation,
+          exercises,
+        }),
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },
@@ -826,20 +846,24 @@ describe('POST /api/session/generate', () => {
                   },
                 ]
               : [],
+          lessonTreatment:
+            learningObjectiveId === 'greetings_basics.exchange_origins'
+              ? 'Exchange origins with another passenger inside a railway terminal.'
+              : undefined,
         }),
       ]),
     );
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
-        lesson: { topic: originStationReviewTopic },
+        lesson: { topic: originHotelReviewTopic },
         metadata: {
           learningObjectiveId: 'greetings_basics.exchange_origins',
           intentionalReview: {
             candidateType: 'lesson_topic',
             candidateIdentity: 'exchanging origins',
             learningObjectiveId: 'greetings_basics.exchange_origins',
-            transferContextId: 'station_encounter',
-            transferTask: stationTransferTask,
+            transferContextId: 'hotel_lobby',
+            transferTask: hotelTransferTask,
           },
         },
       }),
@@ -860,6 +884,8 @@ describe('POST /api/session/generate', () => {
               type: 'lesson_topic',
               identity: 'exchanging origins',
               reasonCodes: ['structured_review_intent'],
+              originalTreatmentContextIds: ['station_encounter'],
+              treatmentEvidenceComplete: true,
             }),
           }),
         }),
@@ -1244,6 +1270,11 @@ describe('POST /api/session/generate', () => {
         category: 'greetings_basics',
         learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'First greetings',
+        lessonTreatment: JSON.stringify({
+          topic: 'First greetings',
+          explanation: lesson.explanation,
+          exercises,
+        }),
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },

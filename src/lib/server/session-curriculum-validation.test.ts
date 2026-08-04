@@ -225,6 +225,8 @@ describe('validateGeneratedSessionPlan', () => {
       reasonCodes: ['structured_review_intent' as const],
       evidenceSessionIds: ['origin-session'],
       lastSeenAt: '2026-05-03T08:00:00.000Z',
+      originalTreatmentContextIds: [],
+      treatmentEvidenceComplete: true,
     };
     const coverageWithReview = {
       ...baseCoverage,
@@ -627,6 +629,8 @@ describe('validateGeneratedSessionPlan', () => {
       reasonCodes: ['wrong_exercise_result' as const],
       evidenceSessionIds: ['session-greetings'],
       lastSeenAt: '2026-05-22T08:00:00.000Z',
+      originalTreatmentContextIds: [],
+      treatmentEvidenceComplete: true,
     };
     const coverageWithSelectedPhraseReview = {
       ...baseCoverage,
