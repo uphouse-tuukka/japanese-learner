@@ -115,6 +115,8 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
   return {
     summaryText: parsed.summaryText,
     category: typeof parsed.category === 'string' ? parsed.category : undefined,
+    learningObjectiveId:
+      typeof parsed.learningObjectiveId === 'string' ? parsed.learningObjectiveId : undefined,
     topic: parsed.topic,
     accuracy: parsed.accuracy,
     strengths: asStringArray(parsed.strengths),
@@ -129,6 +131,11 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
     hadLevelUpRecommendation:
       typeof parsed.hadLevelUpRecommendation === 'boolean'
         ? parsed.hadLevelUpRecommendation
+        : undefined,
+    coverageSource:
+      parsed.coverageSource === 'server_generated_plan' ||
+      parsed.coverageSource === 'legacy_client_fallback'
+        ? parsed.coverageSource
         : undefined,
   };
 }

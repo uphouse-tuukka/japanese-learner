@@ -9,6 +9,7 @@ const {
   mockGenerateUpdatedJournal,
   mockGetProgressJournal,
   mockGetRecentSessionSummaries,
+  mockGetSession,
   mockGetSessionExercises,
   mockGetUserById,
   mockInsertExerciseResults,
@@ -25,6 +26,7 @@ const {
   mockGenerateUpdatedJournal: vi.fn(),
   mockGetProgressJournal: vi.fn(),
   mockGetRecentSessionSummaries: vi.fn(),
+  mockGetSession: vi.fn(),
   mockGetSessionExercises: vi.fn(),
   mockGetUserById: vi.fn(),
   mockInsertExerciseResults: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock('$lib/server/db', () => ({
   completeSessionRecord: mockCompleteSessionRecord,
   getProgressJournal: mockGetProgressJournal,
   getRecentSessionSummaries: mockGetRecentSessionSummaries,
+  getSession: mockGetSession,
   getSessionExercises: mockGetSessionExercises,
   getUserById: mockGetUserById,
   insertExerciseResults: mockInsertExerciseResults,
@@ -126,6 +129,7 @@ function expectNoWrites() {
   expect(mockGetSessionExercises).not.toHaveBeenCalled();
   expect(mockGetProgressJournal).not.toHaveBeenCalled();
   expect(mockGetRecentSessionSummaries).not.toHaveBeenCalled();
+  expect(mockGetSession).not.toHaveBeenCalled();
   expect(mockGenerateSessionSummary).not.toHaveBeenCalled();
   expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
   expect(mockCheckBudget).not.toHaveBeenCalled();
@@ -147,6 +151,7 @@ describe('POST /api/session/complete', () => {
     mockGenerateUpdatedJournal.mockReset();
     mockGetProgressJournal.mockReset();
     mockGetRecentSessionSummaries.mockReset();
+    mockGetSession.mockReset();
     mockGetSessionExercises.mockReset();
     mockGetUserById.mockReset();
     mockInsertExerciseResults.mockReset();
@@ -187,6 +192,19 @@ describe('POST /api/session/complete', () => {
     });
     mockGetProgressJournal.mockResolvedValue(null);
     mockGetRecentSessionSummaries.mockResolvedValue([]);
+    mockGetSession.mockResolvedValue({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      status: 'completing',
+      model: 'gpt-5.4',
+      tokenInput: 10,
+      tokenOutput: 20,
+      summary: null,
+      plannedCoverage: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      completedAt: CLAIMED_AT,
+    });
     mockGetSessionExercises.mockResolvedValue([
       {
         sessionId: 'session-1',
@@ -665,6 +683,140 @@ describe('POST /api/session/complete', () => {
         summary: expect.any(String),
       }),
     );
+  });
+
+  it.each([
+    ['missing', {}],
+    [
+      'blank',
+      {
+        lessonTopic: '   ',
+        category: '   ',
+        culturalNote: '   ',
+        keyPhrases: [],
+        keyPhraseDetails: [],
+      },
+    ],
+    [
+      'altered',
+      {
+        lessonTopic: 'Altered browser topic',
+        category: 'shopping',
+        culturalNote: 'Altered browser note',
+        keyPhrases: ['altered phrase'],
+        keyPhraseDetails: [{ japanese: '偽' }],
+      },
+    ],
+    [
+      'malformed',
+      {
+        lessonTopic: { unexpected: true },
+        category: 42,
+        culturalNote: ['unexpected'],
+        keyPhrases: 'not-an-array',
+        keyPhraseDetails: 'not-an-array',
+      },
+    ],
+  ])(
+    'uses server-owned generated coverage when resumed browser metadata is %s',
+    async (_case, browserMetadata) => {
+      mockGetSession.mockResolvedValueOnce({
+        id: 'session-1',
+        userId: 'user-1',
+        mode: 'ai',
+        status: 'completing',
+        model: 'gpt-5.4',
+        tokenInput: 10,
+        tokenOutput: 20,
+        summary: null,
+        plannedCoverage: {
+          version: 1,
+          category: 'food_dining',
+          learningObjectiveId: 'food_dining.order_item',
+          lessonTopic: 'Ordering ramen',
+          culturalNote: 'Ticket machines are common.',
+          keyPhraseDetails: [
+            {
+              japanese: 'ラーメンをください',
+              romaji: 'raamen o kudasai',
+              english: 'Ramen, please.',
+              usage: 'Use while ordering.',
+            },
+          ],
+        },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        completedAt: CLAIMED_AT,
+      });
+
+      const response = await completeSession({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        results: validResults(),
+        ...browserMetadata,
+      });
+
+      expect(response.status).toBe(200);
+      const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+        string,
+        { summary: string; tokenInput: number; tokenOutput: number },
+      ];
+      const storedMeta = JSON.parse(completion.summary) as Record<string, unknown>;
+
+      expect(storedMeta).toMatchObject({
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_item',
+        topic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhrases: ['ラーメンをください'],
+        keyPhraseDetails: [
+          {
+            japanese: 'ラーメンをください',
+            romaji: 'raamen o kudasai',
+            english: 'Ramen, please.',
+            usage: 'Use while ordering.',
+          },
+        ],
+        coverageSource: 'server_generated_plan',
+      });
+    },
+  );
+
+  it('keeps the bounded lower-confidence fallback for legacy planned sessions', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      status: 'completing',
+      model: 'gpt-5.4',
+      tokenInput: 10,
+      tokenOutput: 20,
+      summary: null,
+      plannedCoverage: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      completedAt: CLAIMED_AT,
+    });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+      lessonTopic: 'Legacy browser topic',
+      category: 'food_dining',
+      culturalNote: 'Legacy browser note',
+      keyPhraseDetails: [{ japanese: 'ください', romaji: 'kudasai' }],
+    });
+
+    expect(response.status).toBe(200);
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [
+      string,
+      { summary: string; tokenInput: number; tokenOutput: number },
+    ];
+    expect(JSON.parse(completion.summary)).toMatchObject({
+      category: 'food_dining',
+      topic: 'Legacy browser topic',
+      keyPhrases: ['ください'],
+      coverageSource: 'legacy_client_fallback',
+    });
   });
 
   it('sanitizes structured key phrase details and derives legacy key phrases from them first', async () => {

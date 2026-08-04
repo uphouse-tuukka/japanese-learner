@@ -112,6 +112,45 @@ describe('session completion claims', () => {
     });
   });
 
+  it('persists generated coverage through completion for later authoritative history', async () => {
+    const db = await loadDb();
+    await db.insertUser({ id: 'user-1', name: 'Test User', level: 'beginner' });
+    await db.createSession({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_item',
+        lessonTopic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: [{ japanese: 'ラーメンをください', romaji: 'raamen o kudasai' }],
+      },
+    });
+
+    const claim = await db.claimSessionCompletion('user-1', 'session-1');
+    if (claim.status !== 'claimed') throw new Error('Expected session claim.');
+    await expect(
+      db.completeSessionRecord('session-1', {
+        summary: 'completed summary',
+        completionClaimedAt: claim.claimedAt,
+      }),
+    ).resolves.toBe(true);
+
+    await expect(db.getSession('session-1')).resolves.toMatchObject({
+      status: 'completed',
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_item',
+        lessonTopic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: [{ japanese: 'ラーメンをください', romaji: 'raamen o kudasai' }],
+      },
+    });
+  });
+
   it('keeps a fresh completing claim busy for concurrent completion requests', async () => {
     const db = await loadDb();
     await seedPlannedSession(db);

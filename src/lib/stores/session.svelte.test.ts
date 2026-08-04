@@ -37,6 +37,7 @@ function buildSession(id: string): Session {
     tokenInput: 10,
     tokenOutput: 20,
     summary: null,
+    plannedCoverage: null,
     createdAt: '2026-07-01T08:00:00.000Z',
     completedAt: null,
   };

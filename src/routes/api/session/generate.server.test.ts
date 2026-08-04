@@ -125,6 +125,7 @@ function buildGeneratedPlan(
     lesson?: Partial<typeof lesson>;
     tokenUsage?: { input: number; output: number };
     model?: string;
+    metadata?: Record<string, unknown>;
   } = {},
 ) {
   return {
@@ -132,7 +133,7 @@ function buildGeneratedPlan(
     lesson: { ...lesson, ...overrides.lesson },
     exercises,
     tokenUsage: overrides.tokenUsage ?? generatedPlan.tokenUsage,
-    metadata: {},
+    metadata: overrides.metadata ?? {},
   };
 }
 
@@ -344,6 +345,13 @@ describe('POST /api/session/generate', () => {
       model: 'gpt-5.4',
       tokenInput: 10,
       tokenOutput: 20,
+      plannedCoverage: {
+        version: 1,
+        category: 'greetings_basics',
+        lessonTopic: 'Basic greetings',
+        culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
+        keyPhraseDetails: [],
+      },
     });
     expect(mockAttachExercisesToSession).toHaveBeenCalledWith('session-1', exercises);
     expect(mockRecordUsageEvent).toHaveBeenCalledWith({
@@ -371,6 +379,25 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         userId: 'user-1',
         exerciseCount: 4,
+      }),
+    );
+  });
+
+  it('persists an app-selected Learning Objective identity when generation provides one', async () => {
+    mockGenerateSessionPlan.mockResolvedValueOnce(
+      buildGeneratedPlan({ metadata: { learningObjectiveId: 'greetings_basics.first_meeting' } }),
+    );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockCreateSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plannedCoverage: expect.objectContaining({
+          category: 'greetings_basics',
+          learningObjectiveId: 'greetings_basics.first_meeting',
+          lessonTopic: 'Basic greetings',
+        }),
       }),
     );
   });
@@ -582,6 +609,13 @@ describe('POST /api/session/generate', () => {
       model: 'gpt-5.4',
       tokenInput: 13,
       tokenOutput: 21,
+      plannedCoverage: {
+        version: 1,
+        category: 'greetings_basics',
+        lessonTopic: 'First greetings',
+        culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
+        keyPhraseDetails: [],
+      },
     });
     expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
       userId: 'user-1',

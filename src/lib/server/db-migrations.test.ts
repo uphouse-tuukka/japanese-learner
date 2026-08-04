@@ -2,6 +2,7 @@ import { createClient, type InStatement } from '@libsql/client';
 import { describe, expect, it } from 'vitest';
 import {
   PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+  SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY,
   SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY,
   SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY,
   SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
@@ -52,7 +53,10 @@ class FakeMigrationDb {
       userXpCreateSql?: string;
     } = {},
   ) {
-    this.existingMigrationKeys = new Set(input.existingMigrationKeys ?? []);
+    this.existingMigrationKeys = new Set([
+      SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY,
+      ...(input.existingMigrationKeys ?? []),
+    ]);
     this.portfolioColumns = new Set(input.portfolioColumns ?? []);
     this.portfolioTableExists = input.portfolioTableExists ?? true;
     this.spokenMissionColumns = new Set(input.spokenMissionColumns ?? []);
@@ -183,6 +187,35 @@ describe('hasUserXpMissionReasons', () => {
 });
 
 describe('runDatabaseMigrations', () => {
+  it('adds planned Learning Session coverage storage to an existing sessions table idempotently', async () => {
+    const db = createClient({ url: 'file::memory:' });
+    await db.batch([
+      `CREATE TABLE _migrations (key TEXT PRIMARY KEY);`,
+      `CREATE TABLE sessions (id TEXT PRIMARY KEY);`,
+      ...[
+        USER_XP_MISSION_REASONS_MIGRATION_KEY,
+        PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY,
+        SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY,
+        SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY,
+        SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY,
+      ].map((key) => ({
+        sql: `INSERT INTO _migrations (key) VALUES (?);`,
+        args: [key],
+      })),
+    ]);
+
+    await runDatabaseMigrations(db);
+    await runDatabaseMigrations(db);
+
+    const columns = await db.execute(`PRAGMA table_info(sessions);`);
+    expect(columns.rows.filter((row) => row.name === 'planned_coverage_json')).toHaveLength(1);
+    const marker = await db.execute({
+      sql: `SELECT key FROM _migrations WHERE key = ?;`,
+      args: [SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY],
+    });
+    expect(marker.rows).toHaveLength(1);
+  });
+
   it('runs current user_xp migration and adds all portfolio v2 columns when migration markers are absent', async () => {
     const db = new FakeMigrationDb({
       userXpCreateSql:

@@ -121,6 +121,9 @@ Important values:
 
 Learn and Practice session completion is claim based.
 The completion APIs move a planned `sessions` row into a transient `completing` status before writing results and finalizing the record.
+A newly generated Learning Session stores its Topic Category, Lesson Topic, cultural note, optional Learning Objective identity, and structured Lesson Key Phrases in server-owned planned-session metadata before the generation response succeeds.
+Learning Session completion uses that stored metadata even when resumed browser lesson data is missing or altered.
+Legacy planned sessions without stored metadata retain a bounded client/exercise fallback and mark the resulting Coverage Evidence as lower confidence.
 A completed retry by the same user returns the stored completion summary without duplicate exercise results, XP, token usage, or journal side effects.
 A concurrent completion for the same in-flight claim returns `409`, and an unknown or cross-user completed session returns `404`.
 Stale `completing` claims older than 30 minutes are reclaimed or removed with their partial exercise results when new session work starts.

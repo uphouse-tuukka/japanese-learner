@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-07-02
+**Last updated:** 2026-08-04
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -65,6 +65,14 @@
 - Mix exercise types within level constraints
 
 ## Content Standards
+
+### Coverage metadata authority
+
+- A generated Learning Session must durably store its generated Topic Category, Lesson Topic, cultural note, structured Lesson Key Phrases, and optional app-selected Learning Objective identity with the planned server session before responding successfully.
+- Completion must build Coverage Evidence metadata from the stored generated plan, not from browser-authored lesson fields.
+- Missing, blank, altered, malformed, or resumed browser lesson data must not replace valid server-owned metadata.
+- Legacy planned sessions without stored plan metadata may use the bounded compatibility fallback and must identify the resulting coverage as lower confidence.
+- Completion retries must return the stored completion result without repeating coverage, result, token, XP, or journal side effects.
 
 ### Lessons
 

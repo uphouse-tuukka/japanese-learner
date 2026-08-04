@@ -55,6 +55,7 @@ function storedSession(
     createdAt: `2026-05-${id.padStart(2, '0')}T08:00:00.000Z`,
     completedAt: `2026-05-${id.padStart(2, '0')}T08:05:00.000Z`,
     ...overrides,
+    plannedCoverage: overrides.plannedCoverage ?? null,
   };
 }
 

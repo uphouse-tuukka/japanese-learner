@@ -16,6 +16,7 @@ describe('getSchemaStatements', () => {
     expect(schemaSql).toContain('PRAGMA foreign_keys = ON;');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS users');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS sessions');
+    expect(schemaSql).toContain('planned_coverage_json TEXT');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS exercises');
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS user_exercise_results');
   });

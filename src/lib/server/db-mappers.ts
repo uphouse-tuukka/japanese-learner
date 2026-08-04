@@ -7,6 +7,7 @@ import type {
   User,
   UserLevel,
 } from '$lib/types';
+import { parsePlannedSessionCoverage } from '$lib/validators/planned-session-coverage';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -70,6 +71,9 @@ export function mapSessionRow(row: Record<string, unknown>): Session {
     tokenInput: asNumber(row.token_input),
     tokenOutput: asNumber(row.token_output),
     summary: row.summary ? asString(row.summary) : null,
+    plannedCoverage: parsePlannedSessionCoverage(
+      row.planned_coverage_json ? asString(row.planned_coverage_json) : null,
+    ),
     createdAt: asIso(row.created_at),
     completedAt: row.completed_at ? asIso(row.completed_at) : null,
   };
