@@ -687,7 +687,7 @@ describe('POST /api/session/generate', () => {
     ]);
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
-        lesson: { topic: 'Restaurant payment', category: 'food_dining' },
+        lesson: { topic: 'Ordering a set meal', category: 'food_dining' },
         metadata: { learningObjectiveId: 'food_dining.order_food_and_drinks' },
       }),
     );
