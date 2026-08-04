@@ -61,6 +61,7 @@ export type CoveredLearningObjective = {
   topicIdentities: string[];
   firstSeenAt: string;
   lastSeenAt: string;
+  lastMasteredAt: string | null;
 };
 
 export type CoveredKeyPhrase = {
@@ -465,6 +466,7 @@ function addLearningObjective(
     id: string;
     category: TopicCategoryKey;
     topicIdentity?: string;
+    mastered: boolean;
     sessionId: string;
     seenAt: string;
   },
@@ -479,6 +481,7 @@ function addLearningObjective(
       topicIdentities: new Set(input.topicIdentity ? [input.topicIdentity] : []),
       firstSeenAt: input.seenAt,
       lastSeenAt: input.seenAt,
+      lastMasteredAt: input.mastered ? input.seenAt : null,
     });
     return;
   }
@@ -488,6 +491,11 @@ function addLearningObjective(
   if (input.topicIdentity) current.topicIdentities.add(input.topicIdentity);
   current.firstSeenAt = earliestIso(current.firstSeenAt, input.seenAt);
   current.lastSeenAt = latestIso(current.lastSeenAt, input.seenAt);
+  if (input.mastered) {
+    current.lastMasteredAt = current.lastMasteredAt
+      ? latestIso(current.lastMasteredAt, input.seenAt)
+      : input.seenAt;
+  }
 }
 
 function addPhrase(
@@ -766,22 +774,45 @@ function selectCategory(input: {
   };
 }
 
+function reviewCandidateMatchesObjective(
+  candidate: ReviewCandidate,
+  objective: CoveredLearningObjective,
+): boolean {
+  return (
+    candidate.evidenceSessionIds.some((sessionId) => objective.sessionIds.includes(sessionId)) ||
+    (candidate.category === objective.category &&
+      Boolean(
+        candidate.topicIdentity && objective.topicIdentities.includes(candidate.topicIdentity),
+      ))
+  );
+}
+
 function reviewCandidateForObjective(
   objective: CoveredLearningObjective,
   reviewCandidates: ReviewCandidate[],
 ): ReviewCandidate | null {
   return (
-    reviewCandidates.find(
-      (candidate) =>
-        candidate.evidenceSessionIds.some((sessionId) =>
-          objective.sessionIds.includes(sessionId),
-        ) ||
-        (candidate.category === objective.category &&
-          Boolean(
-            candidate.topicIdentity && objective.topicIdentities.includes(candidate.topicIdentity),
-          )),
-    ) ?? null
+    reviewCandidates.find((candidate) => reviewCandidateMatchesObjective(candidate, objective)) ??
+    null
   );
+}
+
+function isResolvedByCanonicalObjectiveMastery(
+  candidate: ReviewCandidate,
+  coveredLearningObjectives: CoveredLearningObjective[],
+): boolean {
+  if (candidate.type !== 'lesson_topic') return false;
+
+  return coveredLearningObjectives.some((objective) => {
+    if (!objective.lastMasteredAt || !reviewCandidateMatchesObjective(candidate, objective)) {
+      return false;
+    }
+    const masteryTime = dateValue(objective.lastMasteredAt);
+    const candidateTime = dateValue(candidate.lastSeenAt);
+    return candidate.reasonCodes.includes('structured_review_intent')
+      ? masteryTime > candidateTime
+      : masteryTime >= candidateTime;
+  });
 }
 
 function selectObjectiveInCategory(input: {
@@ -818,12 +849,7 @@ function selectObjectiveInCategory(input: {
     const coveredObjective = input.coveredLearningObjectives.find(
       (objective) =>
         objective.category === input.category &&
-        (candidate.evidenceSessionIds.some((sessionId) =>
-          objective.sessionIds.includes(sessionId),
-        ) ||
-          Boolean(
-            candidate.topicIdentity && objective.topicIdentities.includes(candidate.topicIdentity),
-          )),
+        reviewCandidateMatchesObjective(candidate, objective),
     );
     if (!coveredObjective) continue;
     const objective = getLearningObjective(coveredObjective.id);
@@ -1219,6 +1245,7 @@ export function buildCoverageEvidence(input: {
         id: learningObjective.id,
         category: learningObjective.category,
         topicIdentity: topicIdentity ?? undefined,
+        mastered: session.meta.accuracy === 100,
         sessionId: session.sessionId,
         seenAt,
       });
@@ -1258,7 +1285,9 @@ export function buildCoverageEvidence(input: {
     exerciseResults: input.exerciseResults ?? [],
   });
 
-  const reviewCandidates = toReviewCandidates(candidates);
+  const reviewCandidates = toReviewCandidates(candidates).filter(
+    (candidate) => !isResolvedByCanonicalObjectiveMastery(candidate, coveredLearningObjectives),
+  );
   const initialCategoryRotation = selectCategory({ sessions, categories, reviewCandidates });
   const { categoryRotation, learningObjectiveSelection } = selectLearningObjective({
     categoryRotation: initialCategoryRotation,

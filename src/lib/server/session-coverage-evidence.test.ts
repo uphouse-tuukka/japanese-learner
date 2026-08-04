@@ -517,6 +517,79 @@ describe('review candidate derivation', () => {
     expect(evidence.reviewCandidates).toEqual([]);
   });
 
+  it('resolves older topic Review Evidence after canonical mastery under a new title', () => {
+    const sessions = [
+      sourceSession(
+        'mastery',
+        'greetings_basics',
+        'Introducing your country of origin',
+        '2026-05-05T08:00:00.000Z',
+        {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          accuracy: 100,
+          keyPhraseDetails: [
+            { japanese: 'アメリカから来ました', romaji: 'amerika kara kimashita' },
+          ],
+        },
+      ),
+      sourceSession(
+        'weakness',
+        'greetings_basics',
+        'Saying where you are from',
+        '2026-05-04T08:00:00.000Z',
+        {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          accuracy: 0,
+          keyPhraseDetails: [
+            { japanese: 'アメリカから来ました', romaji: 'amerika kara kimashita' },
+          ],
+        },
+      ),
+    ];
+    const unrelatedExercise = {
+      ...exercise,
+      japanese: 'どこですか',
+      romaji: 'doko desu ka',
+    };
+
+    const evidence = buildCoverageEvidence({
+      sessions,
+      exerciseResults: [
+        {
+          sessionId: 'weakness',
+          exerciseId: 'weakness-result-1',
+          isCorrect: false,
+          answerText: 'incorrect',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: unrelatedExercise,
+        },
+        {
+          sessionId: 'weakness',
+          exerciseId: 'weakness-result-2',
+          isCorrect: false,
+          answerText: 'incorrect again',
+          createdAt: '2026-05-04T08:11:00.000Z',
+          exercise: { ...unrelatedExercise, id: 'weakness-result-2' },
+        },
+      ],
+    });
+
+    expect(evidence.coveredLearningObjectives).toEqual([
+      expect.objectContaining({
+        id: 'greetings_basics.exchange_origins',
+        lastMasteredAt: '2026-05-05T08:00:00.000Z',
+      }),
+    ]);
+    expect(evidence.reviewCandidates).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'lesson_topic',
+          identity: 'saying where you are from',
+        }),
+      ]),
+    );
+  });
+
   it('resolves an earlier same-session phrase miss after a later correct result', () => {
     const session = sourceSession(
       'same-session',

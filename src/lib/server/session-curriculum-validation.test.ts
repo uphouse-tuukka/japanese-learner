@@ -181,6 +181,7 @@ describe('validateGeneratedSessionPlan', () => {
           topicIdentities: ['saying where you are from'],
           firstSeenAt: '2026-05-01T08:00:00.000Z',
           lastSeenAt: '2026-05-01T08:00:00.000Z',
+          lastMasteredAt: '2026-05-01T08:00:00.000Z',
         },
       ],
     } as CoverageEvidence;
@@ -235,11 +236,23 @@ describe('validateGeneratedSessionPlan', () => {
       }),
       coverageEvidence: compatibilityCoverage,
     });
+    const inventedObjective = validateGeneratedSessionPlan({
+      plan: plan({
+        category: 'food_dining',
+        topic: 'Paying at a restaurant',
+        learningObjectiveId: 'food_dining.model_invented_goal',
+      }),
+      coverageEvidence: compatibilityCoverage,
+    });
 
     expect(fresh.valid).toBe(true);
     expect(repeated.valid).toBe(false);
     if (!repeated.valid) {
       expect(repeated.reasonCodes).toContain('repeated_lesson_topic');
+    }
+    expect(inventedObjective.valid).toBe(false);
+    if (!inventedObjective.valid) {
+      expect(inventedObjective.reasonCodes).toContain('invalid_learning_objective_identity');
     }
   });
 

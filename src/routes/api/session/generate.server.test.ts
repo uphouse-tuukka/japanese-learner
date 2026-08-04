@@ -453,7 +453,7 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it('does not persist a model-invented objective identity in compatibility categories', async () => {
+  it('rejects and does not persist a model-invented identity in compatibility categories', async () => {
     mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
       buildCompletedAiSession({
         id: 'food-1',
@@ -462,19 +462,30 @@ describe('POST /api/session/generate', () => {
         topic: 'Ordering food',
       }),
     ]);
-    mockGenerateSessionPlan.mockResolvedValueOnce(
-      buildGeneratedPlan({
-        lesson: {
-          topic: 'Paying at a restaurant',
-          category: 'food_dining',
-        },
-        metadata: { learningObjectiveId: 'food_dining.model_invented_goal' },
-      }),
-    );
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: {
+            topic: 'Paying at a restaurant',
+            category: 'food_dining',
+          },
+          metadata: { learningObjectiveId: 'food_dining.model_invented_goal' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: {
+            topic: 'Paying at a restaurant',
+            category: 'food_dining',
+          },
+          metadata: {},
+        }),
+      );
 
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
 
     expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
     expect(mockCreateSessionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         plannedCoverage: expect.not.objectContaining({
@@ -553,6 +564,7 @@ describe('POST /api/session/generate', () => {
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
         lesson: { topic: 'Restaurant payment', category: 'food_dining' },
+        metadata: {},
       }),
     );
 
@@ -841,6 +853,7 @@ describe('POST /api/session/generate', () => {
   });
 
   it('retries when the model invents a Learning Objective identity', async () => {
+    const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockGenerateSessionPlan
       .mockResolvedValueOnce(
         buildGeneratedPlan({
@@ -871,6 +884,13 @@ describe('POST /api/session/generate', () => {
       1,
       expect.objectContaining({ sessionId: null, tokensIn: 11, tokensOut: 22 }),
     );
+    const validationLog = logSpy.mock.calls.find(
+      ([message]) => message === '[api/session/generate] curriculum validation failed',
+    );
+    expect(validationLog?.[1]).toEqual(
+      expect.objectContaining({ generatedLearningObjectiveStatus: 'unrecognized' }),
+    );
+    expect(JSON.stringify(validationLog?.[1])).not.toContain('model_invented_goal');
   });
 
   it('fails closed without creating a session when both generation attempts violate curriculum rails', async () => {

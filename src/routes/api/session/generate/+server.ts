@@ -369,7 +369,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               reasonCodes: validation.reasonCodes,
               selectedCategory: validation.details.selectedCategory,
               selectedLearningObjectiveId: validation.details.selectedLearningObjectiveId,
-              generatedLearningObjectiveId: validation.details.generatedLearningObjectiveId,
+              generatedLearningObjectiveStatus: validation.details.generatedLearningObjectiveStatus,
               learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
               generatedCategory: validation.details.generatedCategory,
               blockedCategories: validation.details.blockedCategories,

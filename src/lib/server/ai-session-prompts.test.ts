@@ -377,7 +377,10 @@ describe('ai session prompt builders', () => {
     const promptText = systemPrompt(prompt);
     const payload = userPayload<{
       selectedLearningObjective: { id: string; category: string };
-      requiredOutputExample: { learningObjectiveId: string };
+      requiredOutputExample: {
+        learningObjectiveId: string;
+        lesson: { category: string; topic: string };
+      };
     }>(prompt);
 
     expect(promptText).toContain(
@@ -398,6 +401,10 @@ describe('ai session prompt builders', () => {
     expect(payload.requiredOutputExample.learningObjectiveId).toBe(
       'greetings_basics.exchange_origins',
     );
+    expect(payload.requiredOutputExample.lesson).toMatchObject({
+      category: 'greetings_basics',
+      topic: 'Ask where someone is from and state a country or place of origin.',
+    });
   });
 
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {

@@ -28,6 +28,11 @@ export type SessionCurriculumValidationDetails = {
   repeatedLessonTopic: string | null;
   selectedLearningObjectiveId: string | null;
   generatedLearningObjectiveId: string | null;
+  generatedLearningObjectiveStatus:
+    | 'missing'
+    | 'unrecognized'
+    | 'recognized_selected'
+    | 'recognized_other';
 };
 
 export type SessionCurriculumValidationResult =
@@ -102,6 +107,16 @@ export function validateGeneratedSessionPlan(input: {
     plan.metadata.learningObjectiveId.trim()
       ? plan.metadata.learningObjectiveId.trim()
       : null;
+  const generatedLearningObjective = generatedLearningObjectiveId
+    ? getLearningObjective(generatedLearningObjectiveId)
+    : null;
+  const generatedLearningObjectiveStatus = !generatedLearningObjectiveId
+    ? 'missing'
+    : !generatedLearningObjective
+      ? 'unrecognized'
+      : generatedLearningObjective.id === selectedLearningObjective?.id
+        ? 'recognized_selected'
+        : 'recognized_other';
   const reasonCodes: SessionCurriculumValidationReasonCode[] = [];
 
   if (generatedCategory !== selectedCategory) {
@@ -116,9 +131,6 @@ export function validateGeneratedSessionPlan(input: {
   }
 
   if (coverageEvidence.learningObjectiveSelection.mode === 'canonical') {
-    const generatedLearningObjective = generatedLearningObjectiveId
-      ? getLearningObjective(generatedLearningObjectiveId)
-      : null;
     if (
       !selectedLearningObjective ||
       !generatedLearningObjective ||
@@ -133,6 +145,8 @@ export function validateGeneratedSessionPlan(input: {
         repeatsCoveredObjective ? 'repeated_learning_objective' : 'learning_objective_mismatch',
       );
     }
+  } else if (generatedLearningObjectiveId) {
+    reasonCodes.push('invalid_learning_objective_identity');
   }
 
   const generatedTopicIdentity = normalizeTopicIdentity(plan.lesson.topic);
@@ -167,6 +181,7 @@ export function validateGeneratedSessionPlan(input: {
     repeatedLessonTopic: repeatedLessonTopic?.topic ?? null,
     selectedLearningObjectiveId: selectedLearningObjective?.id ?? null,
     generatedLearningObjectiveId,
+    generatedLearningObjectiveStatus,
   };
 
   return reasonCodes.length === 0

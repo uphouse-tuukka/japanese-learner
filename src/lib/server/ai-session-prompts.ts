@@ -492,6 +492,10 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           .filter(Boolean)
           .join(' ')
       : '';
+  const selectedLearningObjective =
+    input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
+  const selectedTopicCategory =
+    input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
   const priorNotes = sessionHistory
     .slice(0, 3)
@@ -611,15 +615,15 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
             learningJournal,
             curriculumValidationFeedback: input.curriculumValidationFeedback ?? [],
           },
-          selectedLearningObjective:
-            input.coverageEvidence?.learningObjectiveSelection.objective ?? null,
+          selectedLearningObjective,
           targetExerciseCount,
           requiredOutputExample: {
-            learningObjectiveId:
-              input.coverageEvidence?.learningObjectiveSelection.objective?.id ?? null,
+            learningObjectiveId: selectedLearningObjective?.id ?? null,
             lesson: {
-              topic: 'Ordering at a restaurant',
-              category: 'food_dining',
+              topic:
+                selectedLearningObjective?.description ??
+                `A focused lesson within ${selectedTopicCategory}`,
+              category: selectedTopicCategory,
               explanation: 'When eating out in Japan, you can use a few polite phrases...',
               culturalNote: "In Japan, you don't tip. Service is included.",
               keyPhrases: [
@@ -658,7 +662,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 acceptedAnswers: ['Thank you very much', 'Thank you'],
               },
             ],
-            focus: 'restaurant_ordering',
+            focus: selectedLearningObjective?.id ?? `${selectedTopicCategory}_focus`,
           },
         }),
       },
