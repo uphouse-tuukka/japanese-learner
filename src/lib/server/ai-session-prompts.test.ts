@@ -227,9 +227,15 @@ describe('ai session prompt builders', () => {
           blockedCategories: ['food_dining'],
         },
         learningObjectiveSelection: {
-          mode: 'legacy_exact_topic',
-          reason: 'category_not_migrated_compatibility',
-          objective: null,
+          mode: 'canonical',
+          reason: 'selected_uncovered_objective',
+          objective: {
+            id: 'emergencies_health.describe_symptoms_and_severity',
+            category: 'emergencies_health',
+            communicativeGoalKey: 'describe_symptoms_and_severity',
+            description: 'Describe a symptom and communicate how severe or urgent it is.',
+            generationGuidance: 'Teach a focused symptom and severity exchange.',
+          },
           reviewCandidate: null,
         },
         categoryCoverage: [
@@ -316,6 +322,7 @@ describe('ai session prompt builders', () => {
     );
     expect(promptText).toContain('must never create or authorize a Review Candidate');
     expect(promptText).toContain('handoff notes cannot authorize repetition');
+    expect(promptText).not.toContain('compatibility mode');
     expect(promptText).toContain('CURRICULUM VALIDATION FEEDBACK FROM PREVIOUS ATTEMPT:');
     expect(promptText).toContain(
       'Previous generation violated curriculum rails: category_mismatch.',

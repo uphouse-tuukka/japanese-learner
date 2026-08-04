@@ -1,4 +1,5 @@
 import { isTopicCategoryKey } from '$lib/topic-categories';
+import { getLearningObjective } from '$lib/learning-objectives';
 import type { Exercise, KeyPhrase, Lesson, PlannedSessionCoverage } from '$lib/types';
 import { parseJsonObject } from './common';
 import { sanitizeKeyPhraseDetails } from './session-meta';
@@ -34,10 +35,17 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
   if (parsed.version !== 1 || !isTopicCategoryKey(parsed.category)) return null;
 
   const lessonTopic = boundedRequiredString(parsed.lessonTopic, MAX_LESSON_TOPIC_LENGTH);
+  const learningObjectiveId = boundedRequiredString(
+    parsed.learningObjectiveId,
+    MAX_OBJECTIVE_ID_LENGTH,
+  );
+  const learningObjective = learningObjectiveId ? getLearningObjective(learningObjectiveId) : null;
   const culturalNote = boundedRequiredString(parsed.culturalNote, MAX_CULTURAL_NOTE_LENGTH);
   const keyPhraseDetails = sanitizeKeyPhraseDetails(parsed.keyPhraseDetails);
   if (
     !lessonTopic ||
+    !learningObjective ||
+    learningObjective.category !== parsed.category ||
     !culturalNote ||
     keyPhraseDetails.length < 3 ||
     keyPhraseDetails.length > 5 ||
@@ -51,6 +59,7 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
   const coverage: PlannedSessionCoverage = {
     version: 1,
     category: parsed.category,
+    learningObjectiveId: learningObjective.id,
     lessonTopic,
     culturalNote,
     keyPhraseDetails: keyPhraseDetails as KeyPhrase[],
@@ -69,18 +78,13 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
   ) {
     coverage.lessonTreatmentComplete = true;
   }
-  const learningObjectiveId = boundedOptionalString(
-    parsed.learningObjectiveId,
-    MAX_OBJECTIVE_ID_LENGTH,
-  );
-  if (learningObjectiveId) coverage.learningObjectiveId = learningObjectiveId;
   return coverage;
 }
 
 export function buildPlannedSessionCoverage(input: {
   lesson: Lesson;
   exercises: Exercise[];
-  learningObjectiveId?: unknown;
+  learningObjectiveId: unknown;
 }): PlannedSessionCoverage {
   const lessonTreatment = JSON.stringify({
     topic: input.lesson.topic,

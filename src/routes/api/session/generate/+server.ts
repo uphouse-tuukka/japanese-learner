@@ -103,7 +103,7 @@ function validationFeedbackForRetry(
     feedback.push(
       validation.details.selectedLearningObjectiveId
         ? `Use Learning Objective identity exactly "${validation.details.selectedLearningObjectiveId}".`
-        : 'Do not invent a Learning Objective identity in compatibility mode.',
+        : 'Use the app-selected canonical Learning Objective identity exactly.',
     );
   }
   if (validation.reasonCodes.includes('ineligible_review')) {
@@ -407,6 +407,25 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             continue;
           }
 
+          logInfo('api/session/generate', 'curriculum plan approved', {
+            attempt,
+            validationReasonCodes: validation.reasonCodes,
+            totalCompletedAiSessions: coverageEvidence.source.totalCompletedAiSessions,
+            parseableCompletedAiSessions: coverageEvidence.source.parseableCompletedAiSessions,
+            ignoredCompletedAiSessions: coverageEvidence.source.ignoredCompletedAiSessions,
+            selectedCategory: coverageEvidence.categoryRotation.selectedCategory,
+            categorySelectionReason: coverageEvidence.categoryRotation.selectionReason,
+            selectedLearningObjectiveId: coverageEvidence.learningObjectiveSelection.objective.id,
+            learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
+            reviewCandidateReasonCodes:
+              coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
+            reviewCandidateType:
+              coverageEvidence.learningObjectiveSelection.reviewCandidate?.type ?? null,
+            reviewCandidateResolutionState: coverageEvidence.learningObjectiveSelection
+              .reviewCandidate
+              ? 'eligible_unresolved'
+              : 'none_selected',
+          });
           plan = generatedPlan;
           break;
         } catch (error) {

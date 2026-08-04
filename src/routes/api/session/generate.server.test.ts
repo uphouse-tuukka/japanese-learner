@@ -568,6 +568,20 @@ describe('POST /api/session/generate', () => {
         ignoredCompletedAiSessions: 0,
       }),
     );
+    expect(logSpy).toHaveBeenCalledWith(
+      '[api/session/generate] curriculum plan approved',
+      expect.objectContaining({
+        attempt: 1,
+        validationReasonCodes: [],
+        selectedCategory: 'greetings_basics',
+        selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
+        learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        reviewCandidateReasonCodes: [],
+        reviewCandidateResolutionState: 'none_selected',
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+      }),
+    );
   });
 
   it.each(canonicalObjectiveCases)(

@@ -191,7 +191,7 @@ export interface SessionKeyPhraseDetail {
 export interface PlannedSessionCoverage {
   version: 1;
   category: import('$lib/topic-categories').TopicCategoryKey;
-  learningObjectiveId?: string;
+  learningObjectiveId: string;
   lessonTopic: string;
   /** Bounded server-generated lesson and exercise text used only for review-context freshness. */
   lessonTreatment?: string;

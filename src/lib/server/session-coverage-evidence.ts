@@ -6,7 +6,6 @@ import {
 import {
   getLearningObjective,
   getLearningObjectivesForCategory,
-  hasCanonicalLearningObjectives,
   type LearningObjective,
 } from '$lib/learning-objectives';
 import type { Exercise, KeyPhrase, Session, SessionKeyPhraseDetail, SessionMeta } from '$lib/types';
@@ -128,13 +127,12 @@ export type CategoryRotationEvidence = {
 
 export type LearningObjectiveSelectionReason =
   | 'selected_uncovered_objective'
-  | 'selected_review_candidate_objective'
-  | 'category_not_migrated_compatibility';
+  | 'selected_review_candidate_objective';
 
 export type LearningObjectiveSelection = {
-  mode: 'canonical' | 'legacy_exact_topic';
+  mode: 'canonical';
   reason: LearningObjectiveSelectionReason;
-  objective: LearningObjective | null;
+  objective: LearningObjective;
   reviewCandidate: ReviewCandidate | null;
 };
 
@@ -832,15 +830,6 @@ function selectObjectiveInCategory(input: {
   coveredLearningObjectives: CoveredLearningObjective[];
   reviewCandidates: ReviewCandidate[];
 }): LearningObjectiveSelection | null {
-  if (!hasCanonicalLearningObjectives(input.category)) {
-    return {
-      mode: 'legacy_exact_topic',
-      reason: 'category_not_migrated_compatibility',
-      objective: null,
-      reviewCandidate: null,
-    };
-  }
-
   const objectives = getLearningObjectivesForCategory(input.category);
   const coveredById = new Map(
     input.coveredLearningObjectives
@@ -916,7 +905,7 @@ function selectLearningObjective(input: {
     };
   }
 
-  throw new Error('No eligible Learning Objective or compatibility category is available.');
+  throw new Error('No eligible canonical Learning Objective is available.');
 }
 
 function upsertReviewCandidate(

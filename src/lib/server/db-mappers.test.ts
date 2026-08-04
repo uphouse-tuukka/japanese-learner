@@ -129,6 +129,7 @@ describe('db row mappers', () => {
         planned_coverage_json: JSON.stringify({
           version: 1,
           category: 'food_dining',
+          learningObjectiveId: 'food_dining.order_food_and_drinks',
           lessonTopic: 'Ordering ramen',
           culturalNote: 'Ticket machines are common.',
           keyPhraseDetails,
@@ -136,6 +137,7 @@ describe('db row mappers', () => {
       }).plannedCoverage,
     ).toMatchObject({
       category: 'food_dining',
+      learningObjectiveId: 'food_dining.order_food_and_drinks',
       lessonTopic: 'Ordering ramen',
       keyPhraseDetails,
     });
