@@ -869,10 +869,10 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it('rejects a journal-only review claim and retries without authorizing repetition', async () => {
+  it('rejects a neutral journal-only review claim and retries without authorizing repetition', async () => {
     mockGetUser.mockResolvedValueOnce(
       buildMockUser({
-        progressJournal: '**Persistent weak spots** - The learner mentioned greetings again.',
+        progressJournal: '**Categories & topics covered** - Basic greetings completed.',
       }),
     );
     mockGenerateSessionPlan
@@ -900,6 +900,13 @@ describe('POST /api/session/generate', () => {
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
 
     expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        learningJournal: '**Categories & topics covered** - Basic greetings completed.',
+        coverageEvidence: expect.objectContaining({ reviewCandidates: [] }),
+      }),
+    );
     expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -1329,6 +1336,33 @@ describe('POST /api/session/generate', () => {
       model: 'gpt-5.4',
       tokensIn: 12,
       tokensOut: 23,
+    });
+  });
+
+  it('records returned usage when a model response cannot be normalized before retry', async () => {
+    const rejectedResponseError = Object.assign(new Error('invalid model response'), {
+      generationUsage: { model: 'gpt-5.4', input: 17, output: 9 },
+    });
+    mockGenerateSessionPlan
+      .mockRejectedValueOnce(rejectedResponseError)
+      .mockResolvedValueOnce(generatedPlan);
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
+      userId: 'user-1',
+      sessionId: null,
+      model: 'gpt-5.4',
+      tokensIn: 17,
+      tokensOut: 9,
+    });
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(2, {
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 10,
+      tokensOut: 20,
     });
   });
 

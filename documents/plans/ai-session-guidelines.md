@@ -147,6 +147,7 @@
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries
 - Adjust difficulty based on recent accuracy (>80% increase, <50% reinforce)
+- Record provider token usage with no session id for every returned generation response rejected during parsing, normalization, or curriculum validation.
 
 ## Model Configuration
 

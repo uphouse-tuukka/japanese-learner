@@ -19,6 +19,7 @@ import {
   buildUpdatedJournalPrompt,
 } from '$lib/server/ai-summary-prompts';
 import { logInfo, logWarn } from '$lib/server/logger';
+import { normalizeIntentionalReviewClaim } from '$lib/server/session-intentional-review';
 import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
 import {
   getPhraseIdentityKeys,
@@ -47,7 +48,6 @@ const SESSION_SUMMARY_MAX_WORDS = 60;
 const MAX_SESSION_REVIEW_INTENTS = 5;
 const MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH = 160;
 const MAX_LEARNING_OBJECTIVE_ID_LENGTH = 160;
-const MAX_INTENTIONAL_REVIEW_TRANSFER_TASK_LENGTH = 320;
 
 function splitSentences(text: string): string[] {
   const matches = text.match(/[^.!?。！？]+[.!?。！？]+[”’"')\]]*|[^.!?。！？]+$/gu);
@@ -74,32 +74,6 @@ export function normalizeSessionSummaryText(rawSummary: string): string {
 function boundedReviewIntentField(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH).trimEnd();
-}
-
-function normalizeIntentionalReviewClaim(
-  value: unknown,
-): Record<string, unknown> | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (typeof value !== 'object' || Array.isArray(value)) return { invalid: true };
-
-  const claim = value as Record<string, unknown>;
-  const candidateType = claim.candidateType;
-  const candidateIdentity = boundedReviewIntentField(claim.candidateIdentity);
-  const learningObjectiveId = boundedReviewIntentField(claim.learningObjectiveId);
-  const transferTask =
-    typeof claim.transferTask === 'string'
-      ? claim.transferTask.trim().slice(0, MAX_INTENTIONAL_REVIEW_TRANSFER_TASK_LENGTH).trimEnd()
-      : '';
-  if (
-    (candidateType !== 'key_phrase' && candidateType !== 'lesson_topic') ||
-    !candidateIdentity ||
-    !learningObjectiveId ||
-    !transferTask
-  ) {
-    return { invalid: true };
-  }
-  return { candidateType, candidateIdentity, learningObjectiveId, transferTask };
 }
 
 function keyPhraseDisplay(phrase: KeyPhrase): string {
@@ -193,6 +167,16 @@ function getUsageFromResponse(response: OpenAI.Responses.Response): {
   };
 }
 
+export class SessionPlanGenerationError extends Error {
+  readonly generationUsage: { model: string; input: number; output: number };
+
+  constructor(generationUsage: { model: string; input: number; output: number }) {
+    super('[ai] Session plan response could not be normalized');
+    this.name = 'SessionPlanGenerationError';
+    this.generationUsage = generationUsage;
+  }
+}
+
 export async function generateSessionPlan(input: SessionPlanPromptInput): Promise<SessionPlan> {
   const client = getOpenAiClient();
   const sessionPrompt = buildSessionPlanPrompt(input);
@@ -208,89 +192,97 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
       },
     },
   });
-
-  if (!response.output_text) {
-    throw new Error('[ai] OpenAI response missing output_text for session generation');
-  }
-
-  const parsed = JSON.parse(response.output_text) as {
-    learningObjectiveId?: unknown;
-    intentionalReview?: unknown;
-    lesson: unknown;
-    exercises: unknown[];
-    focus: string;
-  };
-
-  const lesson = normalizeLesson(parsed.lesson);
-  const validExercises: Exercise[] = [];
-  const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
-  for (let i = 0; i < rawExercises.length; i += 1) {
-    try {
-      const exercise = normalizeExercise(rawExercises[i], i, input.userLevel);
-      validateExerciseSet([exercise], input.userLevel);
-      validExercises.push(exercise);
-    } catch (err) {
-      logWarn('ai', 'skipping invalid exercise', {
-        exerciseIndex: i,
-        userLevel: input.userLevel,
-        errorType: err instanceof Error ? err.name : typeof err,
-      });
-    }
-  }
-  if (validExercises.length === 0) {
-    throw new Error('[ai] No valid exercises could be parsed from model output');
-  }
-  const exercises = validateExerciseSet(validExercises, input.userLevel);
-
-  const minExercises = Math.ceil(targetExerciseCount / 2);
-  if (exercises.length < minExercises) {
-    throw new Error(
-      `[ai] expected at least ${minExercises} exercises, received ${exercises.length}`,
-    );
-  }
-
   const usage = getUsageFromResponse(response);
-  const parsedLesson = parsed.lesson as Record<string, unknown> | null;
-  const learningObjectiveId =
-    typeof parsed.learningObjectiveId === 'string'
-      ? parsed.learningObjectiveId.trim().slice(0, MAX_LEARNING_OBJECTIVE_ID_LENGTH)
-      : '';
-  const intentionalReview = normalizeIntentionalReviewClaim(parsed.intentionalReview);
 
-  const plan: SessionPlan = {
-    id: `session-${randomUUID()}`,
-    userId: input.userId,
-    mode: 'ai',
-    createdAt: nowIso(),
-    model: usage.model,
-    lesson,
-    exercises,
-    tokenUsage: {
+  try {
+    if (!response.output_text) {
+      throw new Error('[ai] OpenAI response missing output_text for session generation');
+    }
+
+    const parsed = JSON.parse(response.output_text) as {
+      learningObjectiveId?: unknown;
+      intentionalReview?: unknown;
+      lesson: unknown;
+      exercises: unknown[];
+      focus: string;
+    };
+
+    const lesson = normalizeLesson(parsed.lesson);
+    const validExercises: Exercise[] = [];
+    const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+    for (let i = 0; i < rawExercises.length; i += 1) {
+      try {
+        const exercise = normalizeExercise(rawExercises[i], i, input.userLevel);
+        validateExerciseSet([exercise], input.userLevel);
+        validExercises.push(exercise);
+      } catch (err) {
+        logWarn('ai', 'skipping invalid exercise', {
+          exerciseIndex: i,
+          userLevel: input.userLevel,
+          errorType: err instanceof Error ? err.name : typeof err,
+        });
+      }
+    }
+    if (validExercises.length === 0) {
+      throw new Error('[ai] No valid exercises could be parsed from model output');
+    }
+    const exercises = validateExerciseSet(validExercises, input.userLevel);
+
+    const minExercises = Math.ceil(targetExerciseCount / 2);
+    if (exercises.length < minExercises) {
+      throw new Error(
+        `[ai] expected at least ${minExercises} exercises, received ${exercises.length}`,
+      );
+    }
+
+    const parsedLesson = parsed.lesson as Record<string, unknown> | null;
+    const learningObjectiveId =
+      typeof parsed.learningObjectiveId === 'string'
+        ? parsed.learningObjectiveId.trim().slice(0, MAX_LEARNING_OBJECTIVE_ID_LENGTH)
+        : '';
+    const intentionalReview = normalizeIntentionalReviewClaim(parsed.intentionalReview);
+
+    const plan: SessionPlan = {
+      id: `session-${randomUUID()}`,
+      userId: input.userId,
+      mode: 'ai',
+      createdAt: nowIso(),
+      model: usage.model,
+      lesson,
+      exercises,
+      tokenUsage: {
+        input: usage.input,
+        output: usage.output,
+      },
+      metadata: {
+        focus: assertString(parsed.focus, 'focus'),
+        category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : undefined,
+        learningObjectiveId: learningObjectiveId || undefined,
+        ...(intentionalReview === undefined ? {} : { intentionalReview }),
+        exerciseCount: exercises.length,
+        teachingFlow: 'lesson_then_quiz',
+        userLevel: input.userLevel,
+      },
+    };
+
+    logInfo('ai', 'generated session plan', {
+      sessionId: plan.id,
+      userId: plan.userId,
+      exerciseCount: plan.exercises.length,
+      category: plan.metadata.category,
+      userLevel: plan.metadata.userLevel,
+      tokensInput: usage.input,
+      tokensOutput: usage.output,
+    });
+
+    return plan;
+  } catch {
+    throw new SessionPlanGenerationError({
+      model: usage.model,
       input: usage.input,
       output: usage.output,
-    },
-    metadata: {
-      focus: assertString(parsed.focus, 'focus'),
-      category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : undefined,
-      learningObjectiveId: learningObjectiveId || undefined,
-      ...(intentionalReview === undefined ? {} : { intentionalReview }),
-      exerciseCount: exercises.length,
-      teachingFlow: 'lesson_then_quiz',
-      userLevel: input.userLevel,
-    },
-  };
-
-  logInfo('ai', 'generated session plan', {
-    sessionId: plan.id,
-    userId: plan.userId,
-    exerciseCount: plan.exercises.length,
-    category: plan.metadata.category,
-    userLevel: plan.metadata.userLevel,
-    tokensInput: usage.input,
-    tokensOutput: usage.output,
-  });
-
-  return plan;
+    });
+  }
 }
 
 export async function generateSessionSummary(input: {

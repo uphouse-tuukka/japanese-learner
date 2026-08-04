@@ -658,6 +658,29 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       transferTask: 'Exchange origins with another traveler while waiting for a train.',
     });
   });
+
+  it('preserves reported token usage when returned session JSON is invalid', async () => {
+    mockResponsesCreate.mockResolvedValueOnce({
+      output_text: '{invalid json',
+      usage: { input_tokens: 17, output_tokens: 9, total_tokens: 26 },
+    });
+
+    await expect(
+      generateSessionPlan({
+        userId: 'user-1',
+        userName: 'Tester',
+        userLevel: 'beginner',
+        exerciseCount: 4,
+      }),
+    ).rejects.toMatchObject({
+      name: 'SessionPlanGenerationError',
+      generationUsage: {
+        model: 'gpt-5.4',
+        input: 17,
+        output: 9,
+      },
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

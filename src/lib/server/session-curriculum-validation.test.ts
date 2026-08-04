@@ -289,6 +289,19 @@ describe('validateGeneratedSessionPlan', () => {
       }),
       coverageEvidence: coverageWithReview,
     });
+    const cosmeticRestatement = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Practice saying where you are from again',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Practice saying where you are from with another person.',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
     const staleCandidate = validateGeneratedSessionPlan({
       plan: plan({
         learningObjectiveId: 'greetings_basics.exchange_origins',
@@ -345,6 +358,11 @@ describe('validateGeneratedSessionPlan', () => {
     if (!duplicatedLessonTopic.valid) {
       expect(duplicatedLessonTopic.reasonCodes).toContain('ineligible_review');
       expect(duplicatedLessonTopic.details.intentionalReviewStatus).toBe('duplicate_treatment');
+    }
+    expect(cosmeticRestatement.valid).toBe(false);
+    if (!cosmeticRestatement.valid) {
+      expect(cosmeticRestatement.reasonCodes).toContain('ineligible_review');
+      expect(cosmeticRestatement.details.intentionalReviewStatus).toBe('duplicate_treatment');
     }
     expect(staleCandidate.valid).toBe(false);
     if (!staleCandidate.valid) {

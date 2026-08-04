@@ -6,6 +6,10 @@ import {
   type ReviewCandidate,
 } from '$lib/server/session-coverage-evidence';
 import { getLearningObjective } from '$lib/learning-objectives';
+import {
+  isIntentionalReviewClaim,
+  normalizeIntentionalReviewClaim,
+} from '$lib/server/session-intentional-review';
 import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/topic-categories';
 import type { Lesson } from '$lib/types';
 
@@ -64,33 +68,6 @@ type GeneratedSessionPlanLike = {
   metadata: Record<string, unknown>;
 };
 
-type IntentionalReviewClaim = {
-  candidateType: 'key_phrase' | 'lesson_topic';
-  candidateIdentity: string;
-  learningObjectiveId: string;
-  transferTask: string;
-};
-
-function parseIntentionalReviewClaim(value: unknown): IntentionalReviewClaim | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const claim = value as Record<string, unknown>;
-  const candidateType = claim.candidateType;
-  const candidateIdentity =
-    typeof claim.candidateIdentity === 'string' ? claim.candidateIdentity.trim() : '';
-  const learningObjectiveId =
-    typeof claim.learningObjectiveId === 'string' ? claim.learningObjectiveId.trim() : '';
-  const transferTask = typeof claim.transferTask === 'string' ? claim.transferTask.trim() : '';
-  if (
-    (candidateType !== 'key_phrase' && candidateType !== 'lesson_topic') ||
-    !candidateIdentity ||
-    !learningObjectiveId ||
-    !transferTask
-  ) {
-    return null;
-  }
-  return { candidateType, candidateIdentity, learningObjectiveId, transferTask };
-}
-
 function duplicatesOriginalTreatment(
   transferTask: string,
   generatedTopic: string,
@@ -108,8 +85,22 @@ function duplicatesOriginalTreatment(
     .map((value) => (typeof value === 'string' ? normalizeTopicIdentity(value) : null))
     .filter((value): value is string => Boolean(value));
   return (
-    originalTreatmentIdentities.includes(transferIdentity) ||
-    originalTreatmentIdentities.includes(generatedTopicIdentity)
+    originalTreatmentIdentities.some((identity) =>
+      containsNormalizedTokenSequence(transferIdentity, identity),
+    ) ||
+    originalTreatmentIdentities.some((identity) =>
+      containsNormalizedTokenSequence(generatedTopicIdentity, identity),
+    )
+  );
+}
+
+function containsNormalizedTokenSequence(value: string, sequence: string): boolean {
+  if (value === sequence) return true;
+  const valueTokens = value.split(' ');
+  const sequenceTokens = sequence.split(' ');
+  if (sequenceTokens.length === 1) return false;
+  return valueTokens.some((_, startIndex) =>
+    sequenceTokens.every((token, offset) => valueTokens[startIndex + offset] === token),
   );
 }
 
@@ -199,7 +190,10 @@ export function validateGeneratedSessionPlan(input: {
         ? 'recognized_selected'
         : 'recognized_other';
   const rawIntentionalReview = plan.metadata.intentionalReview;
-  const intentionalReviewClaim = parseIntentionalReviewClaim(rawIntentionalReview);
+  const normalizedIntentionalReview = normalizeIntentionalReviewClaim(rawIntentionalReview);
+  const intentionalReviewClaim = isIntentionalReviewClaim(normalizedIntentionalReview)
+    ? normalizedIntentionalReview
+    : null;
   const selectedReviewCandidate = coverageEvidence.learningObjectiveSelection.reviewCandidate;
   let intentionalReviewStatus: SessionCurriculumValidationDetails['intentionalReviewStatus'] =
     'not_applicable';
