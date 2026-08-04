@@ -58,6 +58,8 @@ export interface Session {
   tokenInput: number;
   tokenOutput: number;
   summary: string | null;
+  /** Authoritative generated lesson coverage. Null only for legacy or non-Learn planned sessions. */
+  plannedCoverage: PlannedSessionCoverage | null;
   createdAt: string;
   /** Completion timestamp for completed sessions, or the claim timestamp while status is `completing`. */
   completedAt: string | null;
@@ -186,6 +188,15 @@ export interface SessionKeyPhraseDetail {
   usage?: string;
 }
 
+export interface PlannedSessionCoverage {
+  version: 1;
+  category: import('$lib/topic-categories').TopicCategoryKey;
+  learningObjectiveId?: string;
+  lessonTopic: string;
+  culturalNote: string;
+  keyPhraseDetails: KeyPhrase[];
+}
+
 export interface Lesson {
   topic: string;
   category?: string;
@@ -238,6 +249,7 @@ export interface LevelUpRecommendation {
 export interface SessionMeta {
   summaryText: string;
   category?: string;
+  learningObjectiveId?: string;
   topic: string;
   accuracy: number;
   strengths: string[];
@@ -250,6 +262,7 @@ export interface SessionMeta {
   culturalNote?: string;
   miniLesson?: SessionMiniLesson | null;
   hadLevelUpRecommendation?: boolean;
+  coverageSource?: 'server_generated_plan' | 'legacy_client_fallback';
 }
 
 export type ExerciseAnswerPayload = {

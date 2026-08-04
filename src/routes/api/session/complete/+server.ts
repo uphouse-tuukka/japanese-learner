@@ -8,6 +8,7 @@ import {
   completeSessionRecord,
   getProgressJournal,
   getRecentSessionSummaries,
+  getSession,
   getSessionExercises,
   getUserById,
   insertExerciseResults,
@@ -225,6 +226,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       finalized: false,
     };
 
+    const claimedSession = await getSession(sessionId);
+    if (
+      !claimedSession ||
+      claimedSession.userId !== userId ||
+      claimedSession.status !== 'completing'
+    ) {
+      throw new Error('Claimed Learning Session could not be loaded.');
+    }
+    const plannedCoverage = claimedSession.plannedCoverage;
+
     await insertExerciseResults({
       userId,
       sessionId,
@@ -240,18 +251,28 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const user = await getUserById(userId);
     const sessionExercises = await getSessionExercises(sessionId);
     const exercises = sessionExercises.map((item) => item.exercise);
-    const requestedLessonTopic = String(body.lessonTopic ?? '').trim();
-    const lessonTopic = requestedLessonTopic || inferLessonTopic(exercises);
-    const category = String(body.category ?? '').trim() || undefined;
-    const culturalNote = String(body.culturalNote ?? '').trim() || undefined;
-    const keyPhraseDetails = sanitizeKeyPhraseDetails(body.keyPhraseDetails);
+    const fallbackLessonTopic =
+      String(body.lessonTopic ?? '').trim() || inferLessonTopic(exercises);
+    const fallbackCategory = String(body.category ?? '').trim() || undefined;
+    const fallbackCulturalNote = String(body.culturalNote ?? '').trim() || undefined;
+    const fallbackKeyPhraseDetails = sanitizeKeyPhraseDetails(body.keyPhraseDetails);
     const requestKeyPhrases = toStringList(body.keyPhrases);
-    const keyPhrases =
-      keyPhraseDetails.length > 0
-        ? deriveLegacyKeyPhrasesFromDetails(keyPhraseDetails)
+    const fallbackKeyPhrases =
+      fallbackKeyPhraseDetails.length > 0
+        ? deriveLegacyKeyPhrasesFromDetails(fallbackKeyPhraseDetails)
         : requestKeyPhrases.length > 0
           ? requestKeyPhrases.slice(0, 10)
           : deriveKeyPhrasesFromExercises(exercises);
+    const lessonTopic = plannedCoverage?.lessonTopic ?? fallbackLessonTopic;
+    const category = plannedCoverage?.category ?? fallbackCategory;
+    const culturalNote = plannedCoverage?.culturalNote ?? fallbackCulturalNote;
+    const keyPhraseDetails = plannedCoverage?.keyPhraseDetails ?? fallbackKeyPhraseDetails;
+    const keyPhrases = plannedCoverage
+      ? deriveLegacyKeyPhrasesFromDetails(plannedCoverage.keyPhraseDetails)
+      : fallbackKeyPhrases;
+    const coverageSource = plannedCoverage
+      ? ('server_generated_plan' as const)
+      : ('legacy_client_fallback' as const);
     const exerciseTypes = Array.from(new Set(exercises.map((exercise) => exercise.type)));
 
     let summary: SessionSummary;
@@ -342,6 +363,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       summary: JSON.stringify({
         summaryText: summary.summary,
         category,
+        learningObjectiveId: plannedCoverage?.learningObjectiveId,
         topic: lessonTopic,
         accuracy: summary.accuracy,
         strengths: summary.strengths,
@@ -354,6 +376,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         culturalNote,
         miniLesson: summary.miniLesson ?? null,
         hadLevelUpRecommendation: !!summary.levelUpRecommendation,
+        coverageSource,
       } satisfies SessionMeta),
       tokenInput: summaryTokenInput,
       tokenOutput: summaryTokenOutput,

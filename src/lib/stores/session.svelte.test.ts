@@ -37,6 +37,7 @@ function buildSession(id: string): Session {
     tokenInput: 10,
     tokenOutput: 20,
     summary: null,
+    plannedCoverage: null,
     createdAt: '2026-07-01T08:00:00.000Z',
     completedAt: null,
   };
@@ -130,6 +131,46 @@ describe('session store persistence', () => {
       answerText: 'Wrong answer',
       isCorrect: false,
     });
+  });
+
+  it('restores the original server-owned coverage metadata before resumed completion', () => {
+    useFakeStorage();
+    const key = 'learn:user-1';
+    const resumableSession = buildSession('learn-session');
+    resumableSession.plannedCoverage = {
+      version: 1,
+      category: 'food_dining',
+      learningObjectiveId: 'food_dining.order_item',
+      lessonTopic: 'Ordering ramen',
+      culturalNote: 'Ticket machines are common.',
+      keyPhraseDetails: [
+        {
+          japanese: 'ラーメンをください',
+          romaji: 'raamen o kudasai',
+          english: 'Ramen, please.',
+          usage: 'Use while ordering.',
+        },
+        {
+          japanese: 'おすすめは何ですか',
+          romaji: 'osusume wa nan desu ka',
+          english: 'What do you recommend?',
+          usage: 'Use to ask for a recommendation.',
+        },
+        {
+          japanese: 'お会計をお願いします',
+          romaji: 'okaikei o onegaishimasu',
+          english: 'The bill, please.',
+          usage: 'Use when ready to pay.',
+        },
+      ],
+    };
+
+    startSession(resumableSession, buildExercises(2));
+    saveSessionToStorage(key);
+    resetSession();
+
+    expect(restoreSessionFromStorage(key)).toBe(true);
+    expect(state.session?.plannedCoverage).toEqual(resumableSession.plannedCoverage);
   });
 
   it('does not restore an explicitly completed Learn session at 8 of 8 as resumable progress', () => {

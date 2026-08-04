@@ -5,6 +5,7 @@ export const PORTFOLIO_V2_SESSION_COLUMNS_MIGRATION_KEY = 'portfolio_v2_session_
 export const SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY = 'spoken_mission_written_support';
 export const SPOKEN_MISSION_SINGLE_IN_PROGRESS_MIGRATION_KEY = 'spoken_mission_single_in_progress';
 export const SPOKEN_MISSION_INCOMPLETE_STATUS_MIGRATION_KEY = 'spoken_mission_incomplete_status';
+export const SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY = 'sessions_planned_coverage';
 
 export type MigrationDatabase = {
   execute(statement: InStatement): Promise<{ rows: Array<unknown> }>;
@@ -18,6 +19,7 @@ type ColumnDefinition = {
 
 const PORTFOLIO_CHALLENGE_ATTEMPTS_TABLE = 'portfolio_challenge_attempts';
 const SPOKEN_MISSION_ATTEMPTS_TABLE = 'user_spoken_missions';
+const SESSIONS_TABLE = 'sessions';
 const SAFE_SQL_IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PORTFOLIO_V2_SESSION_COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { name: 'scenario', definition: 'scenario TEXT DEFAULT NULL' },
@@ -32,6 +34,10 @@ const SPOKEN_MISSION_WRITTEN_SUPPORT_COLUMN: ColumnDefinition = {
   name: 'current_turn_written_support_revealed',
   definition:
     'current_turn_written_support_revealed INTEGER NOT NULL DEFAULT 0 CHECK(current_turn_written_support_revealed IN (0, 1))',
+};
+const SESSIONS_PLANNED_COVERAGE_COLUMN: ColumnDefinition = {
+  name: 'planned_coverage_json',
+  definition: 'planned_coverage_json TEXT',
 };
 const SPOKEN_MISSION_SINGLE_IN_PROGRESS_REQUIRED_COLUMNS = [
   'user_id',
@@ -203,6 +209,16 @@ async function runSpokenMissionWrittenSupportMigration(db: MigrationDatabase): P
   await recordMigrationKey(db, SPOKEN_MISSION_WRITTEN_SUPPORT_MIGRATION_KEY);
 }
 
+async function runSessionsPlannedCoverageMigration(db: MigrationDatabase): Promise<void> {
+  if (!(await tableExists(db, SESSIONS_TABLE))) {
+    return;
+  }
+
+  const columnNames = await getTableColumnNames(db, SESSIONS_TABLE);
+  await addColumnIfMissing(db, SESSIONS_TABLE, columnNames, SESSIONS_PLANNED_COVERAGE_COLUMN);
+  await recordMigrationKey(db, SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY);
+}
+
 async function runSpokenMissionSingleInProgressMigration(db: MigrationDatabase): Promise<void> {
   if (!(await tableExists(db, SPOKEN_MISSION_ATTEMPTS_TABLE))) {
     return;
@@ -350,6 +366,15 @@ export async function runDatabaseMigrations(db: MigrationDatabase): Promise<void
 
   if (migrationResult.rows.length === 0) {
     await runPortfolioV2SessionColumnsMigration(db);
+  }
+
+  const sessionsPlannedCoverageMigration = await db.execute({
+    sql: `SELECT 1 FROM _migrations WHERE key = ? LIMIT 1;`,
+    args: [SESSIONS_PLANNED_COVERAGE_MIGRATION_KEY],
+  });
+
+  if (sessionsPlannedCoverageMigration.rows.length === 0) {
+    await runSessionsPlannedCoverageMigration(db);
   }
 
   const spokenMissionWrittenSupportMigration = await db.execute({

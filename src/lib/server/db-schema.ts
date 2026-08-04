@@ -21,6 +21,7 @@ model TEXT,
 token_input INTEGER NOT NULL DEFAULT 0,
 token_output INTEGER NOT NULL DEFAULT 0,
 summary TEXT,
+planned_coverage_json TEXT,
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 completed_at TEXT,
 FOREIGN KEY (user_id) REFERENCES users(id)

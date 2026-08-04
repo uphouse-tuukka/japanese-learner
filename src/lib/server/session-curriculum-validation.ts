@@ -4,7 +4,7 @@ import {
   type CoverageEvidence,
   type CoveredKeyPhrase,
 } from '$lib/server/session-coverage-evidence';
-import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/server/topic-categories';
+import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/topic-categories';
 import type { Lesson } from '$lib/types';
 
 export type SessionCurriculumValidationReasonCode =

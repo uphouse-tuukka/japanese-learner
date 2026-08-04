@@ -1,4 +1,4 @@
-import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/server/topic-categories';
+import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
 
@@ -6,7 +6,7 @@ export {
   TOPIC_CATEGORIES,
   TOPIC_CATEGORY_KEYS,
   type TopicCategoryKey,
-} from '$lib/server/topic-categories';
+} from '$lib/topic-categories';
 
 export const LEVEL_RULES: Record<
   UserLevel,

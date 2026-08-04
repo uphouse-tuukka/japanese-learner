@@ -2,7 +2,7 @@ import {
   TOPIC_CATEGORY_KEYS,
   isTopicCategoryKey,
   type TopicCategoryKey,
-} from '$lib/server/topic-categories';
+} from '$lib/topic-categories';
 import type { Exercise, KeyPhrase, Session, SessionKeyPhraseDetail, SessionMeta } from '$lib/types';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 

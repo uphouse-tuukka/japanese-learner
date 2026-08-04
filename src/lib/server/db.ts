@@ -7,6 +7,7 @@ import type {
   SessionExercise,
   SessionMeta,
   SessionMode,
+  PlannedSessionCoverage,
   SessionStatus,
   TokenUsage,
   User,
@@ -262,6 +263,7 @@ export async function createSession(input: {
   tokenInput?: number;
   tokenOutput?: number;
   summary?: string | null;
+  plannedCoverage?: PlannedSessionCoverage | null;
   createdAt?: string;
 }): Promise<Session> {
   const db = await getDb();
@@ -274,14 +276,15 @@ export async function createSession(input: {
     tokenInput: Math.max(0, Math.floor(input.tokenInput ?? 0)),
     tokenOutput: Math.max(0, Math.floor(input.tokenOutput ?? 0)),
     summary: input.summary ?? null,
+    plannedCoverage: input.plannedCoverage ?? null,
     createdAt: input.createdAt ?? nowIso(),
     completedAt: null,
   };
 
   await db.execute({
     sql: `
-INSERT INTO sessions (id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO sessions (id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `,
     args: [
       session.id,
@@ -292,6 +295,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       session.tokenInput,
       session.tokenOutput,
       session.summary,
+      session.plannedCoverage ? JSON.stringify(session.plannedCoverage) : null,
       session.createdAt,
       session.completedAt,
     ],
@@ -345,7 +349,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   const db = await getDb();
   const result = await db.execute({
     sql: `
-SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+SELECT id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at
 FROM sessions WHERE id = ? LIMIT 1
 `,
     args: [sessionId],
@@ -390,7 +394,7 @@ export async function getTodaySessionForUser(
 
   const result = await db.execute({
     sql: `
-SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+SELECT id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at
 FROM sessions
 WHERE user_id = ? AND created_at >= ? AND created_at < ?
 ORDER BY datetime(created_at) DESC
@@ -599,7 +603,7 @@ export async function getSessionsForUser(userId: string, limit = 20): Promise<Se
   const safeLimit = Math.max(1, Math.floor(limit));
   const result = await db.execute({
     sql: `
-		SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+		SELECT id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at
 		FROM sessions
 		WHERE user_id = ?
 		ORDER BY datetime(created_at) DESC
@@ -614,7 +618,7 @@ export async function getCompletedAiSessionsForUser(userId: string): Promise<Ses
   const db = await getDb();
   const result = await db.execute({
     sql: `
-SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+SELECT id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at
 FROM sessions
 WHERE user_id = ? AND mode = 'ai' AND status = 'completed'
 ORDER BY datetime(created_at) DESC
@@ -743,7 +747,7 @@ export async function getHistoryByUser(userId: string): Promise<
   const db = await getDb();
   const sessions = await db.execute({
     sql: `
-		SELECT id, user_id, mode, status, model, token_input, token_output, summary, created_at, completed_at
+		SELECT id, user_id, mode, status, model, token_input, token_output, summary, planned_coverage_json, created_at, completed_at
 		FROM sessions
     WHERE user_id = ? AND status IN ('completed', 'error')
 		ORDER BY datetime(created_at) DESC

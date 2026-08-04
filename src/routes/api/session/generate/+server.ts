@@ -22,6 +22,7 @@ import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
+import { buildPlannedSessionCoverage } from '$lib/validators/planned-session-coverage';
 import type { Exercise, Lesson, Session, SessionMiniLesson } from '$lib/types';
 
 type GenerateRequest = {
@@ -385,6 +386,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       model: plan.model,
       tokenInput: plan.tokenUsage.input,
       tokenOutput: plan.tokenUsage.output,
+      plannedCoverage: buildPlannedSessionCoverage({
+        lesson: plan.lesson,
+        learningObjectiveId: plan.metadata.learningObjectiveId,
+      }),
     });
 
     await attachExercisesToSession(session.id, plan.exercises);

@@ -40,6 +40,27 @@ const exercise = {
   explanation: 'こんにちは is a common greeting.',
 } satisfies Exercise;
 
+const plannedKeyPhraseDetails = [
+  {
+    japanese: 'ラーメンをください',
+    romaji: 'raamen o kudasai',
+    english: 'Ramen, please.',
+    usage: 'Use while ordering.',
+  },
+  {
+    japanese: 'おすすめは何ですか',
+    romaji: 'osusume wa nan desu ka',
+    english: 'What do you recommend?',
+    usage: 'Use to ask for a recommendation.',
+  },
+  {
+    japanese: 'お会計をお願いします',
+    romaji: 'okaikei o onegaishimasu',
+    english: 'The bill, please.',
+    usage: 'Use when ready to pay.',
+  },
+];
+
 async function loadDb() {
   vi.resetModules();
   dbHarness.client = createClient({ url: 'file::memory:' });
@@ -109,6 +130,45 @@ describe('session completion claims', () => {
       userId: 'user-1',
       status: 'completing',
       completedAt: claim.status === 'claimed' ? claim.claimedAt : '',
+    });
+  });
+
+  it('persists generated coverage through completion for later authoritative history', async () => {
+    const db = await loadDb();
+    await db.insertUser({ id: 'user-1', name: 'Test User', level: 'beginner' });
+    await db.createSession({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_item',
+        lessonTopic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: plannedKeyPhraseDetails,
+      },
+    });
+
+    const claim = await db.claimSessionCompletion('user-1', 'session-1');
+    if (claim.status !== 'claimed') throw new Error('Expected session claim.');
+    await expect(
+      db.completeSessionRecord('session-1', {
+        summary: 'completed summary',
+        completionClaimedAt: claim.claimedAt,
+      }),
+    ).resolves.toBe(true);
+
+    await expect(db.getSession('session-1')).resolves.toMatchObject({
+      status: 'completed',
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        learningObjectiveId: 'food_dining.order_item',
+        lessonTopic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: plannedKeyPhraseDetails,
+      },
     });
   });
 

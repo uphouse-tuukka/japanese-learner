@@ -83,9 +83,65 @@ describe('db row mappers', () => {
       tokenInput: 12,
       tokenOutput: 7,
       summary: 'Good work.',
+      plannedCoverage: null,
       createdAt: '2025-05-06T12:00:00.000Z',
       completedAt: '2025-05-06T12:20:00.000Z',
     });
+  });
+
+  it('parses valid planned Learning Session coverage without exposing corrupted JSON', () => {
+    const keyPhraseDetails = [
+      {
+        japanese: 'ラーメンをください',
+        romaji: 'raamen o kudasai',
+        english: 'Ramen, please.',
+        usage: 'Use while ordering.',
+      },
+      {
+        japanese: 'おすすめは何ですか',
+        romaji: 'osusume wa nan desu ka',
+        english: 'What do you recommend?',
+        usage: 'Use to ask for a recommendation.',
+      },
+      {
+        japanese: 'お会計をお願いします',
+        romaji: 'okaikei o onegaishimasu',
+        english: 'The bill, please.',
+        usage: 'Use when ready to pay.',
+      },
+    ];
+    const row = {
+      id: 'session-1',
+      user_id: 'user-1',
+      mode: 'ai',
+      status: 'planned',
+      model: 'gpt-5.4',
+      token_input: 12,
+      token_output: 7,
+      summary: null,
+      created_at: '2025-05-06T12:00:00.000Z',
+      completed_at: null,
+    };
+
+    expect(
+      mapSessionRow({
+        ...row,
+        planned_coverage_json: JSON.stringify({
+          version: 1,
+          category: 'food_dining',
+          lessonTopic: 'Ordering ramen',
+          culturalNote: 'Ticket machines are common.',
+          keyPhraseDetails,
+        }),
+      }).plannedCoverage,
+    ).toMatchObject({
+      category: 'food_dining',
+      lessonTopic: 'Ordering ramen',
+      keyPhraseDetails,
+    });
+    expect(
+      mapSessionRow({ ...row, planned_coverage_json: '{not-json' }).plannedCoverage,
+    ).toBeNull();
   });
 
   it('maps a token usage row into the public TokenUsage shape', () => {
