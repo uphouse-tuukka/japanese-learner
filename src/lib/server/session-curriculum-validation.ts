@@ -5,7 +5,7 @@ import {
   type CoveredKeyPhrase,
   type ReviewCandidate,
 } from '$lib/server/session-coverage-evidence';
-import { getLearningObjective } from '$lib/learning-objectives';
+import { getLearningObjective, type LearningObjective } from '$lib/learning-objectives';
 import {
   isIntentionalReviewClaim,
   normalizeIntentionalReviewClaim,
@@ -72,6 +72,7 @@ function duplicatesOriginalTreatment(
   transferTask: string,
   generatedTopic: string,
   candidate: ReviewCandidate,
+  objective: LearningObjective | null,
 ): boolean {
   const transferIdentity = normalizeTopicIdentity(transferTask);
   const generatedTopicIdentity = normalizeTopicIdentity(generatedTopic);
@@ -81,27 +82,84 @@ function duplicatesOriginalTreatment(
     candidate.display,
     candidate.topicIdentity,
     candidate.topic,
+    objective?.description,
+    objective?.generationGuidance,
   ]
     .map((value) => (typeof value === 'string' ? normalizeTopicIdentity(value) : null))
     .filter((value): value is string => Boolean(value));
   return (
     originalTreatmentIdentities.some((identity) =>
-      containsNormalizedTokenSequence(transferIdentity, identity),
+      materiallyRestatesTreatment(transferIdentity, identity),
     ) ||
     originalTreatmentIdentities.some((identity) =>
-      containsNormalizedTokenSequence(generatedTopicIdentity, identity),
+      materiallyRestatesTreatment(generatedTopicIdentity, identity),
     )
   );
 }
 
-function containsNormalizedTokenSequence(value: string, sequence: string): boolean {
-  if (value === sequence) return true;
-  const valueTokens = value.split(' ');
-  const sequenceTokens = sequence.split(' ');
-  if (sequenceTokens.length === 1) return false;
-  return valueTokens.some((_, startIndex) =>
-    sequenceTokens.every((token, offset) => valueTokens[startIndex + offset] === token),
+const TREATMENT_STOP_TOKENS = new Set([
+  'again',
+  'another',
+  'during',
+  'drill',
+  'from',
+  'lesson',
+  'more',
+  'once',
+  'person',
+  'practice',
+  'practicing',
+  'repeat',
+  'repeating',
+  'review',
+  'reviewing',
+  'revisit',
+  'revisiting',
+  'say',
+  'saying',
+  'someone',
+  'task',
+  'teach',
+  'that',
+  'this',
+  'while',
+  'with',
+  'you',
+  'your',
+]);
+
+function treatmentContentTokens(identity: string): string[] {
+  return identity
+    .split(' ')
+    .filter((token) => token.length >= 3 && !TREATMENT_STOP_TOKENS.has(token));
+}
+
+function treatmentTokensMatch(left: string, right: string): boolean {
+  return (
+    left === right ||
+    (left.length >= 5 && right.length >= 5 && left.slice(0, 5) === right.slice(0, 5))
   );
+}
+
+function materiallyRestatesTreatment(value: string, reference: string): boolean {
+  const valueTokens = treatmentContentTokens(value);
+  const referenceTokens = treatmentContentTokens(reference);
+  if (valueTokens.length === 0 || referenceTokens.length === 0) return value === reference;
+
+  const unusedReferenceTokens = [...referenceTokens];
+  let matchingTokenCount = 0;
+  for (const valueToken of valueTokens) {
+    const matchingIndex = unusedReferenceTokens.findIndex((referenceToken) =>
+      treatmentTokensMatch(valueToken, referenceToken),
+    );
+    if (matchingIndex < 0) continue;
+    matchingTokenCount += 1;
+    unusedReferenceTokens.splice(matchingIndex, 1);
+  }
+
+  const overlapRatio = matchingTokenCount / Math.min(valueTokens.length, referenceTokens.length);
+  const novelTokenCount = valueTokens.length - matchingTokenCount;
+  return overlapRatio >= 0.75 && novelTokenCount < 2;
 }
 
 function reviewCandidateMatchesSelectedObjective(
@@ -264,6 +322,7 @@ export function validateGeneratedSessionPlan(input: {
         intentionalReviewClaim.transferTask,
         plan.lesson.topic,
         selectedReviewCandidate,
+        selectedLearningObjective,
       )
     ) {
       intentionalReviewStatus = 'duplicate_treatment';

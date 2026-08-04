@@ -291,13 +291,13 @@ describe('validateGeneratedSessionPlan', () => {
     });
     const cosmeticRestatement = validateGeneratedSessionPlan({
       plan: plan({
-        topic: 'Practice saying where you are from again',
+        topic: 'Practice where you are from once more',
         learningObjectiveId: 'greetings_basics.exchange_origins',
         intentionalReview: {
           candidateType: 'lesson_topic',
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
-          transferTask: 'Practice saying where you are from with another person.',
+          transferTask: 'Repeat the origin exchange once more.',
         },
       }),
       coverageEvidence: coverageWithReview,
