@@ -377,9 +377,13 @@ describe('ai session prompt builders', () => {
     const promptText = systemPrompt(prompt);
     const payload = userPayload<{
       selectedLearningObjective: { id: string; category: string };
-      requiredOutputExample: {
-        learningObjectiveId: string;
-        lesson: { category: string; topic: string };
+      requiredOutputContract: {
+        learningObjectiveId: { const: string };
+        lesson: {
+          category: { const: string };
+          topic: { rule: string };
+          keyPhrases: { rule: string };
+        };
       };
     }>(prompt);
 
@@ -398,13 +402,24 @@ describe('ai session prompt builders', () => {
         category: 'greetings_basics',
       }),
     );
-    expect(payload.requiredOutputExample.learningObjectiveId).toBe(
+    expect(payload.requiredOutputContract.learningObjectiveId.const).toBe(
       'greetings_basics.exchange_origins',
     );
-    expect(payload.requiredOutputExample.lesson).toMatchObject({
-      category: 'greetings_basics',
-      topic: 'Ask where someone is from and state a country or place of origin.',
+    expect(payload.requiredOutputContract.lesson).toMatchObject({
+      category: { const: 'greetings_basics' },
+      topic: {
+        rule: expect.stringContaining(
+          'Ask where someone is from and state a country or place of origin.',
+        ),
+      },
+      keyPhrases: {
+        rule: expect.stringContaining('greetings_basics.exchange_origins'),
+      },
     });
+    const contractText = JSON.stringify(payload.requiredOutputContract);
+    expect(contractText).not.toContain('restaurant');
+    expect(contractText).not.toContain('すみません');
+    expect(contractText).not.toContain('Choose the greeting');
   });
 
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {

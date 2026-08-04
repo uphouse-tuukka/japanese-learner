@@ -617,52 +617,54 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           },
           selectedLearningObjective,
           targetExerciseCount,
-          requiredOutputExample: {
-            learningObjectiveId: selectedLearningObjective?.id ?? null,
-            lesson: {
-              topic:
-                selectedLearningObjective?.description ??
-                `A focused lesson within ${selectedTopicCategory}`,
-              category: selectedTopicCategory,
-              explanation: 'When eating out in Japan, you can use a few polite phrases...',
-              culturalNote: "In Japan, you don't tip. Service is included.",
-              keyPhrases: [
-                {
-                  japanese: 'すみません',
-                  romaji: 'sumimasen',
-                  english: 'Excuse me',
-                  usage: "Use to politely call the server's attention",
-                },
-              ],
+          requiredOutputContract: {
+            learningObjectiveId: {
+              const: selectedLearningObjective?.id ?? null,
+              rule: selectedLearningObjective
+                ? 'Copy this app-selected identity exactly.'
+                : 'Return null because this Topic Category is in compatibility mode.',
             },
-            exercises: [
-              {
-                type: 'multiple_choice',
-                title: 'Choose the greeting',
-                japanese: 'こんにちは',
-                romaji: 'konnichiwa',
-                englishContext: 'A common daytime greeting',
-                tags: ['greetings'],
-                difficulty: 1,
-                question: 'What does こんにちは (konnichiwa) mean?',
-                choices: ['Good morning', 'Good evening', 'Hello / Good afternoon', 'Goodbye'],
-                correctAnswer: 'Hello / Good afternoon',
+            lesson: {
+              category: {
+                const: selectedTopicCategory,
+                rule: 'Copy this app-selected Topic Category exactly.',
               },
-              {
-                type: 'translation',
-                title: 'Translate the phrase',
-                japanese: 'ありがとうございます',
-                romaji: 'arigatou gozaimasu',
-                englishContext: 'A polite expression of gratitude',
-                tags: ['polite_expressions'],
-                difficulty: 1,
-                direction: 'ja_to_en',
-                prompt: 'ありがとうございます (arigatou gozaimasu)',
-                expectedAnswer: 'Thank you very much',
-                acceptedAnswers: ['Thank you very much', 'Thank you'],
+              topic: {
+                type: 'string',
+                rule: selectedLearningObjective
+                  ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
+                  : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
               },
-            ],
-            focus: selectedLearningObjective?.id ?? `${selectedTopicCategory}_focus`,
+              explanation: {
+                type: 'string',
+                rule: selectedLearningObjective
+                  ? `Teach this objective directly and follow its focused guidance: ${selectedLearningObjective.generationGuidance}`
+                  : `Teach only the fresh Lesson Topic chosen within ${selectedTopicCategory}.`,
+              },
+              culturalNote: {
+                type: 'string',
+                rule: 'Provide one authentic note directly relevant to this lesson, avoiding recent notes.',
+              },
+              keyPhrases: {
+                type: 'array',
+                minItems: 3,
+                maxItems: 5,
+                itemFields: ['japanese', 'romaji', 'english', 'usage'],
+                rule: selectedLearningObjective
+                  ? `Every phrase must directly support ${selectedLearningObjective.id} and obey Coverage Evidence avoid/review rails.`
+                  : 'Every phrase must directly support the fresh Lesson Topic and obey Coverage Evidence avoid/review rails.',
+              },
+            },
+            exercises: {
+              type: 'array',
+              targetItems: targetExerciseCount,
+              allowedTypes: LEVEL_RULES[input.userLevel].allowedTypes,
+              rule: 'Quiz only material taught in the objective-aligned lesson and follow every level and exercise-field rule above.',
+            },
+            focus: {
+              type: 'string',
+              rule: 'Return a short internal focus label aligned with the selected objective and lesson.',
+            },
           },
         }),
       },
