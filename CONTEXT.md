@@ -45,7 +45,8 @@ Exact evidence from completed Learning Sessions about what Topic Categories, Les
 _Avoid_: journal note, model memory.
 
 **Review Candidate**:
-Covered material that is worth repeating because learner performance or tutor interpretation suggests useful reinforcement. A Review Candidate explains intentional repetition.
+Covered material that is worth repeating because current unresolved item-level performance or an explicit structured tutor request justifies reinforcement.
+A later mastery event resolves older weakness evidence, so a Review Candidate reflects the learner's current state and explains intentional repetition.
 _Avoid_: repeated content, stale topic.
 
 ## Example dialogue

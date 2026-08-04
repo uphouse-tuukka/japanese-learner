@@ -22,6 +22,7 @@ export type CoverageSourceSession = {
 export type CoverageExerciseResult = {
   sessionId: string;
   exerciseId: string;
+  orderIndex?: number;
   isCorrect: boolean;
   answerText: string;
   createdAt: string;
@@ -66,10 +67,7 @@ export type CoveredKeyPhrase = {
 export type ReviewCandidateReasonCode =
   | 'wrong_exercise_result'
   | 'mixed_exercise_result'
-  | 'handoff_note_mention'
-  | 'weakness_mention'
-  | 'learning_journal_mention'
-  | 'low_accuracy_boost';
+  | 'structured_review_intent';
 
 export type ReviewCandidate = {
   type: 'key_phrase' | 'lesson_topic';
@@ -726,37 +724,6 @@ function upsertReviewCandidate(
   if (!current.topicIdentity && input.topicIdentity) current.topicIdentity = input.topicIdentity;
 }
 
-function mentionsPhraseIdentity(text: string, identity: string): boolean {
-  const separatorIndex = identity.indexOf(':');
-  if (separatorIndex < 0) return false;
-  const kind = identity.slice(0, separatorIndex);
-  const value = identity.slice(separatorIndex + 1);
-  if (!value) return false;
-
-  if (kind === 'ja') return normalizeJapanese(text).includes(value);
-  if (kind === 'romaji') return containsTokenSequence(normalizeLatin(text), value);
-  return containsTokenSequence(normalizeLooseIdentity(text), value);
-}
-
-function mentionsPhrase(text: string, phrase: CoveredKeyPhrase): boolean {
-  return phrase.identities.some((identity) => mentionsPhraseIdentity(text, identity));
-}
-
-function mentionsTopic(text: string, topic: CoveredTopic): boolean {
-  const normalizedText = normalizeTopicIdentity(text);
-  return Boolean(normalizedText && containsTokenSequence(normalizedText, topic.identity));
-}
-
-function containsTokenSequence(text: string, sequence: string): boolean {
-  const textTokens = text.split(' ').filter(Boolean);
-  const sequenceTokens = sequence.split(' ').filter(Boolean);
-  if (sequenceTokens.length === 0 || textTokens.length < sequenceTokens.length) return false;
-
-  return textTokens.some((_, index) =>
-    sequenceTokens.every((token, tokenIndex) => textTokens[index + tokenIndex] === token),
-  );
-}
-
 function candidateSort(left: ReviewCandidate, right: ReviewCandidate): number {
   const strengthDiff = right.strength - left.strength;
   if (strengthDiff !== 0) return strengthDiff;
@@ -778,145 +745,142 @@ function toReviewCandidates(candidates: Map<string, MutableReviewCandidate>): Re
     .sort(candidateSort);
 }
 
+function reviewCandidateKey(type: ReviewCandidate['type'], identity: string): string {
+  return `${type}:${identity}`;
+}
+
+function sortedOldestSessions(sessions: CoverageSourceSession[]): CoverageSourceSession[] {
+  return sortedNewestSessions(sessions).reverse();
+}
+
 function deriveResultReviewCandidates(input: {
   candidates: Map<string, MutableReviewCandidate>;
-  sessionsById: Map<string, CoverageSourceSession>;
+  sessions: CoverageSourceSession[];
   phraseIdentityToPrimary: Map<string, string>;
   phrasesByPrimary: Map<string, CoveredKeyPhrase>;
   topicsByIdentity: Map<string, CoveredTopic>;
   exerciseResults: CoverageExerciseResult[];
 }): void {
-  const phraseEvidence = new Map<
+  const resultsBySession = new Map<string, CoverageExerciseResult[]>();
+  const unresolvedTopicSignals = new Map<
     string,
     {
+      wrongExerciseSignals: Set<string>;
       correctCount: number;
-      wrongCount: number;
       sessionIds: Set<string>;
       lastSeenAt: string;
-      phrase: CoveredKeyPhrase | null;
-      display: string;
-      category?: TopicCategoryKey;
-      topic?: string;
-      topicIdentity?: string;
     }
   >();
-  const topicEvidence = new Map<
-    string,
-    {
-      correctCount: number;
-      wrongCount: number;
-      sessionIds: Set<string>;
-      lastSeenAt: string;
-      topic: CoveredTopic;
-    }
-  >();
-
   for (const result of input.exerciseResults) {
-    const session = input.sessionsById.get(result.sessionId);
-    if (!session || !result.exercise) continue;
+    if (!result.exercise) continue;
+    const results = resultsBySession.get(result.sessionId) ?? [];
+    results.push(result);
+    resultsBySession.set(result.sessionId, results);
+  }
 
-    const resultSeenAt = result.createdAt || sessionSortDate(session);
-    const exerciseKeys = getPhraseIdentityKeys(result.exercise);
-    const primaryIdentity =
-      exerciseKeys
+  for (const session of sortedOldestSessions(input.sessions)) {
+    const sessionResults = resultsBySession.get(session.sessionId) ?? [];
+    const phraseCorrectInSession = new Set<string>();
+    const chronologicalSessionResults = [...sessionResults].sort((left, right) => {
+      const dateDiff = dateValue(left.createdAt) - dateValue(right.createdAt);
+      if (dateDiff !== 0) return dateDiff;
+      return (
+        (left.orderIndex ?? Number.MAX_SAFE_INTEGER) - (right.orderIndex ?? Number.MAX_SAFE_INTEGER)
+      );
+    });
+
+    for (const result of chronologicalSessionResults) {
+      if (!result.exercise) continue;
+      const resultSeenAt = result.createdAt || sessionSortDate(session);
+      const exerciseKeys = getPhraseIdentityKeys(result.exercise);
+      const primaryIdentity = exerciseKeys
         .map((key) => input.phraseIdentityToPrimary.get(key))
-        .find((key): key is string => Boolean(key)) ?? exerciseKeys[0];
+        .find((key): key is string => Boolean(key));
+      if (!primaryIdentity) continue;
 
-    if (primaryIdentity) {
       const phrase = input.phrasesByPrimary.get(primaryIdentity) ?? null;
-      const current = phraseEvidence.get(primaryIdentity) ?? {
-        correctCount: 0,
-        wrongCount: 0,
-        sessionIds: new Set<string>(),
-        lastSeenAt: resultSeenAt,
-        phrase,
+      if (result.isCorrect) {
+        input.candidates.delete(reviewCandidateKey('key_phrase', primaryIdentity));
+        phraseCorrectInSession.add(primaryIdentity);
+        continue;
+      }
+
+      const hasEarlierCorrectResult = phraseCorrectInSession.has(primaryIdentity);
+      upsertReviewCandidate(input.candidates, {
+        type: 'key_phrase',
+        identity: primaryIdentity,
         display: phrase?.display ?? phraseDisplay(result.exercise),
         category: phrase?.category,
         topic: phrase?.topic,
         topicIdentity: phrase?.topicIdentity,
-      };
-      if (result.isCorrect) current.correctCount += 1;
-      else current.wrongCount += 1;
-      current.sessionIds.add(result.sessionId);
-      current.lastSeenAt = latestIso(current.lastSeenAt, resultSeenAt);
-      phraseEvidence.set(primaryIdentity, current);
+        strength: hasEarlierCorrectResult ? 6 : 7,
+        reasonCode: hasEarlierCorrectResult ? 'mixed_exercise_result' : 'wrong_exercise_result',
+        sessionId: session.sessionId,
+        seenAt: resultSeenAt,
+      });
     }
 
     const topicIdentity = normalizeTopicIdentity(session.meta.topic);
-    if (topicIdentity) {
-      const topic = input.topicsByIdentity.get(topicIdentity);
-      if (topic) {
-        const current = topicEvidence.get(topicIdentity) ?? {
-          correctCount: 0,
-          wrongCount: 0,
-          sessionIds: new Set<string>(),
-          lastSeenAt: resultSeenAt,
-          topic,
-        };
-        if (result.isCorrect) current.correctCount += 1;
-        else current.wrongCount += 1;
-        current.sessionIds.add(result.sessionId);
-        current.lastSeenAt = latestIso(current.lastSeenAt, resultSeenAt);
-        topicEvidence.set(topicIdentity, current);
+    const topic = topicIdentity ? input.topicsByIdentity.get(topicIdentity) : undefined;
+    if (topicIdentity && topic) {
+      if (session.meta.accuracy === 100) {
+        input.candidates.delete(reviewCandidateKey('lesson_topic', topicIdentity));
+        unresolvedTopicSignals.delete(topicIdentity);
+      } else {
+        const wrongExerciseIds = new Set(
+          sessionResults.filter((result) => !result.isCorrect).map((result) => result.exerciseId),
+        );
+        if (wrongExerciseIds.size > 0) {
+          const currentSignals = unresolvedTopicSignals.get(topicIdentity) ?? {
+            wrongExerciseSignals: new Set<string>(),
+            correctCount: 0,
+            sessionIds: new Set<string>(),
+            lastSeenAt: sessionSortDate(session),
+          };
+          for (const exerciseId of wrongExerciseIds) {
+            currentSignals.wrongExerciseSignals.add(`${session.sessionId}:${exerciseId}`);
+          }
+          currentSignals.correctCount += sessionResults.filter((result) => result.isCorrect).length;
+          currentSignals.sessionIds.add(session.sessionId);
+          currentSignals.lastSeenAt = sessionResults.reduce(
+            (latest, result) => latestIso(latest, result.createdAt || sessionSortDate(session)),
+            currentSignals.lastSeenAt,
+          );
+          unresolvedTopicSignals.set(topicIdentity, currentSignals);
+        }
+
+        const topicSignals = unresolvedTopicSignals.get(topicIdentity);
+        if (topicSignals && topicSignals.wrongExerciseSignals.size >= 2) {
+          const reasonCode: ReviewCandidateReasonCode =
+            topicSignals.correctCount > 0 ? 'mixed_exercise_result' : 'wrong_exercise_result';
+          upsertReviewCandidate(input.candidates, {
+            type: 'lesson_topic',
+            identity: topicIdentity,
+            display: topic.topic,
+            category: topic.category,
+            topic: topic.topic,
+            topicIdentity,
+            strength: topicSignals.correctCount > 0 ? 4 : 5,
+            reasonCode,
+            sessionId: session.sessionId,
+            seenAt: topicSignals.lastSeenAt,
+          });
+          const candidate = input.candidates.get(reviewCandidateKey('lesson_topic', topicIdentity));
+          for (const sessionId of topicSignals.sessionIds) {
+            candidate?.evidenceSessionIds.add(sessionId);
+          }
+        }
       }
     }
-  }
 
-  for (const [identity, evidence] of phraseEvidence.entries()) {
-    if (evidence.wrongCount <= 0) continue;
-    const reasonCode: ReviewCandidateReasonCode =
-      evidence.correctCount > 0 ? 'mixed_exercise_result' : 'wrong_exercise_result';
-    upsertReviewCandidate(input.candidates, {
-      type: 'key_phrase',
-      identity,
-      display: evidence.display,
-      category: evidence.category,
-      topic: evidence.topic,
-      topicIdentity: evidence.topicIdentity,
-      strength: evidence.correctCount > 0 ? 6 : 7,
-      reasonCode,
-      sessionId: Array.from(evidence.sessionIds)[0],
-      seenAt: evidence.lastSeenAt,
-    });
-  }
-
-  for (const [identity, evidence] of topicEvidence.entries()) {
-    if (evidence.wrongCount <= 0) continue;
-    const reasonCode: ReviewCandidateReasonCode =
-      evidence.correctCount > 0 ? 'mixed_exercise_result' : 'wrong_exercise_result';
-    upsertReviewCandidate(input.candidates, {
-      type: 'lesson_topic',
-      identity,
-      display: evidence.topic.topic,
-      category: evidence.topic.category,
-      topic: evidence.topic.topic,
-      topicIdentity: identity,
-      strength: evidence.correctCount > 0 ? 4 : 5,
-      reasonCode,
-      sessionId: Array.from(evidence.sessionIds)[0],
-      seenAt: evidence.lastSeenAt,
-    });
-  }
-}
-
-function deriveMentionReviewCandidates(input: {
-  candidates: Map<string, MutableReviewCandidate>;
-  sessions: CoverageSourceSession[];
-  coveredPhrases: CoveredKeyPhrase[];
-  coveredTopics: CoveredTopic[];
-  learningJournal?: string | null;
-}): void {
-  for (const session of input.sessions) {
-    const seenAt = sessionSortDate(session);
-    const weaknessText = [...session.meta.weaknesses].join(' ');
-    const handoffText = [
-      ...(session.meta.handoffNotes ?? []),
-      ...(session.meta.nextSteps ?? []),
-    ].join(' ');
-
-    if (weaknessText) {
-      for (const phrase of input.coveredPhrases) {
-        if (!mentionsPhrase(weaknessText, phrase)) continue;
+    for (const intent of session.meta.reviewIntents ?? []) {
+      if (intent.type === 'key_phrase') {
+        const phrase = Array.from(input.phrasesByPrimary.values()).find(
+          (candidate) =>
+            candidate.primaryIdentity === intent.identity ||
+            candidate.identities.includes(intent.identity),
+        );
+        if (!phrase) continue;
         upsertReviewCandidate(input.candidates, {
           type: 'key_phrase',
           identity: phrase.primaryIdentity,
@@ -924,102 +888,29 @@ function deriveMentionReviewCandidates(input: {
           category: phrase.category,
           topic: phrase.topic,
           topicIdentity: phrase.topicIdentity,
-          strength: 3,
-          reasonCode: 'weakness_mention',
+          strength: 8,
+          reasonCode: 'structured_review_intent',
           sessionId: session.sessionId,
-          seenAt,
+          seenAt: sessionSortDate(session),
         });
+        continue;
       }
-      for (const topic of input.coveredTopics) {
-        if (!mentionsTopic(weaknessText, topic)) continue;
-        upsertReviewCandidate(input.candidates, {
-          type: 'lesson_topic',
-          identity: topic.identity,
-          display: topic.topic,
-          category: topic.category,
-          topic: topic.topic,
-          topicIdentity: topic.identity,
-          strength: 3,
-          reasonCode: 'weakness_mention',
-          sessionId: session.sessionId,
-          seenAt,
-        });
-      }
+
+      const intentTopic = input.topicsByIdentity.get(intent.identity);
+      if (!intentTopic) continue;
+      upsertReviewCandidate(input.candidates, {
+        type: 'lesson_topic',
+        identity: intentTopic.identity,
+        display: intentTopic.topic,
+        category: intentTopic.category,
+        topic: intentTopic.topic,
+        topicIdentity: intentTopic.identity,
+        strength: 8,
+        reasonCode: 'structured_review_intent',
+        sessionId: session.sessionId,
+        seenAt: sessionSortDate(session),
+      });
     }
-
-    if (handoffText) {
-      for (const phrase of input.coveredPhrases) {
-        if (!mentionsPhrase(handoffText, phrase)) continue;
-        upsertReviewCandidate(input.candidates, {
-          type: 'key_phrase',
-          identity: phrase.primaryIdentity,
-          display: phrase.display,
-          category: phrase.category,
-          topic: phrase.topic,
-          topicIdentity: phrase.topicIdentity,
-          strength: 4,
-          reasonCode: 'handoff_note_mention',
-          sessionId: session.sessionId,
-          seenAt,
-        });
-      }
-      for (const topic of input.coveredTopics) {
-        if (!mentionsTopic(handoffText, topic)) continue;
-        upsertReviewCandidate(input.candidates, {
-          type: 'lesson_topic',
-          identity: topic.identity,
-          display: topic.topic,
-          category: topic.category,
-          topic: topic.topic,
-          topicIdentity: topic.identity,
-          strength: 4,
-          reasonCode: 'handoff_note_mention',
-          sessionId: session.sessionId,
-          seenAt,
-        });
-      }
-    }
-
-    if (session.meta.accuracy < 50) {
-      for (const candidate of input.candidates.values()) {
-        if (!candidate.evidenceSessionIds.has(session.sessionId)) continue;
-        candidate.strength += 1;
-        candidate.reasonCodes.add('low_accuracy_boost');
-      }
-    }
-  }
-
-  const journal = compactWhitespace(input.learningJournal ?? '');
-  if (!journal) return;
-
-  for (const phrase of input.coveredPhrases) {
-    if (!mentionsPhrase(journal, phrase)) continue;
-    upsertReviewCandidate(input.candidates, {
-      type: 'key_phrase',
-      identity: phrase.primaryIdentity,
-      display: phrase.display,
-      category: phrase.category,
-      topic: phrase.topic,
-      topicIdentity: phrase.topicIdentity,
-      strength: 2,
-      reasonCode: 'learning_journal_mention',
-      seenAt: phrase.lastSeenAt,
-    });
-  }
-
-  for (const topic of input.coveredTopics) {
-    if (!mentionsTopic(journal, topic)) continue;
-    upsertReviewCandidate(input.candidates, {
-      type: 'lesson_topic',
-      identity: topic.identity,
-      display: topic.topic,
-      category: topic.category,
-      topic: topic.topic,
-      topicIdentity: topic.identity,
-      strength: 2,
-      reasonCode: 'learning_journal_mention',
-      seenAt: topic.lastSeenAt,
-    });
   }
 }
 
@@ -1090,7 +981,6 @@ export function buildCoverageEvidence(input: {
   totalCompletedAiSessionCount?: number;
   ignoredCompletedAiSessionCount?: number;
   exerciseResults?: CoverageExerciseResult[];
-  learningJournal?: string | null;
 }): CoverageEvidence {
   const sessions = sortedNewestSessions(input.sessions);
   const categories = new Map<TopicCategoryKey, MutableCategory>();
@@ -1133,7 +1023,6 @@ export function buildCoverageEvidence(input: {
   const coveredTopics = toCoveredTopics(topics);
   const coveredKeyPhrases = toCoveredPhrases(phrases);
   const candidates = new Map<string, MutableReviewCandidate>();
-  const sessionsById = new Map(sessions.map((session) => [session.sessionId, session]));
   const topicsByIdentity = new Map(coveredTopics.map((topic) => [topic.identity, topic]));
   const phrasesByPrimary = new Map(
     coveredKeyPhrases.map((phrase) => [phrase.primaryIdentity, phrase]),
@@ -1141,18 +1030,11 @@ export function buildCoverageEvidence(input: {
 
   deriveResultReviewCandidates({
     candidates,
-    sessionsById,
+    sessions,
     phraseIdentityToPrimary,
     phrasesByPrimary,
     topicsByIdentity,
     exerciseResults: input.exerciseResults ?? [],
-  });
-  deriveMentionReviewCandidates({
-    candidates,
-    sessions,
-    coveredPhrases: coveredKeyPhrases,
-    coveredTopics,
-    learningJournal: input.learningJournal,
   });
 
   const reviewCandidates = toReviewCandidates(candidates);

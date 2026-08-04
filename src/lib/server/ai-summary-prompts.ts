@@ -1,5 +1,5 @@
 import type { AiPromptMessage } from '$lib/server/ai-session-prompts';
-import type { Exercise, SessionSummary, UserLevel } from '$lib/types';
+import type { Exercise, KeyPhrase, SessionSummary, UserLevel } from '$lib/types';
 
 export type SessionSummaryPromptInput = {
   sessionId: string;
@@ -7,6 +7,7 @@ export type SessionSummaryPromptInput = {
   userLevel: UserLevel;
   japaneseWritingEnabled?: boolean;
   lessonTopic?: string;
+  lessonKeyPhrases?: KeyPhrase[];
   progressJournal?: string | null;
   suppressPromotion?: boolean;
   recentSessions?: Array<{
@@ -152,6 +153,7 @@ export function buildSessionSummaryPrompt(input: SessionSummaryPromptInput): Ses
     userLevel: input.userLevel,
     japaneseWritingEnabled: input.japaneseWritingEnabled ?? false,
     lessonTopic: input.lessonTopic ?? 'travel_japanese',
+    lessonKeyPhrases: input.lessonKeyPhrases ?? [],
     accuracy,
     exercises: input.exercises.map((exercise) => ({
       id: exercise.id,
@@ -172,7 +174,7 @@ export function buildSessionSummaryPrompt(input: SessionSummaryPromptInput): Ses
         content: [
           'You are a Japanese tutor providing a concise end-of-session learner summary plus internal handoff notes.',
           'Write ALL learner-visible summary text in English. The summary, patterns_strong, patterns_weak, mini_lesson.english, and mini_lesson.note fields must be in English.',
-          'Return JSON only with keys: summary, patterns_strong, patterns_weak, mini_lesson, handoff_notes, levelUpRecommendation.',
+          'Return JSON only with keys: summary, patterns_strong, patterns_weak, mini_lesson, handoff_notes, review_intents, levelUpRecommendation.',
           '',
           'RULES:',
           '1) Only reference exercises that appear in the provided session data. Never fabricate.',
@@ -181,10 +183,11 @@ export function buildSessionSummaryPrompt(input: SessionSummaryPromptInput): Ses
           '3) patterns_weak: Identify conceptual gaps and confusion patterns (particle errors, verb form mistakes, similar-word confusion). Do NOT list individual wrong answers. If accuracy is 100%, mention 1-2 growth areas (nuance, range).',
           '4) mini_lesson: exactly one object with keys kind, japanese, romaji, english, note. kind must be one of: related_phrase, likely_reply, nuance_upgrade, follow_up. Keep it closely related to this completed lesson, concrete, and immediately usable. Do NOT copy a taught key phrase verbatim. Do NOT phrase it as a future promise ("next time we will...").',
           '5) handoff_notes: 0-3 short internal notes for the next session generator. Keep them specific and pattern-oriented. These are internal only and MUST NOT be written as learner-facing "next time" statements.',
-          '6) All Japanese in learner-visible output must include matching romaji. Example: japanese="こんにちは", romaji="konnichiwa".',
+          '6) review_intents: 0-3 objects with target_type ("lesson_topic" or "key_phrase"), target, reason, and review_requested. Set review_requested=true only for a specific unresolved weakness demonstrated by the current structured exercise results. The target must exactly name the exact current Lesson Topic or Lesson Key Phrase from CURRENT SESSION DATA. Do not request review from a journal mention, positive summary language, a neutral handoff, or a general growth opportunity. Otherwise return an empty array.',
+          '7) All Japanese in learner-visible output must include matching romaji. Example: japanese="こんにちは", romaji="konnichiwa".',
           input.suppressPromotion
-            ? '7) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.'
-            : '7) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
+            ? '8) levelUpRecommendation: MUST be null. A promotion was recently recommended — do NOT suggest another promotion this session.'
+            : '8) levelUpRecommendation: null or {recommendedLevel, reason}. Recommend promotion only with consistent mastery (>=80% recent accuracy + strong evidence across multiple sessions). Never promote ready_for_japan. Do NOT recommend promotion in consecutive sessions.',
           '',
           "TRANSLATION ACCURACY: The 'isCorrect' field uses string matching which may be imperfect. Answers conveying the same meaning ARE correct. Do not penalize natural phrasings, added politeness, contractions, or word order differences. If an 'incorrect' answer was actually correct, acknowledge it as a strength.",
           'Keep feedback encouraging, concise, and travel-focused.',

@@ -74,6 +74,17 @@
 - Legacy planned sessions without stored plan metadata may use the bounded compatibility fallback and must identify the resulting coverage as lower confidence.
 - Completion retries must return the stored completion result without repeating coverage, result, token, XP, or journal side effects.
 
+### Review Evidence
+
+- Review Candidates must represent current unresolved item-level weakness, not every historical mistake.
+- Phrase Review Evidence is chronological: a later correct result for the exact Lesson Key Phrase resolves older wrong or mixed result evidence, while a later wrong or mixed result can reopen review.
+- Lesson Topic Review Evidence requires multiple unresolved wrong item signals or an explicit structured review request.
+- A later 100 percent accurate Learning Session for the exact Lesson Topic resolves older topic-level Review Evidence.
+- One unrelated wrong exercise must not make every Lesson Key Phrase or the entire Lesson Topic reviewable.
+- Free-text Learning Journal sections, learner-facing strengths or weaknesses, legacy next steps, and neutral handoff notes are advisory only and must never authorize repetition.
+- A structured review request must name an exact current Lesson Topic or Lesson Key Phrase, include a specific unresolved reason, and explicitly request review.
+- Summary generation must validate structured review targets against server-owned lesson coverage before persisting them.
+
 ### Lessons
 
 - Teach one focused topic per session

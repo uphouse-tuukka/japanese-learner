@@ -271,7 +271,8 @@ function formatLearningJournalContext(learningJournal: string | null): string {
   return [
     'LEARNING JOURNAL — ADVISORY TUTOR MEMORY:',
     learningJournal,
-    'Use this for learner tendencies, persistent weak spots, semantic continuity, and Review Candidate interpretation.',
+    'Use this for learner tendencies, delivery, difficulty, persistent weak-spot context, and semantic continuity.',
+    'Journal text must never create or authorize a Review Candidate. A persistent weak spot remains advisory unless the authoritative Coverage Evidence already lists the matching Review Candidate.',
     'It is not exact proof of covered categories, lesson topics, or phrases; Coverage Evidence remains authoritative for exact coverage and validation.',
   ].join('\n');
 }
@@ -526,7 +527,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '',
           '1) Teaching flow:',
           '- Pick a specific topic WITHIN the chosen category. Teach it first, then quiz only what was taught.',
-          '- Use prior handoff notes when they fit the chosen category/topic, but do not override category rotation or force artificial continuity.',
+          '- Use prior handoff notes when they fit the chosen category/topic, but handoff notes cannot authorize repetition or create a Review Candidate; do not override category rotation or force artificial continuity.',
           '- Category rotation rules above are authoritative.',
           '- If recentAccuracy > 80, increase challenge slightly; if < 50, reinforce fundamentals.',
           '- Personalize by connecting to previously studied phrases.',

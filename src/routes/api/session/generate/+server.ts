@@ -135,7 +135,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       totalCompletedAiSessionCount: parsedCoverageSources.totalCompletedAiSessions,
       ignoredCompletedAiSessionCount: parsedCoverageSources.ignoredCompletedAiSessions,
       exerciseResults: completedAiExerciseResults,
-      learningJournal: user.progressJournal,
     });
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
       .map((session): SessionHistoryItem | null => {

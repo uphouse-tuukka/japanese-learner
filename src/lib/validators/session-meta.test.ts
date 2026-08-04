@@ -194,4 +194,44 @@ describe('parseSessionMeta', () => {
     expect(parsed?.nextSteps).toBeUndefined();
     expect(parsed?.handoffNotes).toBeUndefined();
   });
+
+  it('keeps only explicit structured review requests with bounded exact identities', () => {
+    const parsed = parseSessionMeta(
+      validSessionMeta({
+        reviewIntents: [
+          {
+            type: 'key_phrase',
+            identity: ' ja:すみません ',
+            display: ' すみません (sumimasen) ',
+            reason: ' A specific production error remains unresolved. ',
+            reviewRequested: true,
+          },
+          {
+            type: 'lesson_topic',
+            identity: 'restaurant ordering',
+            display: 'Restaurant ordering',
+            reason: 'Neutral handoff only.',
+            reviewRequested: false,
+          },
+          {
+            type: 'unknown',
+            identity: 'invalid',
+            display: 'Invalid',
+            reason: 'Invalid type.',
+            reviewRequested: true,
+          },
+        ],
+      }),
+    );
+
+    expect(parsed?.reviewIntents).toEqual([
+      {
+        type: 'key_phrase',
+        identity: 'ja:すみません',
+        display: 'すみません (sumimasen)',
+        reason: 'A specific production error remains unresolved.',
+        reviewRequested: true,
+      },
+    ]);
+  });
 });

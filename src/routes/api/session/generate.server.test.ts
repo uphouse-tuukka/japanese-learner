@@ -529,6 +529,107 @@ describe('POST /api/session/generate', () => {
     );
   });
 
+  it('rejects a mastered topic after seven intervening sessions despite journal and positive handoff mentions', async () => {
+    const masteredPhrase = {
+      japanese: 'ください',
+      romaji: 'kudasai',
+      english: 'please give me',
+      usage: 'Use when requesting an item.',
+    };
+    const masterySessions = [
+      buildCompletedAiSession({
+        id: 'old-weakness',
+        createdAt: '2026-05-01T08:00:00.000Z',
+        category: 'greetings_basics',
+        topic: 'Basic greetings',
+        accuracy: 0,
+        weaknesses: ['Basic greetings were difficult.'],
+        handoffNotes: ['Review Basic greetings.'],
+        keyPhraseDetails: [masteredPhrase],
+      }),
+      buildCompletedAiSession({
+        id: 'mastery',
+        createdAt: '2026-05-02T08:00:00.000Z',
+        category: 'greetings_basics',
+        topic: 'Basic greetings',
+        accuracy: 100,
+        weaknesses: ['Explore more nuance in Basic greetings.'],
+        handoffNotes: ['Basic greetings are now a strength.'],
+        keyPhraseDetails: [masteredPhrase],
+      }),
+      ...[
+        ['travel_essentials', 'Reading prices'],
+        ['food_dining', 'Paying at a restaurant'],
+        ['transport', 'Finding a platform'],
+        ['shopping', 'Choosing a size'],
+        ['directions', 'Finding an exit'],
+        ['hotel_accommodation', 'Checking in'],
+        ['greetings_basics', 'Greeting shop staff'],
+      ].map(([category, topic], index) =>
+        buildCompletedAiSession({
+          id: `intervening-${index + 1}`,
+          createdAt: `2026-05-${String(index + 3).padStart(2, '0')}T08:00:00.000Z`,
+          category,
+          topic,
+          accuracy: 100,
+        }),
+      ),
+    ];
+    mockGetUser.mockResolvedValueOnce(
+      buildMockUser({
+        progressJournal: [
+          '**Categories & topics covered** - greetings_basics: Basic greetings',
+          '**Vocabulary bank** - ください',
+          '**Persistent weak spots** - none',
+          '**Progress snapshot** - Basic greetings mastered',
+          '**Learning trajectory** - building beyond Basic greetings',
+        ].join('\n'),
+      }),
+    );
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce(masterySessions);
+    mockGetCompletedAiExerciseResultsForUser.mockResolvedValueOnce([
+      {
+        sessionId: 'old-weakness',
+        exerciseId: 'old-weakness-result',
+        isCorrect: false,
+        answerText: 'incorrect',
+        createdAt: '2026-05-01T08:10:00.000Z',
+        exercise: buildMultipleChoiceExercise({ id: 'old-weakness-result' }),
+      },
+      {
+        sessionId: 'mastery',
+        exerciseId: 'mastery-result',
+        isCorrect: true,
+        answerText: 'Please',
+        createdAt: '2026-05-02T08:10:00.000Z',
+        exercise: buildMultipleChoiceExercise({ id: 'mastery-result' }),
+      },
+    ]);
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(buildGeneratedPlan({ lesson: { topic: 'Basic greetings' } }))
+      .mockResolvedValueOnce(buildGeneratedPlan({ lesson: { topic: 'Greeting a shopkeeper' } }));
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        learningJournal: expect.stringContaining('Basic greetings mastered'),
+        coverageEvidence: expect.objectContaining({ reviewCandidates: [] }),
+      }),
+    );
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('repeated_lesson_topic'),
+        ]),
+      }),
+    );
+  });
+
   it('returns the existing budget-exhausted response shape', async () => {
     const budgetInfo = { allowed: false, remainingTokens: 0, limit: 100 };
     mockCheckBudget.mockResolvedValueOnce(budgetInfo);

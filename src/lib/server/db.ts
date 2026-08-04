@@ -631,6 +631,7 @@ ORDER BY datetime(created_at) DESC
 export async function getCompletedAiExerciseResultsForUser(userId: string): Promise<
   Array<{
     exerciseId: string;
+    orderIndex?: number;
     sessionId: string;
     isCorrect: boolean;
     answerText: string;
@@ -641,21 +642,26 @@ export async function getCompletedAiExerciseResultsForUser(userId: string): Prom
   const db = await getDb();
   const result = await db.execute({
     sql: `
-SELECT r.exercise_id, r.session_id, r.is_correct, r.answer_text, r.created_at, e.content_json
+SELECT r.exercise_id, r.session_id, r.is_correct, r.answer_text, r.created_at, e.content_json, se.order_index
 FROM user_exercise_results r
 JOIN sessions s ON s.id = r.session_id
 JOIN exercises e ON e.id = r.exercise_id
+LEFT JOIN session_exercises se ON se.session_id = r.session_id AND se.exercise_id = r.exercise_id
 WHERE r.user_id = ?
   AND s.user_id = ?
   AND s.mode = 'ai'
   AND s.status = 'completed'
-ORDER BY datetime(r.created_at) DESC
+ORDER BY datetime(r.created_at) DESC, se.order_index DESC, r.id DESC
 `,
     args: [userId, userId],
   });
 
   return (result.rows as Array<Record<string, unknown>>).map((row) => ({
     exerciseId: asString(row.exercise_id),
+    orderIndex:
+      row.order_index === null || row.order_index === undefined
+        ? undefined
+        : asNumber(row.order_index),
     sessionId: asString(row.session_id),
     isCorrect: asNumber(row.is_correct) === 1,
     answerText: asString(row.answer_text),

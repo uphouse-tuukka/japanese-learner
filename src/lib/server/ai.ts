@@ -20,10 +20,23 @@ import {
 } from '$lib/server/ai-summary-prompts';
 import { logInfo, logWarn } from '$lib/server/logger';
 import { getOpenAiClient as getCachedOpenAiClient } from '$lib/server/openai-client';
+import {
+  getPhraseIdentityKeys,
+  normalizeTopicIdentity,
+  phrasesShareIdentity,
+} from '$lib/server/session-coverage-evidence';
 import { LEVEL_ORDER } from '$lib/types';
 export { generatePublicChallengePlan } from '$lib/server/ai-public-challenge';
 export { TOPIC_CATEGORIES, type TopicCategoryKey } from '$lib/server/ai-session-prompts';
-import type { Exercise, SessionPlan, SessionSummary, TokenUsage, UserLevel } from '$lib/types';
+import type {
+  Exercise,
+  KeyPhrase,
+  SessionPlan,
+  SessionReviewIntent,
+  SessionSummary,
+  TokenUsage,
+  UserLevel,
+} from '$lib/types';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -31,6 +44,8 @@ function nowIso(): string {
 
 const SESSION_SUMMARY_MAX_SENTENCES = 3;
 const SESSION_SUMMARY_MAX_WORDS = 60;
+const MAX_SESSION_REVIEW_INTENTS = 5;
+const MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH = 160;
 
 function splitSentences(text: string): string[] {
   const matches = text.match(/[^.!?。！？]+[.!?。！？]+[”’"')\]]*|[^.!?。！？]+$/gu);
@@ -52,6 +67,76 @@ export function normalizeSessionSummaryText(rawSummary: string): string {
   const finalWord = truncatedWords[truncatedWords.length - 1] ?? '';
   truncatedWords[truncatedWords.length - 1] = finalWord.replace(/[.,;:!?。！？]*$/u, '') + '…';
   return truncatedWords.join(' ');
+}
+
+function boundedReviewIntentField(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH).trimEnd();
+}
+
+function keyPhraseDisplay(phrase: KeyPhrase): string {
+  const japanese = phrase.japanese.trim();
+  const romaji = phrase.romaji.trim();
+  if (japanese && romaji) return `${japanese} (${romaji})`;
+  return japanese || romaji || phrase.english.trim();
+}
+
+function normalizeSessionReviewIntents(
+  value: unknown,
+  lessonTopic: string | undefined,
+  lessonKeyPhrases: KeyPhrase[],
+): SessionReviewIntent[] {
+  if (!Array.isArray(value)) return [];
+
+  const intents: SessionReviewIntent[] = [];
+  const seen = new Set<string>();
+  const lessonTopicIdentity = normalizeTopicIdentity(lessonTopic ?? '');
+
+  for (const item of value) {
+    if (intents.length >= MAX_SESSION_REVIEW_INTENTS) break;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+
+    const raw = item as Record<string, unknown>;
+    if ((raw.review_requested ?? raw.reviewRequested) !== true) continue;
+    const targetType = raw.target_type ?? raw.targetType;
+    const target = boundedReviewIntentField(raw.target);
+    const reason = boundedReviewIntentField(raw.reason);
+    if (!target || !reason) continue;
+
+    let intent: SessionReviewIntent | null = null;
+    if (targetType === 'lesson_topic') {
+      const targetIdentity = normalizeTopicIdentity(target);
+      if (targetIdentity && targetIdentity === lessonTopicIdentity && lessonTopic) {
+        intent = {
+          type: 'lesson_topic',
+          identity: targetIdentity,
+          display: lessonTopic.trim(),
+          reason,
+          reviewRequested: true,
+        };
+      }
+    } else if (targetType === 'key_phrase') {
+      const phrase = lessonKeyPhrases.find((candidate) => phrasesShareIdentity(target, candidate));
+      const identity = phrase ? getPhraseIdentityKeys(phrase)[0] : undefined;
+      if (phrase && identity) {
+        intent = {
+          type: 'key_phrase',
+          identity,
+          display: keyPhraseDisplay(phrase),
+          reason,
+          reviewRequested: true,
+        };
+      }
+    }
+
+    if (!intent) continue;
+    const key = `${intent.type}:${intent.identity}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    intents.push(intent);
+  }
+
+  return intents;
 }
 
 function getOpenAiClient(): OpenAI {
@@ -177,6 +262,7 @@ export async function generateSessionSummary(input: {
   userLevel: UserLevel;
   japaneseWritingEnabled?: boolean;
   lessonTopic?: string;
+  lessonKeyPhrases?: KeyPhrase[];
   progressJournal?: string | null;
   suppressPromotion?: boolean;
   recentSessions?: Array<{
@@ -194,6 +280,7 @@ export async function generateSessionSummary(input: {
 }): Promise<{
   summary: SessionSummary;
   handoffNotes: string[];
+  reviewIntents: SessionReviewIntent[];
   tokenUsage: Pick<TokenUsage, 'model' | 'tokensIn' | 'tokensOut' | 'tokensTotal'>;
 }> {
   const client = getOpenAiClient();
@@ -307,6 +394,11 @@ export async function generateSessionSummary(input: {
     'nextSteps',
   );
   const handoffNotes = handoffNotesFromModel.length > 0 ? handoffNotesFromModel : legacyNextSteps;
+  const reviewIntents = normalizeSessionReviewIntents(
+    pickFirst(['review_intents', 'reviewIntents']),
+    input.lessonTopic,
+    input.lessonKeyPhrases ?? [],
+  );
 
   const summary: SessionSummary = {
     sessionId: input.sessionId,
@@ -350,11 +442,13 @@ export async function generateSessionSummary(input: {
     tokensOutput: usage.output,
     hasMiniLesson: !!miniLesson,
     handoffNotesCount: handoffNotes.length,
+    reviewIntentCount: reviewIntents.length,
   });
 
   return {
     summary,
     handoffNotes,
+    reviewIntents,
     tokenUsage: {
       model: usage.model,
       tokensIn: usage.input,

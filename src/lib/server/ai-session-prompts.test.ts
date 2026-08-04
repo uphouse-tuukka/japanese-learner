@@ -262,7 +262,7 @@ describe('ai session prompt builders', () => {
             topic: 'Ordering food',
             topicIdentity: 'ordering food',
             strength: 7,
-            reasonCodes: ['wrong_exercise_result', 'learning_journal_mention'],
+            reasonCodes: ['wrong_exercise_result'],
             evidenceSessionIds: ['session-2'],
             lastSeenAt: '2026-05-03T08:00:00.000Z',
           },
@@ -306,6 +306,8 @@ describe('ai session prompt builders', () => {
     expect(promptText).toContain(
       'not exact proof of covered categories, lesson topics, or phrases',
     );
+    expect(promptText).toContain('must never create or authorize a Review Candidate');
+    expect(promptText).toContain('handoff notes cannot authorize repetition');
     expect(promptText).toContain('CURRICULUM VALIDATION FEEDBACK FROM PREVIOUS ATTEMPT:');
     expect(promptText).toContain(
       'Previous generation violated curriculum rails: category_mismatch.',

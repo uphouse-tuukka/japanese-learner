@@ -196,6 +196,7 @@ describe('POST /api/session/complete', () => {
         generatedAt: '2026-01-01T00:00:00.000Z',
       },
       handoffNotes: ['Review once'],
+      reviewIntents: [],
       tokenUsage: {
         model: 'gpt-5.4',
         tokensIn: 10,
@@ -786,6 +787,75 @@ describe('POST /api/session/complete', () => {
       });
     },
   );
+
+  it('persists server-validated structured review intent with completed coverage', async () => {
+    mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+    mockGetSession.mockResolvedValueOnce({
+      id: 'session-1',
+      userId: 'user-1',
+      mode: 'ai',
+      status: 'completing',
+      model: 'gpt-5.4',
+      tokenInput: 10,
+      tokenOutput: 20,
+      summary: null,
+      plannedCoverage: {
+        version: 1,
+        category: 'food_dining',
+        lessonTopic: 'Ordering ramen',
+        culturalNote: 'Ticket machines are common.',
+        keyPhraseDetails: plannedKeyPhraseDetails,
+      },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      completedAt: CLAIMED_AT,
+    });
+    mockGenerateSessionSummary.mockResolvedValueOnce({
+      summary: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        summary: 'AI generated summary',
+        strengths: ['Strong recall'],
+        weaknesses: ['Keep practicing'],
+        accuracy: 50,
+        generatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      handoffNotes: ['Positive mention of ramen ordering.'],
+      reviewIntents: [
+        {
+          type: 'key_phrase',
+          identity: 'ja:ラーメンをください',
+          display: 'ラーメンをください (raamen o kudasai)',
+          reason: 'The learner missed the production item.',
+          reviewRequested: true,
+        },
+      ],
+      tokenUsage: { model: 'gpt-5.4', tokensIn: 10, tokensOut: 20 },
+    });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lessonTopic: 'Ordering ramen',
+        lessonKeyPhrases: plannedKeyPhraseDetails,
+      }),
+    );
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [string, { summary: string }];
+    expect(JSON.parse(completion.summary)).toMatchObject({
+      reviewIntents: [
+        {
+          type: 'key_phrase',
+          identity: 'ja:ラーメンをください',
+          reviewRequested: true,
+        },
+      ],
+    });
+  });
 
   it('keeps the bounded lower-confidence fallback for legacy planned sessions', async () => {
     mockGetSession.mockResolvedValueOnce({

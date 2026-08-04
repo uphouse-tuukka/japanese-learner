@@ -256,6 +256,55 @@ describe('generateSessionSummary', () => {
     expect(result.summary).not.toHaveProperty('handoffNotes');
   });
 
+  it('returns only explicit structured review intent for exact current lesson targets', async () => {
+    mockModelOutput(
+      validSummaryModelPayload({
+        review_intents: [
+          {
+            target_type: 'key_phrase',
+            target: 'すみません',
+            reason: 'The learner missed the production item.',
+            review_requested: true,
+          },
+          {
+            target_type: 'lesson_topic',
+            target: 'Ordering food',
+            reason: 'Positive mention only.',
+            review_requested: false,
+          },
+          {
+            target_type: 'key_phrase',
+            target: 'こんにちは',
+            reason: 'Not taught in this session.',
+            review_requested: true,
+          },
+        ],
+      }),
+    );
+
+    const result = await generateSessionSummary({
+      ...baseSessionInput(),
+      lessonKeyPhrases: [
+        {
+          japanese: 'すみません',
+          romaji: 'sumimasen',
+          english: 'Excuse me',
+          usage: 'Get attention politely.',
+        },
+      ],
+    });
+
+    expect(result.reviewIntents).toEqual([
+      {
+        type: 'key_phrase',
+        identity: 'ja:すみません',
+        display: 'すみません (sumimasen)',
+        reason: 'The learner missed the production item.',
+        reviewRequested: true,
+      },
+    ]);
+  });
+
   it('falls back to legacy next_focus values as handoffNotes when handoff_notes absent', async () => {
     mockModelOutput(
       validSummaryModelPayload({

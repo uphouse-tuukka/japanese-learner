@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import { matchSelectedUser } from '$lib/server/selected-user';
-import type { Exercise, SessionMeta, SessionSummary } from '$lib/types';
+import type { Exercise, SessionMeta, SessionReviewIntent, SessionSummary } from '$lib/types';
 import {
   claimSessionCompletion,
   completeSessionRecord,
@@ -277,6 +277,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     let summary: SessionSummary;
     let handoffNotes: string[] = [];
+    let reviewIntents: SessionReviewIntent[] = [];
     let summaryTokenInput = 0;
     let summaryTokenOutput = 0;
     let summaryUsageEvent: {
@@ -308,6 +309,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           userLevel: user.level,
           japaneseWritingEnabled: user.japaneseWritingEnabled,
           lessonTopic,
+          lessonKeyPhrases: plannedCoverage?.keyPhraseDetails ?? [],
           progressJournal,
           recentSessions: recentSessionsCompact,
           exercises,
@@ -317,6 +319,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         const aiResult = await generateSessionSummary(summaryInput);
         summary = aiResult.summary;
         handoffNotes = aiResult.handoffNotes;
+        reviewIntents = aiResult.reviewIntents ?? [];
         summaryTokenInput = aiResult.tokenUsage.tokensIn;
         summaryTokenOutput = aiResult.tokenUsage.tokensOut;
         summaryUsageEvent = {
@@ -370,6 +373,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         weaknesses: summary.weaknesses,
         nextSteps: summary.nextSteps,
         handoffNotes: handoffNotes.length > 0 ? handoffNotes : undefined,
+        reviewIntents: reviewIntents.length > 0 ? reviewIntents : undefined,
         exerciseTypes,
         keyPhrases,
         keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,
