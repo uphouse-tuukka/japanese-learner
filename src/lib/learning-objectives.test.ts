@@ -115,12 +115,14 @@ describe('canonical Learning Objective catalog', () => {
         {
           id: 'greetings_basics.exchange_names',
           category: 'greetings_basics',
+          communicativeGoalKey: 'exchange_names',
           description: 'Exchange names in a first meeting.',
           generationGuidance: 'Teach a short two-way name exchange.',
         },
         {
           id: 'greetings_basics.exchange_names',
           category: 'travel_essentials',
+          communicativeGoalKey: 'exchange_names',
           description: 'Duplicate identity.',
           generationGuidance: 'This must be rejected.',
         },
@@ -132,6 +134,7 @@ describe('canonical Learning Objective catalog', () => {
         {
           id: 'greetings_basics.exchange_names',
           category: 'travel_essentials',
+          communicativeGoalKey: 'exchange_names',
           description: 'Exchange names in a first meeting.',
           generationGuidance: 'Teach a short two-way name exchange.',
         },
@@ -143,6 +146,7 @@ describe('canonical Learning Objective catalog', () => {
         {
           id: 'greetings_basics.exchange_names',
           category: 'greetings_basics',
+          communicativeGoalKey: 'exchange_names',
           description: 'Exchange names in a first meeting.',
           generationGuidance: '   ',
         },
@@ -154,13 +158,15 @@ describe('canonical Learning Objective catalog', () => {
         {
           id: 'food_dining.order_food_and_drinks',
           category: 'food_dining',
-          description: 'Order a meal and drinks in a restaurant.',
+          communicativeGoalKey: 'restaurant_order',
+          description: 'Order food and drinks in a restaurant.',
           generationGuidance: 'Teach a concise restaurant order.',
         },
         {
           id: 'food_dining.place_a_restaurant_order',
           category: 'food_dining',
-          description: 'Order a meal and drinks in a restaurant!',
+          communicativeGoalKey: 'restaurant_order',
+          description: 'Place a restaurant meal and beverage order.',
           generationGuidance: 'Teach the same goal under a different identity.',
         },
       ]),

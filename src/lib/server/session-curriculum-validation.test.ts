@@ -25,6 +25,7 @@ const baseCoverage = {
     objective: {
       id: 'greetings_basics.greet_by_time',
       category: 'greetings_basics',
+      communicativeGoalKey: 'greet_by_time',
       description: 'Choose and use a basic greeting that fits the time of day.',
       generationGuidance: 'Teach an appropriate time-of-day greeting.',
     },

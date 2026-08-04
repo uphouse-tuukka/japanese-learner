@@ -114,7 +114,7 @@
 
 - Greetings & Basics, Travel Essentials, Food & Dining, Transport, Shopping, Directions & Navigation, and Hotel & Accommodation use an app-owned catalog of stable Learning Objective identities.
 - The core travel-scenario catalogs separate ordering, menu clarification, dietary needs, transport stages, product discovery, purchase tasks, route finding, indoor navigation, check-in, accommodation services, and problem resolution into materially distinct communicative goals.
-- Each catalog entry declares its Topic Category, a learner-facing communicative goal, and focused generation guidance.
+- Each catalog entry declares its Topic Category, a stable communicative-goal key, a learner-facing description, and focused generation guidance.
 - The application deterministically selects an uncovered Learning Objective or a currently eligible review objective after selecting the Topic Category.
 - The model must copy the selected identity exactly and may vary the Lesson Topic wording without changing that identity.
 - Coverage and validation use the stable identity, so semantic title variants such as saying where the learner is from and introducing their country of origin remain one objective.

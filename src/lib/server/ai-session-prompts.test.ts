@@ -363,6 +363,7 @@ describe('ai session prompt builders', () => {
           objective: {
             id: 'greetings_basics.exchange_origins',
             category: 'greetings_basics',
+            communicativeGoalKey: 'exchange_origins',
             description: 'Ask where someone is from and state a country or place of origin.',
             generationGuidance:
               'Teach a two-way origin exchange without expanding into a full introduction.',
