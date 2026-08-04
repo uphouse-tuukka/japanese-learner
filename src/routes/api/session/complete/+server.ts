@@ -13,10 +13,11 @@ import {
   getUserById,
   insertExerciseResults,
   resetSessionCompletionClaim,
-  updateProgressJournal,
 } from '$lib/server/db';
 import { generateSessionSummary, generateUpdatedJournal } from '$lib/server/ai';
 import { runBackgroundTask } from '$lib/server/background-task';
+import { logError } from '$lib/server/logger';
+import { persistGeneratedJournal } from '$lib/server/progress-journal';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { processSessionCompletion } from '$lib/server/gamification';
 import { calculateMaxCombo } from '$lib/utils/results';
@@ -339,16 +340,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             },
             userLevel: user.level,
           });
-          if (!journalResult?.journal) {
-            return;
-          }
-          await updateProgressJournal(userId, journalResult.journal);
-          await recordUsageEvent({
+          await persistGeneratedJournal({
             userId,
             sessionId,
-            model: journalResult.tokenUsage.model,
-            tokensIn: journalResult.tokenUsage.tokensIn,
-            tokensOut: journalResult.tokenUsage.tokensOut,
+            currentJournal: progressJournal,
+            journal: journalResult.journal,
+            tokenUsage: journalResult.tokenUsage,
           });
         };
       } catch (error) {
@@ -412,15 +409,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     if (journalUpdateTask) {
       try {
-        // Fire-and-forget — do not block the main response on journal generation.
-        runBackgroundTask('session-complete-journal-update', journalUpdateTask, {
+        await runBackgroundTask('session-complete-journal-update', journalUpdateTask, {
           route: 'api/session/complete',
           sessionId,
           userId,
         });
-      } catch (telemetryError) {
-        console.error('[api/session/complete] journal scheduling failed (non-fatal)', {
-          error: telemetryError,
+      } catch (error) {
+        logError('api/session/complete', 'journal scheduling failed (non-fatal)', {
+          error,
           sessionId,
           userId,
         });

@@ -161,12 +161,22 @@ export async function getProgressJournal(userId: string): Promise<string | null>
   return asString(row.progress_journal) || null;
 }
 
-export async function updateProgressJournal(userId: string, journal: string): Promise<void> {
+export async function updateProgressJournalIfCurrent(
+  userId: string,
+  currentJournal: string | null,
+  nextJournal: string,
+): Promise<boolean> {
   const db = await getDb();
-  await db.execute({
-    sql: `UPDATE users SET progress_journal = ?, updated_at = ? WHERE id = ?`,
-    args: [journal, nowIso(), userId],
+  const currentJournalCondition =
+    currentJournal === null ? 'progress_journal IS NULL' : 'progress_journal = ?';
+  const result = await db.execute({
+    sql: `UPDATE users SET progress_journal = ?, updated_at = ? WHERE id = ? AND ${currentJournalCondition}`,
+    args:
+      currentJournal === null
+        ? [nextJournal, nowIso(), userId]
+        : [nextJournal, nowIso(), userId, currentJournal],
   });
+  return result.rowsAffected === 1;
 }
 
 export async function updateJapaneseWritingSetting(

@@ -9,10 +9,10 @@ const {
   mockGetProgressJournal,
   mockGetUserById,
   mockInsertExerciseResults,
+  mockLogError,
+  mockPersistGeneratedJournal,
   mockProcessSessionCompletion,
-  mockRecordUsageEvent,
   mockResetSessionCompletionClaim,
-  mockUpdateProgressJournal,
   mockRunBackgroundTask,
 } = vi.hoisted(() => ({
   mockClaimSessionCompletion: vi.fn(),
@@ -21,10 +21,10 @@ const {
   mockGetProgressJournal: vi.fn(),
   mockGetUserById: vi.fn(),
   mockInsertExerciseResults: vi.fn(),
+  mockLogError: vi.fn(),
+  mockPersistGeneratedJournal: vi.fn(),
   mockProcessSessionCompletion: vi.fn(),
-  mockRecordUsageEvent: vi.fn(),
   mockResetSessionCompletionClaim: vi.fn(),
-  mockUpdateProgressJournal: vi.fn(),
   mockRunBackgroundTask: vi.fn(),
 }));
 
@@ -35,15 +35,10 @@ vi.mock('$lib/server/db', () => ({
   getUserById: mockGetUserById,
   insertExerciseResults: mockInsertExerciseResults,
   resetSessionCompletionClaim: mockResetSessionCompletionClaim,
-  updateProgressJournal: mockUpdateProgressJournal,
 }));
 
 vi.mock('$lib/server/ai', () => ({
   generateUpdatedJournal: mockGenerateUpdatedJournal,
-}));
-
-vi.mock('$lib/server/token-limiter', () => ({
-  recordUsageEvent: mockRecordUsageEvent,
 }));
 
 vi.mock('$lib/server/gamification', () => ({
@@ -52,6 +47,14 @@ vi.mock('$lib/server/gamification', () => ({
 
 vi.mock('$lib/server/background-task', () => ({
   runBackgroundTask: mockRunBackgroundTask,
+}));
+
+vi.mock('$lib/server/logger', () => ({
+  logError: mockLogError,
+}));
+
+vi.mock('$lib/server/progress-journal', () => ({
+  persistGeneratedJournal: mockPersistGeneratedJournal,
 }));
 
 import { POST } from './complete/+server';
@@ -108,12 +111,11 @@ async function completePractice(
 function expectNoWrites() {
   expect(mockInsertExerciseResults).not.toHaveBeenCalled();
   expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
-  expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+  expect(mockPersistGeneratedJournal).not.toHaveBeenCalled();
   expect(mockGetProgressJournal).not.toHaveBeenCalled();
   expect(mockClaimSessionCompletion).not.toHaveBeenCalled();
   expect(mockGetUserById).not.toHaveBeenCalled();
   expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
-  expect(mockRecordUsageEvent).not.toHaveBeenCalled();
   expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
   expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
   expect(mockRunBackgroundTask).not.toHaveBeenCalled();
@@ -131,10 +133,10 @@ describe('POST /api/practice/complete', () => {
     mockGetProgressJournal.mockReset();
     mockGetUserById.mockReset();
     mockInsertExerciseResults.mockReset();
+    mockLogError.mockReset();
+    mockPersistGeneratedJournal.mockReset();
     mockProcessSessionCompletion.mockReset();
-    mockRecordUsageEvent.mockReset();
     mockResetSessionCompletionClaim.mockReset();
-    mockUpdateProgressJournal.mockReset();
     mockRunBackgroundTask.mockReset();
 
     mockClaimSessionCompletion.mockResolvedValue({ status: 'claimed', claimedAt: CLAIMED_AT });
@@ -151,9 +153,8 @@ describe('POST /api/practice/complete', () => {
     mockGetUserById.mockResolvedValue(null);
     mockInsertExerciseResults.mockResolvedValue(undefined);
     mockProcessSessionCompletion.mockResolvedValue({ totalXp: 12 });
-    mockRecordUsageEvent.mockResolvedValue(undefined);
     mockResetSessionCompletionClaim.mockResolvedValue(undefined);
-    mockUpdateProgressJournal.mockResolvedValue(undefined);
+    mockPersistGeneratedJournal.mockResolvedValue(undefined);
   });
 
   it('returns a local summary for a matching selected_user cookie using the trimmed userId', async () => {
@@ -274,7 +275,6 @@ describe('POST /api/practice/complete', () => {
     expect(mockGetProgressJournal).not.toHaveBeenCalled();
     expect(mockGetUserById).not.toHaveBeenCalled();
     expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
-    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
     expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
     expect(mockRunBackgroundTask).not.toHaveBeenCalled();
   });
@@ -298,7 +298,6 @@ describe('POST /api/practice/complete', () => {
     expect(mockGetProgressJournal).not.toHaveBeenCalled();
     expect(mockGetUserById).not.toHaveBeenCalled();
     expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
-    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
     expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
     expect(mockRunBackgroundTask).not.toHaveBeenCalled();
   });
@@ -322,7 +321,6 @@ describe('POST /api/practice/complete', () => {
     expect(mockGetProgressJournal).not.toHaveBeenCalled();
     expect(mockGetUserById).not.toHaveBeenCalled();
     expect(mockGenerateUpdatedJournal).not.toHaveBeenCalled();
-    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
     expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
     expect(mockRunBackgroundTask).not.toHaveBeenCalled();
   });
@@ -345,7 +343,6 @@ describe('POST /api/practice/complete', () => {
     expect(mockResetSessionCompletionClaim).toHaveBeenCalledWith('user-1', 'session-1', CLAIMED_AT);
     expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
     expect(mockRunBackgroundTask).not.toHaveBeenCalled();
-    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
 
     const retryResponse = await completePractice({
       userId: 'user-1',
@@ -382,14 +379,11 @@ describe('POST /api/practice/complete', () => {
     expect(mockResetSessionCompletionClaim).not.toHaveBeenCalled();
     expect(mockProcessSessionCompletion).not.toHaveBeenCalled();
     expect(mockRunBackgroundTask).not.toHaveBeenCalled();
-    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
   });
 
-  it('keeps a completed practice response successful when post-completion telemetry scheduling fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mockRunBackgroundTask.mockImplementationOnce(() => {
-      throw new Error('scheduler unavailable');
-    });
+  it('keeps journal scheduling failures non-fatal and uses sanitized logging', async () => {
+    const schedulingError = new Error('deferred lifecycle unavailable');
+    mockRunBackgroundTask.mockRejectedValueOnce(schedulingError);
 
     const response = await completePractice({
       userId: 'user-1',
@@ -405,6 +399,15 @@ describe('POST /api/practice/complete', () => {
     });
     expect(mockCompleteSessionRecord).toHaveBeenCalledOnce();
     expect(mockProcessSessionCompletion).toHaveBeenCalledOnce();
+    expect(mockLogError).toHaveBeenCalledWith(
+      'api/practice/complete',
+      'journal scheduling failed (non-fatal)',
+      {
+        error: schedulingError,
+        sessionId: 'session-1',
+        userId: 'user-1',
+      },
+    );
   });
 
   it('returns 403 before writes or downstream calls when selected_user does not match body userId', async () => {
@@ -560,7 +563,7 @@ describe('POST /api/practice/complete', () => {
       userId: 'user-1',
     });
     expect(mockGetProgressJournal).not.toHaveBeenCalled();
-    expect(mockUpdateProgressJournal).not.toHaveBeenCalled();
+    expect(mockPersistGeneratedJournal).not.toHaveBeenCalled();
 
     await task();
 
@@ -577,13 +580,16 @@ describe('POST /api/practice/complete', () => {
       },
       userLevel: 'beginner',
     });
-    expect(mockUpdateProgressJournal).toHaveBeenCalledWith('user-1', 'updated progress journal');
-    expect(mockRecordUsageEvent).toHaveBeenCalledWith({
+    expect(mockPersistGeneratedJournal).toHaveBeenCalledWith({
       userId: 'user-1',
       sessionId: 'session-1',
-      model: 'gpt-5.4',
-      tokensIn: 1,
-      tokensOut: 2,
+      currentJournal: null,
+      journal: 'updated progress journal',
+      tokenUsage: {
+        model: 'gpt-5.4',
+        tokensIn: 1,
+        tokensOut: 2,
+      },
     });
   });
 

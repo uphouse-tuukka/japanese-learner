@@ -127,6 +127,9 @@ Legacy planned sessions without stored metadata retain a bounded client/exercise
 A completed retry by the same user returns the stored completion summary without duplicate exercise results, XP, token usage, or journal side effects.
 A concurrent completion for the same in-flight claim returns `409`, and an unknown or cross-user completed session returns `404`.
 Stale `completing` claims older than 30 minutes are reclaimed or removed with their partial exercise results when new session work starts.
+Journal generation, compare-and-swap persistence, and token telemetry run inside Vercel's supported deferred function lifecycle after the completed record is durable.
+Local and non-Vercel runtimes await the same guarded work before returning because they do not provide that durable deferred boundary.
+Journal failures remain non-fatal, and an update generated from an older journal snapshot cannot overwrite a newer journal.
 
 Browser resume state is intentionally conservative.
 New saved Learn and Practice sessions include `completionConfirmed: false`, and the pages mark that flag true after the completion API succeeds.

@@ -10,11 +10,11 @@ import {
   getUserById,
   insertExerciseResults,
   resetSessionCompletionClaim,
-  updateProgressJournal,
 } from '$lib/server/db';
 import { generateUpdatedJournal } from '$lib/server/ai';
 import { runBackgroundTask } from '$lib/server/background-task';
-import { recordUsageEvent } from '$lib/server/token-limiter';
+import { logError } from '$lib/server/logger';
+import { persistGeneratedJournal } from '$lib/server/progress-journal';
 import { processSessionCompletion } from '$lib/server/gamification';
 import { calculateMaxCombo } from '$lib/utils/results';
 
@@ -206,13 +206,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         },
         userLevel: user.level,
       });
-      await updateProgressJournal(userId, journalResult.journal);
-      await recordUsageEvent({
+      await persistGeneratedJournal({
         userId,
         sessionId,
-        model: journalResult.tokenUsage.model,
-        tokensIn: journalResult.tokenUsage.tokensIn,
-        tokensOut: journalResult.tokenUsage.tokensOut,
+        currentJournal: progressJournal,
+        journal: journalResult.journal,
+        tokenUsage: journalResult.tokenUsage,
       });
     };
     const completedSession = await completeSessionRecord(sessionId, {
@@ -226,14 +225,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     claimedCompletion.finalized = true;
 
     try {
-      runBackgroundTask('practice-complete-journal-update', journalUpdateTask, {
+      await runBackgroundTask('practice-complete-journal-update', journalUpdateTask, {
         route: 'api/practice/complete',
         sessionId,
         userId,
       });
-    } catch (telemetryError) {
-      console.error('[api/practice/complete] post-completion telemetry failed (non-fatal)', {
-        error: telemetryError,
+    } catch (error) {
+      logError('api/practice/complete', 'journal scheduling failed (non-fatal)', {
+        error,
         sessionId,
         userId,
       });
