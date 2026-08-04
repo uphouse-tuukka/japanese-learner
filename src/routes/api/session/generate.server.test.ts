@@ -12,6 +12,16 @@ const {
   mockCheckBudget,
   mockRecordUsageEvent,
   mockGetUser,
+  mockClaimSessionCompletion,
+  mockCompleteSessionRecord,
+  mockGetProgressJournal,
+  mockGetRecentSessionSummaries,
+  mockGetSession,
+  mockGetSessionExercises,
+  mockGetUserById,
+  mockInsertExerciseResults,
+  mockResetSessionCompletionClaim,
+  mockProcessSessionCompletion,
 } = vi.hoisted(() => ({
   mockGenerateSessionPlan: vi.fn(),
   mockDeleteStaleGhostSessions: vi.fn(),
@@ -24,6 +34,16 @@ const {
   mockCheckBudget: vi.fn(),
   mockRecordUsageEvent: vi.fn(),
   mockGetUser: vi.fn(),
+  mockClaimSessionCompletion: vi.fn(),
+  mockCompleteSessionRecord: vi.fn(),
+  mockGetProgressJournal: vi.fn(),
+  mockGetRecentSessionSummaries: vi.fn(),
+  mockGetSession: vi.fn(),
+  mockGetSessionExercises: vi.fn(),
+  mockGetUserById: vi.fn(),
+  mockInsertExerciseResults: vi.fn(),
+  mockResetSessionCompletionClaim: vi.fn(),
+  mockProcessSessionCompletion: vi.fn(),
 }));
 
 vi.mock('$lib/server/ai', () => ({
@@ -51,6 +71,15 @@ vi.mock('$lib/server/db', () => ({
   getCompletedAiSessionsForUser: mockGetCompletedAiSessionsForUser,
   getExerciseResultsForUser: mockGetExerciseResultsForUser,
   getSessionsForUser: mockGetSessionsForUser,
+  claimSessionCompletion: mockClaimSessionCompletion,
+  completeSessionRecord: mockCompleteSessionRecord,
+  getProgressJournal: mockGetProgressJournal,
+  getRecentSessionSummaries: mockGetRecentSessionSummaries,
+  getSession: mockGetSession,
+  getSessionExercises: mockGetSessionExercises,
+  getUserById: mockGetUserById,
+  insertExerciseResults: mockInsertExerciseResults,
+  resetSessionCompletionClaim: mockResetSessionCompletionClaim,
 }));
 
 vi.mock('$lib/server/token-limiter', () => ({
@@ -62,7 +91,12 @@ vi.mock('$lib/server/users', () => ({
   getUser: mockGetUser,
 }));
 
+vi.mock('$lib/server/gamification', () => ({
+  processSessionCompletion: mockProcessSessionCompletion,
+}));
+
 import { POST } from './generate/+server';
+import { POST as COMPLETE_POST } from './complete/+server';
 
 const keyPhrases = [
   {
@@ -396,6 +430,15 @@ async function generateSession(body: unknown, selectedUserId: string | null = 'u
   return POST({ request: buildRequest(body), cookies: buildCookies(selectedUserId) } as never);
 }
 
+async function completeGeneratedSession(body: unknown) {
+  const request = new Request('http://localhost/api/session/complete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return COMPLETE_POST({ request, cookies: buildCookies('user-1') } as never);
+}
+
 function expectNoGenerationDbOrTokenWrites() {
   expect(mockGenerateSessionPlan).not.toHaveBeenCalled();
   expect(mockDeleteStaleGhostSessions).not.toHaveBeenCalled();
@@ -428,6 +471,16 @@ describe('POST /api/session/generate', () => {
     mockCheckBudget.mockReset();
     mockRecordUsageEvent.mockReset();
     mockGetUser.mockReset();
+    mockClaimSessionCompletion.mockReset();
+    mockCompleteSessionRecord.mockReset();
+    mockGetProgressJournal.mockReset();
+    mockGetRecentSessionSummaries.mockReset();
+    mockGetSession.mockReset();
+    mockGetSessionExercises.mockReset();
+    mockGetUserById.mockReset();
+    mockInsertExerciseResults.mockReset();
+    mockResetSessionCompletionClaim.mockReset();
+    mockProcessSessionCompletion.mockReset();
 
     mockCheckBudget.mockResolvedValue({ allowed: true });
     mockGetUser.mockResolvedValue(buildMockUser());
@@ -439,6 +492,12 @@ describe('POST /api/session/generate', () => {
     mockCreateSessionRecord.mockResolvedValue(session);
     mockAttachExercisesToSession.mockResolvedValue(undefined);
     mockRecordUsageEvent.mockResolvedValue(undefined);
+    mockGetProgressJournal.mockResolvedValue(null);
+    mockGetRecentSessionSummaries.mockResolvedValue([]);
+    mockGetUserById.mockResolvedValue(buildMockUser());
+    mockInsertExerciseResults.mockResolvedValue(undefined);
+    mockResetSessionCompletionClaim.mockResolvedValue(undefined);
+    mockProcessSessionCompletion.mockResolvedValue({ totalXp: 12 });
   });
 
   it('generates a session for a matching selected_user cookie using the trimmed userId and clamped exerciseCount', async () => {
@@ -464,12 +523,10 @@ describe('POST /api/session/generate', () => {
         userId: 'user-1',
         exerciseCount: 12,
         japaneseWritingEnabled: false,
-        categoryRotation: expect.objectContaining({
-          neverVisited: expect.arrayContaining([
-            'greetings_basics',
-            'travel_essentials',
-            'food_dining',
-          ]),
+        coverageEvidence: expect.objectContaining({
+          categoryRotation: expect.objectContaining({
+            selectedCategory: 'greetings_basics',
+          }),
         }),
       }),
     );
@@ -503,6 +560,112 @@ describe('POST /api/session/generate', () => {
       tokensIn: 10,
       tokensOut: 20,
     });
+  });
+
+  it('carries generated coverage through resume-safe completion and an idempotent retry', async () => {
+    let storedPlannedCoverage: Record<string, unknown> | null = null;
+    let storedCompletionSummary: string | null = null;
+    mockCreateSessionRecord.mockImplementationOnce(async (input) => {
+      storedPlannedCoverage = input.plannedCoverage as Record<string, unknown>;
+      return { ...session, plannedCoverage: input.plannedCoverage };
+    });
+
+    const generationResponse = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+    expect(generationResponse.status).toBe(200);
+    expect(storedPlannedCoverage).toMatchObject({
+      category: 'greetings_basics',
+      learningObjectiveId: 'greetings_basics.greet_by_time',
+      lessonTopic: 'Basic greetings',
+      keyPhraseDetails: keyPhrases,
+    });
+
+    mockClaimSessionCompletion.mockResolvedValueOnce({
+      status: 'claimed',
+      claimedAt: '2026-08-04T12:00:00.000Z',
+    });
+    mockGetSession.mockResolvedValueOnce({
+      ...session,
+      status: 'completing',
+      plannedCoverage: storedPlannedCoverage,
+      completedAt: '2026-08-04T12:00:00.000Z',
+    });
+    mockGetSessionExercises.mockResolvedValueOnce(
+      exercises.map((exercise, orderIndex) => ({
+        sessionId: session.id,
+        exerciseId: exercise.id,
+        orderIndex,
+        exercise,
+      })),
+    );
+    mockCheckBudget.mockResolvedValueOnce({ allowed: false, reason: 'budget_unavailable' });
+    mockCompleteSessionRecord.mockImplementationOnce(async (_sessionId, completion) => {
+      storedCompletionSummary = completion.summary;
+      return true;
+    });
+
+    const results = [
+      {
+        exerciseId: 'exercise-1',
+        answerText: 'Please',
+        isCorrect: true,
+      },
+    ];
+    const completionResponse = await completeGeneratedSession({
+      userId: 'user-1',
+      sessionId: session.id,
+      results,
+      lessonTopic: 'Corrupted browser topic',
+      category: 'shopping',
+      culturalNote: 'Corrupted browser note',
+      keyPhrases: ['偽'],
+      keyPhraseDetails: [{ japanese: '偽' }],
+    });
+
+    expect(completionResponse.status).toBe(200);
+    expect(JSON.parse(storedCompletionSummary ?? '{}')).toMatchObject({
+      category: 'greetings_basics',
+      learningObjectiveId: 'greetings_basics.greet_by_time',
+      topic: 'Basic greetings',
+      keyPhraseDetails: keyPhrases,
+      coverageSource: 'server_generated_plan',
+    });
+    expect(mockInsertExerciseResults).toHaveBeenCalledOnce();
+    expect(mockCompleteSessionRecord).toHaveBeenCalledOnce();
+    expect(mockRecordUsageEvent).toHaveBeenCalledOnce();
+    expect(mockRecordUsageEvent).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      model: 'gpt-5.4',
+      tokensIn: 10,
+      tokensOut: 20,
+    });
+
+    mockClaimSessionCompletion.mockResolvedValueOnce({
+      status: 'already_completed',
+      session: {
+        ...session,
+        status: 'completed',
+        plannedCoverage: storedPlannedCoverage,
+        summary: storedCompletionSummary,
+        completedAt: '2026-08-04T12:00:00.000Z',
+      },
+    });
+    const retryResponse = await completeGeneratedSession({
+      userId: 'user-1',
+      sessionId: session.id,
+      results,
+    });
+
+    expect(retryResponse.status).toBe(200);
+    await expect(retryResponse.json()).resolves.toMatchObject({
+      ok: true,
+      state: 'done',
+      summary: { sessionId: session.id, accuracy: 100 },
+      xp: null,
+    });
+    expect(mockInsertExerciseResults).toHaveBeenCalledOnce();
+    expect(mockCompleteSessionRecord).toHaveBeenCalledOnce();
+    expect(mockRecordUsageEvent).toHaveBeenCalledOnce();
   });
 
   it('generates a session when no selected_user cookie is present', async () => {
@@ -1352,7 +1515,18 @@ describe('POST /api/session/generate', () => {
       ([message]) => message === '[api/session/generate] curriculum validation failed',
     );
     expect(validationLog?.[1]).toEqual(
-      expect.objectContaining({ generatedLearningObjectiveStatus: 'unrecognized' }),
+      expect.objectContaining({
+        attempt: 1,
+        validationReasonCodes: ['invalid_learning_objective_identity'],
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+        selectedCategory: 'greetings_basics',
+        selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
+        learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        reviewCandidateReasonCodes: [],
+        reviewCandidateResolutionState: 'none_selected',
+        generatedLearningObjectiveStatus: 'unrecognized',
+      }),
     );
     expect(JSON.stringify(validationLog?.[1])).not.toContain('model_invented_goal');
   });

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { generateSessionPlan, TOPIC_CATEGORIES } from '$lib/server/ai';
+import { generateSessionPlan } from '$lib/server/ai';
 import { jsonError, readJsonBody, requireStringField } from '$lib/server/api';
 import {
   attachExercisesToSession,
@@ -15,6 +15,7 @@ import { validateGeneratedSessionPlan } from '$lib/server/session-curriculum-val
 import {
   buildCoverageEvidence,
   parseCoverageSourceSessions,
+  type CoverageEvidence,
 } from '$lib/server/session-coverage-evidence';
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { withAbort } from '$lib/server/async';
@@ -58,6 +59,24 @@ type SessionHistoryItem = {
 const MAX_GENERATION_ATTEMPTS = 2;
 
 type FailedGenerationUsage = { model: string; input: number; output: number };
+
+function curriculumDiagnosticContext(coverageEvidence: CoverageEvidence) {
+  return {
+    totalCompletedAiSessions: coverageEvidence.source.totalCompletedAiSessions,
+    parseableCompletedAiSessions: coverageEvidence.source.parseableCompletedAiSessions,
+    ignoredCompletedAiSessions: coverageEvidence.source.ignoredCompletedAiSessions,
+    selectedCategory: coverageEvidence.categoryRotation.selectedCategory,
+    categorySelectionReason: coverageEvidence.categoryRotation.selectionReason,
+    selectedLearningObjectiveId: coverageEvidence.learningObjectiveSelection.objective.id,
+    learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
+    reviewCandidateReasonCodes:
+      coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
+    reviewCandidateType: coverageEvidence.learningObjectiveSelection.reviewCandidate?.type ?? null,
+    reviewCandidateResolutionState: coverageEvidence.learningObjectiveSelection.reviewCandidate
+      ? 'eligible_unresolved'
+      : 'none_selected',
+  };
+}
 
 function failedGenerationUsage(error: unknown): FailedGenerationUsage | null {
   if (!error || typeof error !== 'object' || !('generationUsage' in error)) return null;
@@ -172,21 +191,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     });
     logInfo('api/session/generate', 'selected curriculum target', {
       userId,
-      totalCompletedAiSessions: coverageEvidence.source.totalCompletedAiSessions,
-      parseableCompletedAiSessions: coverageEvidence.source.parseableCompletedAiSessions,
-      ignoredCompletedAiSessions: coverageEvidence.source.ignoredCompletedAiSessions,
-      selectedCategory: coverageEvidence.categoryRotation.selectedCategory,
-      categorySelectionReason: coverageEvidence.categoryRotation.selectionReason,
-      selectedLearningObjectiveId:
-        coverageEvidence.learningObjectiveSelection.objective?.id ?? null,
-      learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
-      reviewCandidateReasonCodes:
-        coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
-      reviewCandidateType:
-        coverageEvidence.learningObjectiveSelection.reviewCandidate?.type ?? null,
-      reviewCandidateResolutionState: coverageEvidence.learningObjectiveSelection.reviewCandidate
-        ? 'eligible_unresolved'
-        : 'none_selected',
+      ...curriculumDiagnosticContext(coverageEvidence),
     });
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
       .map((session): SessionHistoryItem | null => {
@@ -257,51 +262,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const coveredTopics = Array.from(
       new Set(latestParsedHistory.map((item) => item.topic.trim()).filter(Boolean)),
     );
-    // Compute category rotation
-    const allCategoryKeys = TOPIC_CATEGORIES.map((c) => c.key);
-    const sessionsWithCategory = parsedSessionHistory.filter((s) => s.category);
-
-    // Find current category streak (consecutive sessions with same category from most recent)
-    let currentCategory: string | null = null;
-    let currentCategoryStreak = 0;
-    if (sessionsWithCategory.length > 0) {
-      currentCategory = sessionsWithCategory[0].category!;
-      currentCategoryStreak = 1;
-      for (let i = 1; i < sessionsWithCategory.length; i++) {
-        if (sessionsWithCategory[i].category === currentCategory) {
-          currentCategoryStreak++;
-        } else {
-          break;
-        }
-      }
-    }
-
-    // Find recently visited categories (within last 4 distinct category changes — these cannot be revisited)
-    const recentCategories: Array<{ category: string; sessionsAgo: number }> = [];
-    const seenCategories = new Set<string>();
-    if (currentCategory) seenCategories.add(currentCategory);
-    let distinctChanges = 0;
-    for (let i = 0; i < sessionsWithCategory.length; i++) {
-      const cat = sessionsWithCategory[i].category!;
-      if (!seenCategories.has(cat)) {
-        seenCategories.add(cat);
-        recentCategories.push({ category: cat, sessionsAgo: i });
-        distinctChanges++;
-        if (distinctChanges >= 4) break;
-      }
-    }
-
-    // Categories never visited
-    const visitedCategories = new Set(sessionsWithCategory.map((s) => s.category!));
-    const neverVisited = allCategoryKeys.filter((k) => !visitedCategories.has(k));
-
-    const categoryRotation = {
-      currentCategory,
-      currentCategoryStreak,
-      recentCategories,
-      neverVisited,
-    };
-
     const exerciseResults = await getExerciseResultsForUser(userId);
     const totalResultCount = exerciseResults.length;
     const totalCorrectCount = exerciseResults.filter((item) => item.isCorrect).length;
@@ -361,7 +321,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               recentAccuracy,
               coveredTopics,
               totalSessionCount: coverageEvidence.source.totalCompletedAiSessions,
-              categoryRotation,
               coverageEvidence: coverageEvidence.promptSnapshot,
               learningJournal: user.progressJournal,
               curriculumValidationFeedback,
@@ -393,11 +352,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               attempt,
               maxAttempts: MAX_GENERATION_ATTEMPTS,
               userId,
-              reasonCodes: validation.reasonCodes,
-              selectedCategory: validation.details.selectedCategory,
-              selectedLearningObjectiveId: validation.details.selectedLearningObjectiveId,
+              ...curriculumDiagnosticContext(coverageEvidence),
+              validationReasonCodes: validation.reasonCodes,
               generatedLearningObjectiveStatus: validation.details.generatedLearningObjectiveStatus,
-              learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
               generatedCategory: validation.details.generatedCategory,
               blockedCategories: validation.details.blockedCategories,
               preferredCategories: validation.details.preferredCategories,
@@ -410,21 +367,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           logInfo('api/session/generate', 'curriculum plan approved', {
             attempt,
             validationReasonCodes: validation.reasonCodes,
-            totalCompletedAiSessions: coverageEvidence.source.totalCompletedAiSessions,
-            parseableCompletedAiSessions: coverageEvidence.source.parseableCompletedAiSessions,
-            ignoredCompletedAiSessions: coverageEvidence.source.ignoredCompletedAiSessions,
-            selectedCategory: coverageEvidence.categoryRotation.selectedCategory,
-            categorySelectionReason: coverageEvidence.categoryRotation.selectionReason,
-            selectedLearningObjectiveId: coverageEvidence.learningObjectiveSelection.objective.id,
-            learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
-            reviewCandidateReasonCodes:
-              coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
-            reviewCandidateType:
-              coverageEvidence.learningObjectiveSelection.reviewCandidate?.type ?? null,
-            reviewCandidateResolutionState: coverageEvidence.learningObjectiveSelection
-              .reviewCandidate
-              ? 'eligible_unresolved'
-              : 'none_selected',
+            ...curriculumDiagnosticContext(coverageEvidence),
           });
           plan = generatedPlan;
           break;

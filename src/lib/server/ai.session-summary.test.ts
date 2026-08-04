@@ -39,6 +39,7 @@ import {
   generateSessionSummary,
   normalizeSessionSummaryText,
 } from '$lib/server/ai';
+import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
 import type { Exercise } from '$lib/types';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,40 @@ function mockModelOutput(payload: Record<string, unknown>) {
     usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
   });
 }
+
+const defaultCoverageEvidence: CompactCoverageEvidence = {
+  source: {
+    totalCompletedAiSessions: 0,
+    parseableCompletedAiSessions: 0,
+    ignoredCompletedAiSessions: 0,
+  },
+  categoryRotation: {
+    currentCategory: null,
+    currentCategoryStreak: 0,
+    selectedCategory: 'food_dining',
+    selectionReason: 'no_prior_category_beginner_flow',
+    mustRotate: false,
+    allowedCategories: ['food_dining'],
+    preferredCategories: ['food_dining'],
+    blockedCategories: [],
+  },
+  learningObjectiveSelection: {
+    mode: 'canonical',
+    reason: 'selected_uncovered_objective',
+    objective: {
+      id: 'food_dining.order_food_and_drinks',
+      category: 'food_dining',
+      communicativeGoalKey: 'order_food_and_drinks',
+      description: 'Order food and drinks in a restaurant.',
+      generationGuidance: 'Teach a focused restaurant ordering exchange.',
+    },
+    reviewCandidate: null,
+  },
+  categoryCoverage: [],
+  avoidTopics: [],
+  avoidKeyPhrases: [],
+  reviewCandidates: [],
+};
 
 function minimalMultipleChoiceExercise(id: string): Exercise {
   return {
@@ -448,6 +483,7 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -488,6 +524,7 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory,
     });
 
@@ -512,6 +549,7 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -538,6 +576,7 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -564,6 +603,7 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [],
     });
 
@@ -612,6 +652,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'elementary',
+      coverageEvidence: defaultCoverageEvidence,
       exerciseCount: 4,
     });
 
@@ -629,6 +670,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       exerciseCount: 4,
     });
 
@@ -652,6 +694,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       exerciseCount: 4,
     });
 
@@ -675,6 +718,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
         userId: 'user-1',
         userName: 'Tester',
         userLevel: 'beginner',
+        coverageEvidence: defaultCoverageEvidence,
         exerciseCount: 4,
       }),
     ).rejects.toMatchObject({
@@ -703,6 +747,7 @@ describe('generateSessionPlan — prior handoff notes context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -730,6 +775,7 @@ describe('generateSessionPlan — prior handoff notes context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -758,6 +804,7 @@ describe('generateSessionPlan — prior handoff notes context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [
         {
           date: '2025-01-01',
@@ -786,6 +833,7 @@ describe('generateSessionPlan — prior handoff notes context', () => {
       userId: 'user-1',
       userName: 'Tester',
       userLevel: 'beginner',
+      coverageEvidence: defaultCoverageEvidence,
       sessionHistory: [],
     });
 

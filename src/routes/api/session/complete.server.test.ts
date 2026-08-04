@@ -908,37 +908,6 @@ describe('POST /api/session/complete', () => {
     });
   });
 
-  it('rejects legacy planned sessions instead of accepting browser-authored coverage', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mockGetSession.mockResolvedValueOnce({
-      id: 'session-1',
-      userId: 'user-1',
-      mode: 'ai',
-      status: 'completing',
-      model: 'gpt-5.4',
-      tokenInput: 10,
-      tokenOutput: 20,
-      summary: null,
-      plannedCoverage: null,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      completedAt: CLAIMED_AT,
-    });
-
-    const response = await completeSession({
-      userId: 'user-1',
-      sessionId: 'session-1',
-      results: validResults(),
-      lessonTopic: 'Legacy browser topic',
-      category: 'food_dining',
-      culturalNote: 'Legacy browser note',
-      keyPhraseDetails: [{ japanese: 'ください', romaji: 'kudasai' }],
-    });
-
-    expect(response.status).toBe(500);
-    expect(mockInsertExerciseResults).not.toHaveBeenCalled();
-    expect(mockCompleteSessionRecord).not.toHaveBeenCalled();
-  });
-
   it('ignores partially malformed browser-authored key phrase details', async () => {
     const response = await completeSession({
       userId: 'user-1',

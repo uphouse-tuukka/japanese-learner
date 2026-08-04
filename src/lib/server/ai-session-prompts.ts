@@ -1,6 +1,5 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
-import { getLearningObjectivesForCategory } from '$lib/learning-objectives';
 import {
   buildIntentionalReviewLessonTopic,
   buildIntentionalReviewTransferTask,
@@ -168,12 +167,6 @@ export type SessionPlanPromptInput = {
   sessionHistory?: SessionPlanPromptHistoryEntry[];
   recentAccuracy?: number;
   coveredTopics?: string[];
-  categoryRotation?: {
-    currentCategory: string | null;
-    currentCategoryStreak: number;
-    recentCategories: Array<{ category: string; sessionsAgo: number }>;
-    neverVisited: string[];
-  };
   totalSessionCount?: number;
   performanceInsights?: {
     overallAccuracy: number;
@@ -181,7 +174,7 @@ export type SessionPlanPromptInput = {
     strongExerciseIds: string[];
     recentWrongAnswers: string[];
   };
-  coverageEvidence?: CompactCoverageEvidence;
+  coverageEvidence: CompactCoverageEvidence;
   learningJournal?: string | null;
   curriculumValidationFeedback?: string[];
 };
@@ -271,9 +264,7 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
   ];
 }
 
-function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
-  if (!evidence) return '';
-
+function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence): string {
   const rotation = evidence.categoryRotation;
   const categoryCoverage = evidence.categoryCoverage
     .map((category) => `${category.category}×${category.count} last ${category.lastSeenAt}`)
@@ -495,46 +486,15 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
   const curriculumValidationFeedback = formatCurriculumValidationFeedback(
     input.curriculumValidationFeedback,
   );
-  const categoryRotation = input.categoryRotation;
-  const categoryContext = coverageEvidenceContext
-    ? [
-        `Available categories: ${categoryList}.`,
-        coverageEvidenceContext,
-        EARLY_CATEGORY_FLOW_GUIDANCE,
-        TRAVEL_ESSENTIALS_GUIDANCE,
-      ].join('\n')
-    : categoryRotation
-      ? [
-          'TOPIC CATEGORY ROTATION:',
-          `Available categories: ${categoryList}.`,
-          `Current category streak: ${categoryRotation.currentCategory ? `"${categoryRotation.currentCategory}" × ${categoryRotation.currentCategoryStreak} session(s)` : 'none (first session)'}. `,
-          categoryRotation.currentCategoryStreak >= 3
-            ? `MUST switch to a different category — 3 sessions reached.`
-            : categoryRotation.currentCategoryStreak >= 2
-              ? `You may continue this category one more time or switch — your choice based on learner progress.`
-              : `Continue this category to build depth, or switch if the learner seems ready.`,
-          categoryRotation.recentCategories.length > 0
-            ? `Recently visited (do NOT return to these yet): ${categoryRotation.recentCategories.map((c) => c.category).join(', ')}.`
-            : '',
-          categoryRotation.neverVisited.length > 0
-            ? `Never visited yet (good candidates): ${categoryRotation.neverVisited.join(', ')}.`
-            : '',
-          EARLY_CATEGORY_FLOW_GUIDANCE,
-          TRAVEL_ESSENTIALS_GUIDANCE,
-        ]
-          .filter(Boolean)
-          .join(' ')
-      : '';
-  const selectedTopicCategory =
-    input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
-  const selectedLearningObjective =
-    input.coverageEvidence?.learningObjectiveSelection.objective ??
-    getLearningObjectivesForCategory(selectedTopicCategory)[0];
-  if (!selectedLearningObjective) {
-    throw new Error(`No canonical Learning Objective exists for ${selectedTopicCategory}.`);
-  }
-  const selectedReviewCandidate =
-    input.coverageEvidence?.learningObjectiveSelection.reviewCandidate ?? null;
+  const categoryContext = [
+    `Available categories: ${categoryList}.`,
+    coverageEvidenceContext,
+    EARLY_CATEGORY_FLOW_GUIDANCE,
+    TRAVEL_ESSENTIALS_GUIDANCE,
+  ].join('\n');
+  const selectedTopicCategory = input.coverageEvidence.categoryRotation.selectedCategory;
+  const selectedLearningObjective = input.coverageEvidence.learningObjectiveSelection.objective;
+  const selectedReviewCandidate = input.coverageEvidence.learningObjectiveSelection.reviewCandidate;
   const selectedTransferContext = selectedReviewCandidate
     ? selectIntentionalReviewTransferContext(selectedReviewCandidate)
     : null;
