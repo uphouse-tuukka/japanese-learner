@@ -622,7 +622,7 @@ describe('POST /api/session/generate', () => {
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: {
-            topic: 'Asking for cold medicine',
+            topic: 'Describing cold symptoms and their severity',
             category: 'emergencies_health',
           },
           metadata: { learningObjectiveId: 'emergencies_health.model_invented_goal' },
