@@ -407,10 +407,12 @@ describe('deterministic Learning Objective selection', () => {
 
   it('uses exact-topic compatibility for categories without a canonical catalog yet', () => {
     const evidence = buildCoverageEvidence({
-      sessions: [sourceSession('1', 'food_dining', 'Ordering food', '2026-05-03T08:00:00.000Z')],
+      sessions: [
+        sourceSession('1', 'emergencies_health', 'Finding a pharmacy', '2026-05-03T08:00:00.000Z'),
+      ],
     });
 
-    expect(evidence.categoryRotation.selectedCategory).toBe('food_dining');
+    expect(evidence.categoryRotation.selectedCategory).toBe('emergencies_health');
     expect(evidence.learningObjectiveSelection).toEqual({
       mode: 'legacy_exact_topic',
       reason: 'category_not_migrated_compatibility',
