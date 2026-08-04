@@ -190,11 +190,11 @@ export interface SessionKeyPhraseDetail {
 
 export interface PlannedSessionCoverage {
   version: 1;
-  category: import('$lib/server/topic-categories').TopicCategoryKey;
+  category: import('$lib/topic-categories').TopicCategoryKey;
   learningObjectiveId?: string;
   lessonTopic: string;
   culturalNote: string;
-  keyPhraseDetails: SessionKeyPhraseDetail[];
+  keyPhraseDetails: KeyPhrase[];
 }
 
 export interface Lesson {

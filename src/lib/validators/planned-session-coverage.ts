@@ -1,5 +1,5 @@
-import { isTopicCategoryKey } from '$lib/server/topic-categories';
-import type { Lesson, PlannedSessionCoverage } from '$lib/types';
+import { isTopicCategoryKey } from '$lib/topic-categories';
+import type { KeyPhrase, Lesson, PlannedSessionCoverage } from '$lib/types';
 import { parseJsonObject } from './common';
 import { sanitizeKeyPhraseDetails } from './session-meta';
 
@@ -42,7 +42,7 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
     category: parsed.category,
     lessonTopic,
     culturalNote,
-    keyPhraseDetails,
+    keyPhraseDetails: keyPhraseDetails as KeyPhrase[],
   };
   const learningObjectiveId = boundedOptionalString(
     parsed.learningObjectiveId,
