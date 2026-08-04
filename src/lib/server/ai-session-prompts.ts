@@ -1,6 +1,9 @@
 import { TOPIC_CATEGORIES as TOPIC_CATEGORY_DEFINITIONS } from '$lib/topic-categories';
 import type { CompactCoverageEvidence } from '$lib/server/session-coverage-evidence';
-import { selectIntentionalReviewTransferContext } from '$lib/server/session-intentional-review';
+import {
+  buildIntentionalReviewTransferTask,
+  selectIntentionalReviewTransferContext,
+} from '$lib/server/session-intentional-review';
 import type { ExerciseType, SessionMiniLesson, UserLevel } from '$lib/types';
 
 export {
@@ -254,12 +257,13 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
   if (!transferContext) {
     throw new Error('No fresh intentional-review transfer context is available.');
   }
+  const transferTask = buildIntentionalReviewTransferTask(transferContext);
 
   return [
     'INTENTIONAL REVIEW REQUIRED:',
     `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
-    `Copy transferContextId exactly "${transferContext.id}" and begin intentionalReview.transferTask exactly with "${transferContext.requiredTaskPrefix}" to ground the review affirmatively in ${transferContext.label}.`,
-    'Describe a materially fresh context or transfer task in intentionalReview.transferTask. It must not duplicate the original lesson treatment.',
+    `Copy transferContextId exactly "${transferContext.id}" and copy intentionalReview.transferTask exactly as "${transferTask}" to ground the review affirmatively in ${transferContext.label}.`,
+    'Use the app-owned transfer task as the concrete setting for the Lesson Topic, explanation, and exercises.',
     candidate.type === 'key_phrase'
       ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
       : 'The selected objective may be reviewed, but every covered Lesson Key Phrase must remain outside lesson.keyPhrases unless that phrase itself is the selected Review Candidate.',
@@ -672,9 +676,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                     learningObjectiveId: { const: selectedLearningObjective.id },
                     transferContextId: { const: selectedTransferContext.id },
                     transferTask: {
-                      type: 'string',
-                      requiredPrefix: selectedTransferContext.requiredTaskPrefix,
-                      rule: `Begin exactly with "${selectedTransferContext.requiredTaskPrefix}" and describe a materially fresh transfer task that does not duplicate or negate the selected context or original lesson treatment.`,
+                      const: buildIntentionalReviewTransferTask(selectedTransferContext),
+                      rule: 'Copy this app-owned affirmative transfer task exactly.',
                     },
                   }
                 : {

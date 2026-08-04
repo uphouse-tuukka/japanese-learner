@@ -155,6 +155,9 @@ function baseSessionInput() {
   };
 }
 
+const stationTransferTask =
+  'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+
 // ---------------------------------------------------------------------------
 // generateSessionSummary
 // ---------------------------------------------------------------------------
@@ -641,7 +644,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
         candidateIdentity: 'ja:どちらからですか',
         learningObjectiveId: 'greetings_basics.exchange_origins',
         transferContextId: 'station_encounter',
-        transferTask: 'At a station, exchange origins with another traveler waiting for a train.',
+        transferTask: stationTransferTask,
       },
     });
 
@@ -657,7 +660,7 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
       candidateIdentity: 'ja:どちらからですか',
       learningObjectiveId: 'greetings_basics.exchange_origins',
       transferContextId: 'station_encounter',
-      transferTask: 'At a station, exchange origins with another traveler waiting for a train.',
+      transferTask: stationTransferTask,
     });
   });
 

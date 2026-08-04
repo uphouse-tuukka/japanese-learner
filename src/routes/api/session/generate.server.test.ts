@@ -141,6 +141,9 @@ const generatedPlan = {
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
+const stationTransferTask =
+  'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+
 const canonicalObjectiveCases = [
   {
     category: 'food_dining',
@@ -834,8 +837,7 @@ describe('POST /api/session/generate', () => {
             candidateIdentity: 'exchanging origins',
             learningObjectiveId: 'greetings_basics.exchange_origins',
             transferContextId: 'station_encounter',
-            transferTask:
-              'At a station, exchange origins with another traveler before a regional train ride.',
+            transferTask: stationTransferTask,
           },
         },
       }),

@@ -483,7 +483,7 @@ describe('ai session prompt builders', () => {
           candidateIdentity: { const: string };
           learningObjectiveId: { const: string };
           transferContextId: { const: string };
-          transferTask: { requiredPrefix: string; rule: string };
+          transferTask: { const: string; rule: string };
         };
       };
     }>(prompt);
@@ -493,7 +493,9 @@ describe('ai session prompt builders', () => {
     );
     expect(promptText).toContain('INTENTIONAL REVIEW REQUIRED');
     expect(promptText).toContain('ja:どちらからですか');
-    expect(promptText).toContain('materially fresh context or transfer task');
+    expect(promptText).toContain(
+      'Use the app-owned transfer task as the concrete setting for the Lesson Topic, explanation, and exercises.',
+    );
     expect(promptText).toContain(
       'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
     );
@@ -503,8 +505,9 @@ describe('ai session prompt builders', () => {
       learningObjectiveId: { const: 'greetings_basics.exchange_origins' },
       transferContextId: { const: 'station_encounter' },
       transferTask: {
-        requiredPrefix: 'At a station,',
-        rule: expect.stringContaining('materially fresh transfer task'),
+        const:
+          'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.',
+        rule: 'Copy this app-owned affirmative transfer task exactly.',
       },
     });
   });

@@ -7,7 +7,7 @@ import {
 } from '$lib/server/session-coverage-evidence';
 import { getLearningObjective, type LearningObjective } from '$lib/learning-objectives';
 import {
-  intentionalReviewTransferContextIsGrounded,
+  buildIntentionalReviewTransferTask,
   isIntentionalReviewClaim,
   normalizeIntentionalReviewClaim,
   selectIntentionalReviewTransferContext,
@@ -329,10 +329,8 @@ export function validateGeneratedSessionPlan(input: {
       reasonCodes.push('ineligible_review');
     } else if (
       !selectedTransferContext ||
-      !intentionalReviewTransferContextIsGrounded(
-        selectedTransferContext,
-        intentionalReviewClaim.transferTask,
-      )
+      intentionalReviewClaim.transferTask !==
+        buildIntentionalReviewTransferTask(selectedTransferContext)
     ) {
       intentionalReviewStatus = 'context_not_grounded';
       reasonCodes.push('ineligible_review');

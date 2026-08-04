@@ -82,6 +82,9 @@ const baseCoverage = {
   promptSnapshot: {} as CoverageEvidence['promptSnapshot'],
 } as CoverageEvidence;
 
+const stationTransferTask =
+  'At a station, apply the selected Learning Objective through a new interaction and transfer challenge.';
+
 function phrase(input: Partial<KeyPhrase>): KeyPhrase {
   return {
     japanese: input.japanese ?? 'こんにちは',
@@ -260,8 +263,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask:
-            'At a station, exchange hometowns with a fellow traveler while waiting for a train.',
+          transferTask: stationTransferTask,
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -289,8 +291,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask:
-            'At a station, exchange hometowns with a fellow traveler while waiting for a train.',
+          transferTask: stationTransferTask,
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -304,7 +305,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask: 'At a station, repeat the origin exchange once more.',
+          transferTask: stationTransferTask,
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -417,7 +418,7 @@ describe('validateGeneratedSessionPlan', () => {
     expect(duplicatedTreatment.valid).toBe(false);
     if (!duplicatedTreatment.valid) {
       expect(duplicatedTreatment.reasonCodes).toContain('ineligible_review');
-      expect(duplicatedTreatment.details.intentionalReviewStatus).toBe('duplicate_treatment');
+      expect(duplicatedTreatment.details.intentionalReviewStatus).toBe('context_not_grounded');
     }
     expect(duplicatedLessonTopic.valid).toBe(false);
     if (!duplicatedLessonTopic.valid) {
@@ -654,7 +655,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'ja:すみません',
           learningObjectiveId: 'greetings_basics.greet_by_time',
           transferContextId: 'station_encounter',
-          transferTask: 'At a station, choose a greeting while asking an attendant for help.',
+          transferTask: stationTransferTask,
         },
       }),
       coverageEvidence: coverageWithSelectedPhraseReview,

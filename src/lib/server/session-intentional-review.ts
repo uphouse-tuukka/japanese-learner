@@ -131,14 +131,8 @@ export function selectIntentionalReviewTransferContext(candidate: {
   );
 }
 
-export function intentionalReviewTransferContextIsGrounded(
+export function buildIntentionalReviewTransferTask(
   context: IntentionalReviewTransferContext,
-  transferTask: string,
-): boolean {
-  const normalizedTask = transferTask.trim().toLowerCase();
-  if (!normalizedTask.startsWith(context.requiredTaskPrefix.toLowerCase())) return false;
-  const taskWords = new Set(normalizedWords(transferTask));
-  return !['avoid', 'instead', 'irrelevant', 'not', 'unlike', 'without'].some((token) =>
-    taskWords.has(token),
-  );
+): string {
+  return `${context.requiredTaskPrefix} apply the selected Learning Objective through a new interaction and transfer challenge.`;
 }
