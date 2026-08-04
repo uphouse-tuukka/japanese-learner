@@ -425,6 +425,85 @@ describe('ai session prompt builders', () => {
     expect(contractText).not.toContain('Choose the greeting');
   });
 
+  it('requires a generated review plan to claim the selected candidate and a fresh transfer task', () => {
+    const reviewCandidate = {
+      type: 'key_phrase' as const,
+      identity: 'ja:どちらからですか',
+      display: 'どちらからですか (dochira kara desu ka)',
+      category: 'greetings_basics' as const,
+      topicIdentity: 'exchanging origins',
+      topic: 'Exchanging origins',
+      strength: 7,
+      reasonCodes: ['wrong_exercise_result' as const],
+      evidenceSessionIds: ['session-origin'],
+      lastSeenAt: '2026-05-03T08:00:00.000Z',
+    };
+    const prompt = buildSessionPlanPrompt({
+      ...baseSessionInput(),
+      coverageEvidence: {
+        source: {
+          totalCompletedAiSessions: 1,
+          parseableCompletedAiSessions: 1,
+          ignoredCompletedAiSessions: 0,
+        },
+        categoryRotation: {
+          currentCategory: 'greetings_basics',
+          currentCategoryStreak: 1,
+          selectedCategory: 'greetings_basics',
+          selectionReason: 'continued_current_category_for_review_candidate',
+          mustRotate: false,
+          allowedCategories: ['greetings_basics'],
+          preferredCategories: ['greetings_basics'],
+          blockedCategories: [],
+        },
+        learningObjectiveSelection: {
+          mode: 'canonical',
+          reason: 'selected_review_candidate_objective',
+          objective: {
+            id: 'greetings_basics.exchange_origins',
+            category: 'greetings_basics',
+            communicativeGoalKey: 'exchange_origins',
+            description: 'Ask where someone is from and state a country or place of origin.',
+            generationGuidance: 'Teach a two-way origin exchange.',
+          },
+          reviewCandidate,
+        },
+        categoryCoverage: [],
+        avoidTopics: [],
+        avoidKeyPhrases: [],
+        reviewCandidates: [reviewCandidate],
+      },
+    });
+
+    const promptText = systemPrompt(prompt);
+    const payload = userPayload<{
+      requiredOutputContract: {
+        intentionalReview: {
+          candidateType: { const: string };
+          candidateIdentity: { const: string };
+          learningObjectiveId: { const: string };
+          transferTask: { rule: string };
+        };
+      };
+    }>(prompt);
+
+    expect(promptText).toContain(
+      'Output valid JSON only with top-level keys: learningObjectiveId, intentionalReview, lesson, exercises, focus.',
+    );
+    expect(promptText).toContain('INTENTIONAL REVIEW REQUIRED');
+    expect(promptText).toContain('ja:どちらからですか');
+    expect(promptText).toContain('materially fresh context or transfer task');
+    expect(promptText).toContain(
+      'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
+    );
+    expect(payload.requiredOutputContract.intentionalReview).toMatchObject({
+      candidateType: { const: 'key_phrase' },
+      candidateIdentity: { const: 'ja:どちらからですか' },
+      learningObjectiveId: { const: 'greetings_basics.exchange_origins' },
+      transferTask: { rule: expect.stringContaining('fresh context or transfer task') },
+    });
+  });
+
   it('allows private elementary prompts to include speaking with microphone-specific rules', () => {
     const prompt = buildSessionPlanPrompt({
       ...baseSessionInput(),

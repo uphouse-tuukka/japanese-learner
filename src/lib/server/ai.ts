@@ -47,6 +47,7 @@ const SESSION_SUMMARY_MAX_WORDS = 60;
 const MAX_SESSION_REVIEW_INTENTS = 5;
 const MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH = 160;
 const MAX_LEARNING_OBJECTIVE_ID_LENGTH = 160;
+const MAX_INTENTIONAL_REVIEW_TRANSFER_TASK_LENGTH = 320;
 
 function splitSentences(text: string): string[] {
   const matches = text.match(/[^.!?。！？]+[.!?。！？]+[”’"')\]]*|[^.!?。！？]+$/gu);
@@ -73,6 +74,32 @@ export function normalizeSessionSummaryText(rawSummary: string): string {
 function boundedReviewIntentField(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, MAX_SESSION_REVIEW_INTENT_FIELD_LENGTH).trimEnd();
+}
+
+function normalizeIntentionalReviewClaim(
+  value: unknown,
+): Record<string, unknown> | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return { invalid: true };
+
+  const claim = value as Record<string, unknown>;
+  const candidateType = claim.candidateType;
+  const candidateIdentity = boundedReviewIntentField(claim.candidateIdentity);
+  const learningObjectiveId = boundedReviewIntentField(claim.learningObjectiveId);
+  const transferTask =
+    typeof claim.transferTask === 'string'
+      ? claim.transferTask.trim().slice(0, MAX_INTENTIONAL_REVIEW_TRANSFER_TASK_LENGTH).trimEnd()
+      : '';
+  if (
+    (candidateType !== 'key_phrase' && candidateType !== 'lesson_topic') ||
+    !candidateIdentity ||
+    !learningObjectiveId ||
+    !transferTask
+  ) {
+    return { invalid: true };
+  }
+  return { candidateType, candidateIdentity, learningObjectiveId, transferTask };
 }
 
 function keyPhraseDisplay(phrase: KeyPhrase): string {
@@ -188,6 +215,7 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
 
   const parsed = JSON.parse(response.output_text) as {
     learningObjectiveId?: unknown;
+    intentionalReview?: unknown;
     lesson: unknown;
     exercises: unknown[];
     focus: string;
@@ -227,6 +255,7 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
     typeof parsed.learningObjectiveId === 'string'
       ? parsed.learningObjectiveId.trim().slice(0, MAX_LEARNING_OBJECTIVE_ID_LENGTH)
       : '';
+  const intentionalReview = normalizeIntentionalReviewClaim(parsed.intentionalReview);
 
   const plan: SessionPlan = {
     id: `session-${randomUUID()}`,
@@ -244,6 +273,7 @@ export async function generateSessionPlan(input: SessionPlanPromptInput): Promis
       focus: assertString(parsed.focus, 'focus'),
       category: typeof parsedLesson?.category === 'string' ? parsedLesson.category : undefined,
       learningObjectiveId: learningObjectiveId || undefined,
+      ...(intentionalReview === undefined ? {} : { intentionalReview }),
       exerciseCount: exercises.length,
       teachingFlow: 'lesson_then_quiz',
       userLevel: input.userLevel,

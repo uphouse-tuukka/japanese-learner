@@ -3,6 +3,7 @@ import {
   phrasesShareIdentity,
   type CoverageEvidence,
   type CoveredKeyPhrase,
+  type ReviewCandidate,
 } from '$lib/server/session-coverage-evidence';
 import { getLearningObjective } from '$lib/learning-objectives';
 import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/topic-categories';
@@ -14,6 +15,7 @@ export type SessionCurriculumValidationReasonCode =
   | 'invalid_learning_objective_identity'
   | 'learning_objective_mismatch'
   | 'repeated_learning_objective'
+  | 'ineligible_review'
   | 'repeated_lesson_topic'
   | 'repeated_key_phrases';
 
@@ -33,6 +35,16 @@ export type SessionCurriculumValidationDetails = {
     | 'unrecognized'
     | 'recognized_selected'
     | 'recognized_other';
+  intentionalReviewStatus:
+    | 'not_applicable'
+    | 'missing'
+    | 'invalid'
+    | 'candidate_mismatch'
+    | 'objective_mismatch'
+    | 'stale_or_resolved'
+    | 'unrelated'
+    | 'duplicate_treatment'
+    | 'eligible';
 };
 
 export type SessionCurriculumValidationResult =
@@ -52,6 +64,76 @@ type GeneratedSessionPlanLike = {
   metadata: Record<string, unknown>;
 };
 
+type IntentionalReviewClaim = {
+  candidateType: 'key_phrase' | 'lesson_topic';
+  candidateIdentity: string;
+  learningObjectiveId: string;
+  transferTask: string;
+};
+
+function parseIntentionalReviewClaim(value: unknown): IntentionalReviewClaim | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const claim = value as Record<string, unknown>;
+  const candidateType = claim.candidateType;
+  const candidateIdentity =
+    typeof claim.candidateIdentity === 'string' ? claim.candidateIdentity.trim() : '';
+  const learningObjectiveId =
+    typeof claim.learningObjectiveId === 'string' ? claim.learningObjectiveId.trim() : '';
+  const transferTask = typeof claim.transferTask === 'string' ? claim.transferTask.trim() : '';
+  if (
+    (candidateType !== 'key_phrase' && candidateType !== 'lesson_topic') ||
+    !candidateIdentity ||
+    !learningObjectiveId ||
+    !transferTask
+  ) {
+    return null;
+  }
+  return { candidateType, candidateIdentity, learningObjectiveId, transferTask };
+}
+
+function duplicatesOriginalTreatment(
+  transferTask: string,
+  generatedTopic: string,
+  candidate: ReviewCandidate,
+): boolean {
+  const transferIdentity = normalizeTopicIdentity(transferTask);
+  const generatedTopicIdentity = normalizeTopicIdentity(generatedTopic);
+  if (!transferIdentity || !generatedTopicIdentity) return true;
+  const originalTreatmentIdentities = [
+    candidate.identity,
+    candidate.display,
+    candidate.topicIdentity,
+    candidate.topic,
+  ]
+    .map((value) => (typeof value === 'string' ? normalizeTopicIdentity(value) : null))
+    .filter((value): value is string => Boolean(value));
+  return (
+    originalTreatmentIdentities.includes(transferIdentity) ||
+    originalTreatmentIdentities.includes(generatedTopicIdentity)
+  );
+}
+
+function reviewCandidateMatchesSelectedObjective(
+  candidate: ReviewCandidate,
+  coverageEvidence: CoverageEvidence,
+): boolean {
+  const selectedObjectiveId = coverageEvidence.learningObjectiveSelection.objective?.id;
+  const coveredObjective = coverageEvidence.coveredLearningObjectives.find(
+    (objective) => objective.id === selectedObjectiveId,
+  );
+  if (!coveredObjective) return false;
+  return (
+    candidate.evidenceSessionIds.some((sessionId) =>
+      coveredObjective.sessionIds.includes(sessionId),
+    ) ||
+    (candidate.category === coveredObjective.category &&
+      Boolean(
+        candidate.topicIdentity &&
+        coveredObjective.topicIdentities.includes(candidate.topicIdentity),
+      ))
+  );
+}
+
 function displayKeyPhrase(phrase: Lesson['keyPhrases'][number]): string {
   const japanese = phrase.japanese.trim();
   const romaji = phrase.romaji.trim();
@@ -59,37 +141,36 @@ function displayKeyPhrase(phrase: Lesson['keyPhrases'][number]): string {
   return japanese || romaji || phrase.english.trim() || 'unknown phrase';
 }
 
-function hasReviewCandidateForTopic(
+function reviewCandidateMatchesTopic(
+  candidate: ReviewCandidate | null,
   topicIdentity: string,
-  coverageEvidence: CoverageEvidence,
 ): boolean {
-  return coverageEvidence.reviewCandidates.some(
-    (candidate) =>
-      candidate.type === 'lesson_topic' &&
-      (candidate.identity === topicIdentity || candidate.topicIdentity === topicIdentity),
+  return Boolean(
+    candidate?.type === 'lesson_topic' &&
+    (candidate.identity === topicIdentity || candidate.topicIdentity === topicIdentity),
   );
 }
 
-function hasReviewCandidateForPhrase(
+function reviewCandidateMatchesPhrase(
+  candidate: ReviewCandidate | null,
   coveredPhrase: CoveredKeyPhrase,
-  coverageEvidence: CoverageEvidence,
 ): boolean {
-  return coverageEvidence.reviewCandidates.some(
-    (candidate) =>
-      candidate.type === 'key_phrase' &&
-      (candidate.identity === coveredPhrase.primaryIdentity ||
-        coveredPhrase.identities.includes(candidate.identity)),
+  return Boolean(
+    candidate?.type === 'key_phrase' &&
+    (candidate.identity === coveredPhrase.primaryIdentity ||
+      coveredPhrase.identities.includes(candidate.identity)),
   );
 }
 
 function phraseRepeatsCoveredNonReviewPhrase(
   generatedPhrase: Lesson['keyPhrases'][number],
   coverageEvidence: CoverageEvidence,
+  approvedReviewCandidate: ReviewCandidate | null,
 ): boolean {
   return coverageEvidence.coveredKeyPhrases.some(
     (coveredPhrase) =>
       phrasesShareIdentity(generatedPhrase, coveredPhrase) &&
-      !hasReviewCandidateForPhrase(coveredPhrase, coverageEvidence),
+      !reviewCandidateMatchesPhrase(approvedReviewCandidate, coveredPhrase),
   );
 }
 
@@ -117,6 +198,11 @@ export function validateGeneratedSessionPlan(input: {
       : generatedLearningObjective.id === selectedLearningObjective?.id
         ? 'recognized_selected'
         : 'recognized_other';
+  const rawIntentionalReview = plan.metadata.intentionalReview;
+  const intentionalReviewClaim = parseIntentionalReviewClaim(rawIntentionalReview);
+  const selectedReviewCandidate = coverageEvidence.learningObjectiveSelection.reviewCandidate;
+  let intentionalReviewStatus: SessionCurriculumValidationDetails['intentionalReviewStatus'] =
+    'not_applicable';
   const reasonCodes: SessionCurriculumValidationReasonCode[] = [];
 
   if (generatedCategory !== selectedCategory) {
@@ -149,6 +235,55 @@ export function validateGeneratedSessionPlan(input: {
     reasonCodes.push('invalid_learning_objective_identity');
   }
 
+  if (selectedReviewCandidate) {
+    const candidateIsCurrent = coverageEvidence.reviewCandidates.some(
+      (candidate) =>
+        candidate.type === selectedReviewCandidate.type &&
+        candidate.identity === selectedReviewCandidate.identity &&
+        candidate.lastSeenAt === selectedReviewCandidate.lastSeenAt,
+    );
+    if (!candidateIsCurrent) {
+      intentionalReviewStatus = 'stale_or_resolved';
+      reasonCodes.push('ineligible_review');
+    } else if (
+      !reviewCandidateMatchesSelectedObjective(selectedReviewCandidate, coverageEvidence)
+    ) {
+      intentionalReviewStatus = 'unrelated';
+      reasonCodes.push('ineligible_review');
+    } else if (rawIntentionalReview === undefined || rawIntentionalReview === null) {
+      intentionalReviewStatus = 'missing';
+      reasonCodes.push('ineligible_review');
+    } else if (!intentionalReviewClaim) {
+      intentionalReviewStatus = 'invalid';
+      reasonCodes.push('ineligible_review');
+    } else if (
+      intentionalReviewClaim.candidateType !== selectedReviewCandidate.type ||
+      intentionalReviewClaim.candidateIdentity !== selectedReviewCandidate.identity
+    ) {
+      intentionalReviewStatus = 'candidate_mismatch';
+      reasonCodes.push('ineligible_review');
+    } else if (intentionalReviewClaim.learningObjectiveId !== selectedLearningObjective?.id) {
+      intentionalReviewStatus = 'objective_mismatch';
+      reasonCodes.push('ineligible_review');
+    } else if (
+      duplicatesOriginalTreatment(
+        intentionalReviewClaim.transferTask,
+        plan.lesson.topic,
+        selectedReviewCandidate,
+      )
+    ) {
+      intentionalReviewStatus = 'duplicate_treatment';
+      reasonCodes.push('ineligible_review');
+    } else {
+      intentionalReviewStatus = 'eligible';
+    }
+  } else if (rawIntentionalReview !== undefined && rawIntentionalReview !== null) {
+    intentionalReviewStatus = 'invalid';
+    reasonCodes.push('ineligible_review');
+  }
+  const approvedReviewCandidate =
+    intentionalReviewStatus === 'eligible' ? selectedReviewCandidate : null;
+
   const generatedTopicIdentity = normalizeTopicIdentity(plan.lesson.topic);
   const repeatedLessonTopic = generatedTopicIdentity
     ? (coverageEvidence.coveredTopics.find((topic) => topic.identity === generatedTopicIdentity) ??
@@ -157,16 +292,18 @@ export function validateGeneratedSessionPlan(input: {
   if (
     generatedTopicIdentity &&
     repeatedLessonTopic &&
-    !hasReviewCandidateForTopic(generatedTopicIdentity, coverageEvidence)
+    !reviewCandidateMatchesTopic(approvedReviewCandidate, generatedTopicIdentity)
   ) {
     reasonCodes.push('repeated_lesson_topic');
   }
 
   const repeatedNonReviewKeyPhrases = plan.lesson.keyPhrases
-    .filter((phrase) => phraseRepeatsCoveredNonReviewPhrase(phrase, coverageEvidence))
+    .filter((phrase) =>
+      phraseRepeatsCoveredNonReviewPhrase(phrase, coverageEvidence, approvedReviewCandidate),
+    )
     .map(displayKeyPhrase);
   const uniqueRepeatedNonReviewKeyPhrases = Array.from(new Set(repeatedNonReviewKeyPhrases));
-  if (uniqueRepeatedNonReviewKeyPhrases.length > 1) {
+  if (uniqueRepeatedNonReviewKeyPhrases.length > 0) {
     reasonCodes.push('repeated_key_phrases');
   }
 
@@ -182,6 +319,7 @@ export function validateGeneratedSessionPlan(input: {
     selectedLearningObjectiveId: selectedLearningObjective?.id ?? null,
     generatedLearningObjectiveId,
     generatedLearningObjectiveStatus,
+    intentionalReviewStatus,
   };
 
   return reasonCodes.length === 0

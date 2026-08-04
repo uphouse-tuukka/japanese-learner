@@ -94,6 +94,10 @@
 - Free-text Learning Journal sections, learner-facing strengths or weaknesses, legacy next steps, and neutral handoff notes are advisory only and must never authorize repetition.
 - A structured review request must name an exact current Lesson Topic or Lesson Key Phrase, include a specific unresolved reason, and explicitly request review.
 - Summary generation must validate structured review targets against server-owned lesson coverage before persisting them.
+- A generated intentional review must return a structured `intentionalReview` claim naming the exact selected Review Candidate type and identity, the selected Learning Objective identity, and a fresh transfer task.
+- The curriculum validator must independently confirm that the claimed Review Candidate remains present in current chronological Review Evidence and belongs to the selected Learning Objective.
+- Missing, stale, resolved, unrelated, journal-only, or mismatched review claims must fail curriculum validation with the stable `ineligible_review` reason code.
+- Intentional review must use a materially fresh Lesson Topic and transfer task rather than duplicating the original treatment.
 
 ### Lessons
 
@@ -101,6 +105,8 @@
 - Include practical, travel-relevant language
 - Cultural notes should be authentic and specific
 - Key phrases: 3-5 per lesson with japanese, romaji, english, usage
+- Every covered non-review Lesson Key Phrase is forbidden in the authoritative `lesson.keyPhrases` list and causes rejection and retry.
+- A covered utility phrase may still appear naturally in explanations or exercise context when it is not declared as a newly taught Lesson Key Phrase.
 
 ### Topic Categories
 
@@ -136,6 +142,7 @@
 ### Personalization
 
 - Never repeat a covered canonical Learning Objective as fresh coverage, regardless of intervening-session count
+- Only the explicitly selected and currently eligible Review Candidate may authorize intentional repetition.
 - Keep exact Lesson Topic avoidance for compatibility categories and legacy history
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries

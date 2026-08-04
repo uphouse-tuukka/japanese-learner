@@ -247,6 +247,13 @@ function buildSessionSummary(input: {
   keyPhrases?: string[];
   weaknesses?: string[];
   handoffNotes?: string[];
+  reviewIntents?: Array<{
+    type: 'key_phrase' | 'lesson_topic';
+    identity: string;
+    display: string;
+    reason: string;
+    reviewRequested: true;
+  }>;
 }) {
   const keyPhraseDetails = input.keyPhraseDetails ?? [];
   return JSON.stringify({
@@ -259,6 +266,7 @@ function buildSessionSummary(input: {
     weaknesses: input.weaknesses ?? [],
     nextSteps: [],
     handoffNotes: input.handoffNotes ?? [],
+    reviewIntents: input.reviewIntents ?? [],
     exerciseTypes: ['multiple_choice'],
     keyPhrases:
       input.keyPhrases ??
@@ -284,6 +292,13 @@ function buildCompletedAiSession(input: {
   }>;
   weaknesses?: string[];
   handoffNotes?: string[];
+  reviewIntents?: Array<{
+    type: 'key_phrase' | 'lesson_topic';
+    identity: string;
+    display: string;
+    reason: string;
+    reviewRequested: true;
+  }>;
 }) {
   return {
     id: input.id,
@@ -768,6 +783,204 @@ describe('POST /api/session/generate', () => {
     );
   });
 
+  it('accepts an explicit intentional review of the selected eligible candidate', async () => {
+    const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const greetingObjectives = [
+      ['greetings_basics.greet_by_time', 'Greeting by time'],
+      ['greetings_basics.exchange_names', 'Exchanging names'],
+      ['greetings_basics.exchange_origins', 'Exchanging origins'],
+      ['greetings_basics.ask_and_answer_wellbeing', 'Asking about wellbeing'],
+      ['greetings_basics.use_polite_thanks_and_apologies', 'Polite thanks and apologies'],
+      ['greetings_basics.open_and_close_brief_interactions', 'Opening and closing interactions'],
+    ];
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce(
+      greetingObjectives.flatMap(([learningObjectiveId, topic], index) => [
+        buildCompletedAiSession({
+          id: `travel-${index + 1}`,
+          createdAt: `2026-05-${String(index * 2 + 1).padStart(2, '0')}T08:00:00.000Z`,
+          category: 'travel_essentials',
+          topic: `Travel literacy ${index + 1}`,
+          accuracy: 80,
+        }),
+        buildCompletedAiSession({
+          id: `greeting-${index + 1}`,
+          createdAt: `2026-05-${String(index * 2 + 2).padStart(2, '0')}T08:00:00.000Z`,
+          category: 'greetings_basics',
+          topic,
+          learningObjectiveId,
+          accuracy: 80,
+          reviewIntents:
+            learningObjectiveId === 'greetings_basics.exchange_origins'
+              ? [
+                  {
+                    type: 'lesson_topic',
+                    identity: 'exchanging origins',
+                    display: 'Exchanging origins',
+                    reason: 'The learner still hesitates when asking the reciprocal question.',
+                    reviewRequested: true,
+                  },
+                ]
+              : [],
+        }),
+      ]),
+    );
+    mockGenerateSessionPlan.mockResolvedValueOnce(
+      buildGeneratedPlan({
+        lesson: { topic: 'Meeting another traveler on a regional train' },
+        metadata: {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          intentionalReview: {
+            candidateType: 'lesson_topic',
+            candidateIdentity: 'exchanging origins',
+            learningObjectiveId: 'greetings_basics.exchange_origins',
+            transferTask: 'Exchange origins with another traveler during a regional train ride.',
+          },
+        },
+      }),
+    );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coverageEvidence: expect.objectContaining({
+          learningObjectiveSelection: expect.objectContaining({
+            reason: 'selected_review_candidate_objective',
+            objective: expect.objectContaining({
+              id: 'greetings_basics.exchange_origins',
+            }),
+            reviewCandidate: expect.objectContaining({
+              type: 'lesson_topic',
+              identity: 'exchanging origins',
+              reasonCodes: ['structured_review_intent'],
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(mockCreateSessionRecord).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      '[api/session/generate] selected curriculum target',
+      expect.objectContaining({
+        reviewCandidateType: 'lesson_topic',
+        reviewCandidateResolutionState: 'eligible_unresolved',
+      }),
+    );
+  });
+
+  it('rejects a journal-only review claim and retries without authorizing repetition', async () => {
+    mockGetUser.mockResolvedValueOnce(
+      buildMockUser({
+        progressJournal: '**Persistent weak spots** - The learner mentioned greetings again.',
+      }),
+    );
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: {
+            learningObjectiveId: 'greetings_basics.greet_by_time',
+            intentionalReview: {
+              candidateType: 'lesson_topic',
+              candidateIdentity: 'basic greetings',
+              learningObjectiveId: 'greetings_basics.greet_by_time',
+              transferTask: 'Greet a shopkeeper in the afternoon.',
+            },
+          },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('ineligible_review'),
+        ]),
+      }),
+    );
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ sessionId: null, tokensIn: 11, tokensOut: 22 }),
+    );
+  });
+
+  it('retries after one repeated non-review Lesson Key Phrase', async () => {
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+      buildCompletedAiSession({
+        id: 'greeting-coverage',
+        createdAt: '2026-05-01T08:00:00.000Z',
+        category: 'greetings_basics',
+        topic: 'Greeting by time',
+        learningObjectiveId: 'greetings_basics.greet_by_time',
+        accuracy: 100,
+        keyPhraseDetails: [keyPhrases[0]!],
+      }),
+    ]);
+    const freshKeyPhrases = [
+      {
+        japanese: 'お名前は何ですか',
+        romaji: 'onamae wa nan desu ka',
+        english: 'What is your name?',
+        usage: 'Ask for a name politely.',
+      },
+      {
+        japanese: 'トゥーッカです',
+        romaji: 'Tuukka desu',
+        english: 'I am Tuukka.',
+        usage: 'State your name.',
+      },
+      {
+        japanese: 'こちらこそ',
+        romaji: 'kochira koso',
+        english: 'Likewise.',
+        usage: 'Return a polite first-meeting sentiment.',
+      },
+    ];
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Exchanging names' },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_names' },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Exchanging names', keyPhrases: freshKeyPhrases },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_names' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('repeated_key_phrases'),
+          expect.stringContaining('Do not repeat any covered Lesson Key Phrase'),
+        ]),
+      }),
+    );
+    expect(mockCreateSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plannedCoverage: expect.objectContaining({ keyPhraseDetails: freshKeyPhrases }),
+      }),
+    );
+  });
+
   it('rejects a paraphrased mastered objective after seven intervening sessions', async () => {
     const masteredPhrase = {
       japanese: 'ください',
@@ -785,6 +998,15 @@ describe('POST /api/session/generate', () => {
         accuracy: 0,
         weaknesses: ['The origin exchange was difficult.'],
         handoffNotes: ['Review the origin exchange.'],
+        reviewIntents: [
+          {
+            type: 'lesson_topic',
+            identity: 'saying where you are from',
+            display: 'Saying where you are from',
+            reason: 'The learner had not yet mastered the origin exchange.',
+            reviewRequested: true,
+          },
+        ],
         keyPhraseDetails: [masteredPhrase],
       }),
       buildCompletedAiSession({
@@ -856,7 +1078,15 @@ describe('POST /api/session/generate', () => {
       .mockResolvedValueOnce(
         buildGeneratedPlan({
           lesson: { topic: 'Introducing your country of origin' },
-          metadata: { learningObjectiveId: 'greetings_basics.exchange_origins' },
+          metadata: {
+            learningObjectiveId: 'greetings_basics.exchange_origins',
+            intentionalReview: {
+              candidateType: 'lesson_topic',
+              candidateIdentity: 'saying where you are from',
+              learningObjectiveId: 'greetings_basics.exchange_origins',
+              transferTask: 'Exchange origins with another traveler on a train.',
+            },
+          },
         }),
       )
       .mockResolvedValueOnce(
@@ -887,6 +1117,7 @@ describe('POST /api/session/generate', () => {
       expect.objectContaining({
         curriculumValidationFeedback: expect.arrayContaining([
           expect.stringContaining('repeated_learning_objective'),
+          expect.stringContaining('ineligible_review'),
         ]),
       }),
     );

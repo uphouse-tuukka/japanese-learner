@@ -631,6 +631,33 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
 
     expect(plan.metadata.learningObjectiveId).toBe('greetings_basics.exchange_origins');
   });
+
+  it('returns the model intentional review claim in server plan metadata', async () => {
+    mockModelOutput({
+      ...minimalSessionPlanPayload(),
+      learningObjectiveId: 'greetings_basics.exchange_origins',
+      intentionalReview: {
+        candidateType: 'key_phrase',
+        candidateIdentity: 'ja:どちらからですか',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        transferTask: 'Exchange origins with another traveler while waiting for a train.',
+      },
+    });
+
+    const plan = await generateSessionPlan({
+      userId: 'user-1',
+      userName: 'Tester',
+      userLevel: 'beginner',
+      exerciseCount: 4,
+    });
+
+    expect(plan.metadata.intentionalReview).toEqual({
+      candidateType: 'key_phrase',
+      candidateIdentity: 'ja:どちらからですか',
+      learningObjectiveId: 'greetings_basics.exchange_origins',
+      transferTask: 'Exchange origins with another traveler while waiting for a train.',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

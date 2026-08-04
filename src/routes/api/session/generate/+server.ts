@@ -91,8 +91,15 @@ function validationFeedbackForRetry(
         : 'Do not invent a Learning Objective identity in compatibility mode.',
     );
   }
+  if (validation.reasonCodes.includes('ineligible_review')) {
+    feedback.push(
+      'Intentional review must identify the exact app-selected eligible Review Candidate and Learning Objective, with a fresh transfer task.',
+    );
+  }
   if (validation.reasonCodes.includes('repeated_key_phrases')) {
-    feedback.push('Use at most one already-covered non-review Lesson Key Phrase.');
+    feedback.push(
+      'Do not repeat any covered Lesson Key Phrase unless it is the explicitly selected Review Candidate.',
+    );
   }
   return feedback;
 }
@@ -160,6 +167,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       learningObjectiveSelectionReason: coverageEvidence.learningObjectiveSelection.reason,
       reviewCandidateReasonCodes:
         coverageEvidence.learningObjectiveSelection.reviewCandidate?.reasonCodes ?? [],
+      reviewCandidateType:
+        coverageEvidence.learningObjectiveSelection.reviewCandidate?.type ?? null,
+      reviewCandidateResolutionState: coverageEvidence.learningObjectiveSelection.reviewCandidate
+        ? 'eligible_unresolved'
+        : 'none_selected',
     });
     const parsedSessionHistory: SessionHistoryItem[] = priorSessions
       .map((session): SessionHistoryItem | null => {
@@ -375,6 +387,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
               blockedCategories: validation.details.blockedCategories,
               preferredCategories: validation.details.preferredCategories,
               repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
+              intentionalReviewStatus: validation.details.intentionalReviewStatus,
             });
             continue;
           }

@@ -239,6 +239,28 @@ function formatLearningObjectiveContext(evidence: CompactCoverageEvidence): stri
   ];
 }
 
+function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): string[] {
+  const selection = evidence.learningObjectiveSelection;
+  const candidate = selection.reviewCandidate;
+  if (!candidate || !selection.objective) {
+    return [
+      'INTENTIONAL REVIEW: none selected. Return top-level intentionalReview as null.',
+      'Do not repeat any covered Lesson Key Phrase in lesson.keyPhrases.',
+      'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
+    ];
+  }
+
+  return [
+    'INTENTIONAL REVIEW REQUIRED:',
+    `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
+    'Describe a materially fresh context or transfer task in intentionalReview.transferTask. It must not duplicate the original lesson treatment.',
+    candidate.type === 'key_phrase'
+      ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
+      : 'The selected objective may be reviewed, but every covered Lesson Key Phrase must remain outside lesson.keyPhrases unless that phrase itself is the selected Review Candidate.',
+    'Previously covered utility language may appear as supporting context without being declared in lesson.keyPhrases.',
+  ];
+}
+
 function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
   if (!evidence) return '';
 
@@ -274,6 +296,7 @@ function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undef
       ? `Blocked Topic Categories: ${rotation.blockedCategories.join(', ')}.`
       : 'Blocked Topic Categories: none.',
     ...formatLearningObjectiveContext(evidence),
+    ...formatIntentionalReviewContext(evidence),
     categoryCoverage ? `Covered category counts: ${categoryCoverage}.` : '',
     avoidTopics
       ? `Avoid covered Lesson Topics unless listed as Review Candidates: ${avoidTopics}.`
@@ -494,6 +517,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
       : '';
   const selectedLearningObjective =
     input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
+  const selectedReviewCandidate =
+    input.coverageEvidence?.learningObjectiveSelection.reviewCandidate ?? null;
   const selectedTopicCategory =
     input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
@@ -539,7 +564,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
         role: 'system',
         content: [
           'You are a Japanese tutor that adapts each session based on learner history.',
-          'Output valid JSON only with top-level keys: learningObjectiveId, lesson, exercises, focus.',
+          'Output valid JSON only with top-level keys: learningObjectiveId, intentionalReview, lesson, exercises, focus.',
           `Current user level: ${input.userLevel}. Apply levelInstructions() as hard constraints for allowed exercise types, difficulty range, and translation directions.`,
           '',
           categoryContext,
@@ -562,6 +587,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '',
           '2) Required output structure:',
           '- learningObjectiveId must exactly follow the authoritative Learning Objective rail above, or be null only when compatibility mode explicitly says so.',
+          '- intentionalReview must exactly follow the authoritative review rail above. Never claim an unselected Review Candidate.',
           '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
           '- each key phrase: japanese, romaji, english, usage.',
           '- every exercise must include: type, title, tags, difficulty, japanese, romaji, englishContext, plus type-specific fields.',
@@ -624,6 +650,23 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                 ? 'Copy this app-selected identity exactly.'
                 : 'Return null because this Topic Category is in compatibility mode.',
             },
+            intentionalReview:
+              selectedReviewCandidate && selectedLearningObjective
+                ? {
+                    type: 'object',
+                    required: true,
+                    candidateType: { const: selectedReviewCandidate.type },
+                    candidateIdentity: { const: selectedReviewCandidate.identity },
+                    learningObjectiveId: { const: selectedLearningObjective.id },
+                    transferTask: {
+                      type: 'string',
+                      rule: 'Describe a materially fresh context or transfer task that does not duplicate the original lesson treatment.',
+                    },
+                  }
+                : {
+                    const: null,
+                    rule: 'No Review Candidate was selected. Return null and do not claim intentional review.',
+                  },
             lesson: {
               category: {
                 const: selectedTopicCategory,

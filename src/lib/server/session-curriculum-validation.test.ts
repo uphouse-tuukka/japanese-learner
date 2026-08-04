@@ -97,6 +97,7 @@ function plan(
     topic?: string;
     keyPhrases?: KeyPhrase[];
     learningObjectiveId?: string | null;
+    intentionalReview?: Record<string, unknown> | null;
   } = {},
 ): SessionPlan {
   return {
@@ -122,6 +123,9 @@ function plan(
         : {
             learningObjectiveId: overrides.learningObjectiveId ?? 'greetings_basics.greet_by_time',
           }),
+      ...(overrides.intentionalReview === undefined
+        ? {}
+        : { intentionalReview: overrides.intentionalReview }),
     },
   };
 }
@@ -202,6 +206,158 @@ describe('validateGeneratedSessionPlan', () => {
     }
   });
 
+  it('requires an eligible intentional review to identify its candidate and fresh transfer task', () => {
+    const reviewCandidate = {
+      type: 'lesson_topic' as const,
+      identity: 'saying where you are from',
+      display: 'Saying where you are from',
+      category: 'greetings_basics' as const,
+      topicIdentity: 'saying where you are from',
+      topic: 'Saying where you are from',
+      strength: 8,
+      reasonCodes: ['structured_review_intent' as const],
+      evidenceSessionIds: ['origin-session'],
+      lastSeenAt: '2026-05-03T08:00:00.000Z',
+    };
+    const coverageWithReview = {
+      ...baseCoverage,
+      learningObjectiveSelection: {
+        mode: 'canonical',
+        reason: 'selected_review_candidate_objective',
+        objective: {
+          id: 'greetings_basics.exchange_origins',
+          category: 'greetings_basics',
+          communicativeGoalKey: 'exchange_origins',
+          description: 'Ask where someone is from and state a country or place of origin.',
+          generationGuidance: 'Teach a two-way origin exchange.',
+        },
+        reviewCandidate,
+      },
+      coveredLearningObjectives: [
+        {
+          id: 'greetings_basics.exchange_origins',
+          category: 'greetings_basics',
+          count: 1,
+          sessionIds: ['origin-session'],
+          topicIdentities: ['saying where you are from'],
+          firstSeenAt: '2026-05-01T08:00:00.000Z',
+          lastSeenAt: '2026-05-01T08:00:00.000Z',
+          lastMasteredAt: null,
+        },
+      ],
+      reviewCandidates: [reviewCandidate],
+    } as CoverageEvidence;
+
+    const missingClaim = validateGeneratedSessionPlan({
+      plan: plan({ learningObjectiveId: 'greetings_basics.exchange_origins' }),
+      coverageEvidence: coverageWithReview,
+    });
+    const explicitReview = validateGeneratedSessionPlan({
+      plan: plan({
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
+    const duplicatedTreatment = validateGeneratedSessionPlan({
+      plan: plan({
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Saying where you are from',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
+    const duplicatedLessonTopic = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Saying where you are from',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
+    const staleCandidate = validateGeneratedSessionPlan({
+      plan: plan({
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+        },
+      }),
+      coverageEvidence: { ...coverageWithReview, reviewCandidates: [] },
+    });
+    const unrelatedCandidate = {
+      ...reviewCandidate,
+      identity: 'exchanging names',
+      display: 'Exchanging names',
+      topicIdentity: 'exchanging names',
+      topic: 'Exchanging names',
+      evidenceSessionIds: ['name-session'],
+    };
+    const unrelatedReview = validateGeneratedSessionPlan({
+      plan: plan({
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'exchanging names',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+        },
+      }),
+      coverageEvidence: {
+        ...coverageWithReview,
+        learningObjectiveSelection: {
+          ...coverageWithReview.learningObjectiveSelection,
+          reviewCandidate: unrelatedCandidate,
+        },
+        reviewCandidates: [unrelatedCandidate],
+      },
+    });
+
+    expect(missingClaim.valid).toBe(false);
+    if (!missingClaim.valid) {
+      expect(missingClaim.reasonCodes).toContain('ineligible_review');
+      expect(missingClaim.details.intentionalReviewStatus).toBe('missing');
+    }
+    expect(explicitReview.valid).toBe(true);
+    expect(explicitReview.details.intentionalReviewStatus).toBe('eligible');
+    expect(duplicatedTreatment.valid).toBe(false);
+    if (!duplicatedTreatment.valid) {
+      expect(duplicatedTreatment.reasonCodes).toContain('ineligible_review');
+      expect(duplicatedTreatment.details.intentionalReviewStatus).toBe('duplicate_treatment');
+    }
+    expect(duplicatedLessonTopic.valid).toBe(false);
+    if (!duplicatedLessonTopic.valid) {
+      expect(duplicatedLessonTopic.reasonCodes).toContain('ineligible_review');
+      expect(duplicatedLessonTopic.details.intentionalReviewStatus).toBe('duplicate_treatment');
+    }
+    expect(staleCandidate.valid).toBe(false);
+    if (!staleCandidate.valid) {
+      expect(staleCandidate.reasonCodes).toContain('ineligible_review');
+      expect(staleCandidate.details.intentionalReviewStatus).toBe('stale_or_resolved');
+    }
+    expect(unrelatedReview.valid).toBe(false);
+    if (!unrelatedReview.valid) {
+      expect(unrelatedReview.reasonCodes).toContain('ineligible_review');
+      expect(unrelatedReview.details.intentionalReviewStatus).toBe('unrelated');
+    }
+  });
+
   it('keeps exact-topic validation for unmigrated categories without requiring an objective id', () => {
     const compatibilityCoverage = {
       ...baseCoverage,
@@ -268,8 +424,8 @@ describe('validateGeneratedSessionPlan', () => {
     }
   });
 
-  it('rejects more than one repeated non-review key phrase while tolerating a single repeat', () => {
-    const tolerated = validateGeneratedSessionPlan({
+  it('rejects every repeated non-review key phrase in the authoritative lesson list', () => {
+    const singleRepeat = validateGeneratedSessionPlan({
       plan: plan({
         keyPhrases: [
           phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
@@ -288,7 +444,11 @@ describe('validateGeneratedSessionPlan', () => {
       coverageEvidence: baseCoverage,
     });
 
-    expect(tolerated.valid).toBe(true);
+    expect(singleRepeat.valid).toBe(false);
+    if (!singleRepeat.valid) {
+      expect(singleRepeat.reasonCodes).toContain('repeated_key_phrases');
+      expect(singleRepeat.details.repeatedNonReviewKeyPhraseCount).toBe(1);
+    }
     expect(rejected.valid).toBe(false);
     if (!rejected.valid) {
       expect(rejected.reasonCodes).toContain('repeated_key_phrases');
@@ -296,7 +456,22 @@ describe('validateGeneratedSessionPlan', () => {
     }
   });
 
-  it('allows repeated topics and phrases only when they are review candidates', () => {
+  it('allows covered utility language as supporting context outside the key phrase list', () => {
+    const supportingPlan = plan({
+      keyPhrases: [phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' })],
+    });
+    supportingPlan.lesson.explanation =
+      'You may still say すみません (sumimasen) naturally before the newly taught phrase.';
+
+    const result = validateGeneratedSessionPlan({
+      plan: supportingPlan,
+      coverageEvidence: baseCoverage,
+    });
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('allows only the explicitly selected eligible review phrase to repeat', () => {
     const coverageWithReview = {
       ...baseCoverage,
       reviewCandidates: [
@@ -327,7 +502,7 @@ describe('validateGeneratedSessionPlan', () => {
       ],
     } as CoverageEvidence;
 
-    const repeatedReview = validateGeneratedSessionPlan({
+    const repeatedUnselectedCandidate = validateGeneratedSessionPlan({
       plan: plan({
         topic: 'Ordering food',
         keyPhrases: [
@@ -337,15 +512,61 @@ describe('validateGeneratedSessionPlan', () => {
       }),
       coverageEvidence: coverageWithReview,
     });
-    const repeatedNonReviewTopic = validateGeneratedSessionPlan({
-      plan: plan({ topic: 'Ordering food' }),
-      coverageEvidence: baseCoverage,
+    const selectedPhraseCandidate = {
+      type: 'key_phrase' as const,
+      identity: 'ja:すみません',
+      display: 'すみません (sumimasen)',
+      category: 'greetings_basics' as const,
+      topicIdentity: 'basic greetings',
+      topic: 'Basic greetings',
+      strength: 7,
+      reasonCodes: ['wrong_exercise_result' as const],
+      evidenceSessionIds: ['session-greetings'],
+      lastSeenAt: '2026-05-22T08:00:00.000Z',
+    };
+    const coverageWithSelectedPhraseReview = {
+      ...baseCoverage,
+      learningObjectiveSelection: {
+        ...baseCoverage.learningObjectiveSelection,
+        reason: 'selected_review_candidate_objective',
+        reviewCandidate: selectedPhraseCandidate,
+      },
+      coveredLearningObjectives: [
+        {
+          id: 'greetings_basics.greet_by_time',
+          category: 'greetings_basics',
+          count: 1,
+          sessionIds: ['session-greetings'],
+          topicIdentities: ['basic greetings'],
+          firstSeenAt: '2026-05-21T08:00:00.000Z',
+          lastSeenAt: '2026-05-21T08:00:00.000Z',
+          lastMasteredAt: null,
+        },
+      ],
+      reviewCandidates: [selectedPhraseCandidate],
+    } as CoverageEvidence;
+    const explicitPhraseReview = validateGeneratedSessionPlan({
+      plan: plan({
+        keyPhrases: [
+          phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
+          phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' }),
+        ],
+        intentionalReview: {
+          candidateType: 'key_phrase',
+          candidateIdentity: 'ja:すみません',
+          learningObjectiveId: 'greetings_basics.greet_by_time',
+          transferTask: 'Choose a greeting while asking a station attendant for help.',
+        },
+      }),
+      coverageEvidence: coverageWithSelectedPhraseReview,
     });
 
-    expect(repeatedReview.valid).toBe(true);
-    expect(repeatedNonReviewTopic.valid).toBe(false);
-    if (!repeatedNonReviewTopic.valid) {
-      expect(repeatedNonReviewTopic.reasonCodes).toContain('repeated_lesson_topic');
+    expect(repeatedUnselectedCandidate.valid).toBe(false);
+    if (!repeatedUnselectedCandidate.valid) {
+      expect(repeatedUnselectedCandidate.reasonCodes).toEqual(
+        expect.arrayContaining(['repeated_lesson_topic', 'repeated_key_phrases']),
+      );
     }
+    expect(explicitPhraseReview.valid).toBe(true);
   });
 });
