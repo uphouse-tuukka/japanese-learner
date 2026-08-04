@@ -258,7 +258,7 @@ function formatIntentionalReviewContext(evidence: CompactCoverageEvidence): stri
   return [
     'INTENTIONAL REVIEW REQUIRED:',
     `Return top-level intentionalReview with candidateType exactly "${candidate.type}", candidateIdentity exactly "${candidate.identity}", and learningObjectiveId exactly "${selection.objective.id}".`,
-    `Copy transferContextId exactly "${transferContext.id}" and ground the generated Lesson Topic, explanation, or transfer task in ${transferContext.label}.`,
+    `Copy transferContextId exactly "${transferContext.id}" and begin intentionalReview.transferTask exactly with "${transferContext.requiredTaskPrefix}" to ground the review affirmatively in ${transferContext.label}.`,
     'Describe a materially fresh context or transfer task in intentionalReview.transferTask. It must not duplicate the original lesson treatment.',
     candidate.type === 'key_phrase'
       ? 'Only this selected Review Candidate may repeat in lesson.keyPhrases. Every other covered Lesson Key Phrase must remain outside the authoritative list.'
@@ -673,7 +673,8 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
                     transferContextId: { const: selectedTransferContext.id },
                     transferTask: {
                       type: 'string',
-                      rule: 'Describe a materially fresh context or transfer task that does not duplicate the original lesson treatment.',
+                      requiredPrefix: selectedTransferContext.requiredTaskPrefix,
+                      rule: `Begin exactly with "${selectedTransferContext.requiredTaskPrefix}" and describe a materially fresh transfer task that does not duplicate or negate the selected context or original lesson treatment.`,
                     },
                   }
                 : {

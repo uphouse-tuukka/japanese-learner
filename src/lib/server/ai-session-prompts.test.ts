@@ -483,7 +483,7 @@ describe('ai session prompt builders', () => {
           candidateIdentity: { const: string };
           learningObjectiveId: { const: string };
           transferContextId: { const: string };
-          transferTask: { rule: string };
+          transferTask: { requiredPrefix: string; rule: string };
         };
       };
     }>(prompt);
@@ -502,7 +502,10 @@ describe('ai session prompt builders', () => {
       candidateIdentity: { const: 'ja:どちらからですか' },
       learningObjectiveId: { const: 'greetings_basics.exchange_origins' },
       transferContextId: { const: 'station_encounter' },
-      transferTask: { rule: expect.stringContaining('fresh context or transfer task') },
+      transferTask: {
+        requiredPrefix: 'At a station,',
+        rule: expect.stringContaining('materially fresh transfer task'),
+      },
     });
   });
 

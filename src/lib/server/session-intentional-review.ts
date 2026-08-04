@@ -13,6 +13,7 @@ export type IntentionalReviewTransferContext = {
   id: 'station_encounter' | 'hotel_lobby' | 'shop_counter' | 'street_encounter';
   label: string;
   cueTokens: string[];
+  requiredTaskPrefix: string;
 };
 
 const TRANSFER_CONTEXTS: IntentionalReviewTransferContext[] = [
@@ -20,21 +21,25 @@ const TRANSFER_CONTEXTS: IntentionalReviewTransferContext[] = [
     id: 'station_encounter',
     label: 'a station or train encounter',
     cueTokens: ['station', 'train', 'platform'],
+    requiredTaskPrefix: 'At a station,',
   },
   {
     id: 'hotel_lobby',
     label: 'a hotel lobby or reception encounter',
     cueTokens: ['hotel', 'lobby', 'reception'],
+    requiredTaskPrefix: 'In a hotel lobby,',
   },
   {
     id: 'shop_counter',
     label: 'a shop or store counter encounter',
     cueTokens: ['shop', 'store', 'counter'],
+    requiredTaskPrefix: 'At a shop counter,',
   },
   {
     id: 'street_encounter',
     label: 'an outdoor street encounter',
     cueTokens: ['street', 'outdoors', 'sidewalk'],
+    requiredTaskPrefix: 'On a city street,',
   },
 ];
 
@@ -128,8 +133,12 @@ export function selectIntentionalReviewTransferContext(candidate: {
 
 export function intentionalReviewTransferContextIsGrounded(
   context: IntentionalReviewTransferContext,
-  generatedText: string,
+  transferTask: string,
 ): boolean {
-  const generatedWords = new Set(normalizedWords(generatedText));
-  return context.cueTokens.some((token) => generatedWords.has(token));
+  const normalizedTask = transferTask.trim().toLowerCase();
+  if (!normalizedTask.startsWith(context.requiredTaskPrefix.toLowerCase())) return false;
+  const taskWords = new Set(normalizedWords(transferTask));
+  return !['avoid', 'instead', 'irrelevant', 'not', 'unlike', 'without'].some((token) =>
+    taskWords.has(token),
+  );
 }

@@ -834,7 +834,8 @@ describe('POST /api/session/generate', () => {
             candidateIdentity: 'exchanging origins',
             learningObjectiveId: 'greetings_basics.exchange_origins',
             transferContextId: 'station_encounter',
-            transferTask: 'Exchange origins with another traveler during a regional train ride.',
+            transferTask:
+              'At a station, exchange origins with another traveler before a regional train ride.',
           },
         },
       }),

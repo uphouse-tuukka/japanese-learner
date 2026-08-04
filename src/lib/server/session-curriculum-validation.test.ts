@@ -260,7 +260,8 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+          transferTask:
+            'At a station, exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -274,7 +275,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask: 'Saying where you are from',
+          transferTask: 'At a station, saying where you are from',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -288,7 +289,8 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask: 'Exchange hometowns with a fellow traveler while waiting for a train.',
+          transferTask:
+            'At a station, exchange hometowns with a fellow traveler while waiting for a train.',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -302,7 +304,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'saying where you are from',
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
-          transferTask: 'Repeat the origin exchange once more at the station.',
+          transferTask: 'At a station, repeat the origin exchange once more.',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -317,6 +319,20 @@ describe('validateGeneratedSessionPlan', () => {
           learningObjectiveId: 'greetings_basics.exchange_origins',
           transferContextId: 'station_encounter',
           transferTask: 'Practice asking where they come from.',
+        },
+      }),
+      coverageEvidence: coverageWithReview,
+    });
+    const negatedContextClaim = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Talking about homeland',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+        intentionalReview: {
+          candidateType: 'lesson_topic',
+          candidateIdentity: 'saying where you are from',
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          transferContextId: 'station_encounter',
+          transferTask: 'At a station, do not use the station context; discuss homeland instead.',
         },
       }),
       coverageEvidence: coverageWithReview,
@@ -417,6 +433,11 @@ describe('validateGeneratedSessionPlan', () => {
     if (!ungroundedContextClaim.valid) {
       expect(ungroundedContextClaim.reasonCodes).toContain('ineligible_review');
       expect(ungroundedContextClaim.details.intentionalReviewStatus).toBe('context_not_grounded');
+    }
+    expect(negatedContextClaim.valid).toBe(false);
+    if (!negatedContextClaim.valid) {
+      expect(negatedContextClaim.reasonCodes).toContain('ineligible_review');
+      expect(negatedContextClaim.details.intentionalReviewStatus).toBe('context_not_grounded');
     }
     expect(staleCandidate.valid).toBe(false);
     if (!staleCandidate.valid) {
@@ -633,7 +654,7 @@ describe('validateGeneratedSessionPlan', () => {
           candidateIdentity: 'ja:すみません',
           learningObjectiveId: 'greetings_basics.greet_by_time',
           transferContextId: 'station_encounter',
-          transferTask: 'Choose a greeting while asking a station attendant for help.',
+          transferTask: 'At a station, choose a greeting while asking an attendant for help.',
         },
       }),
       coverageEvidence: coverageWithSelectedPhraseReview,

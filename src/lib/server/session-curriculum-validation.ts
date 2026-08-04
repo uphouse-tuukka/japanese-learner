@@ -331,7 +331,7 @@ export function validateGeneratedSessionPlan(input: {
       !selectedTransferContext ||
       !intentionalReviewTransferContextIsGrounded(
         selectedTransferContext,
-        [plan.lesson.topic, plan.lesson.explanation, intentionalReviewClaim.transferTask].join(' '),
+        intentionalReviewClaim.transferTask,
       )
     ) {
       intentionalReviewStatus = 'context_not_grounded';
