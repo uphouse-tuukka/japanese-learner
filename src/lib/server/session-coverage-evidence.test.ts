@@ -170,6 +170,11 @@ describe('deterministic category selection', () => {
 
     expect(evidence.categoryRotation.selectedCategory).toBe('greetings_basics');
     expect(evidence.categoryRotation.selectionReason).toBe('no_prior_category_beginner_flow');
+    expect(evidence.learningObjectiveSelection).toMatchObject({
+      mode: 'canonical',
+      reason: 'selected_uncovered_objective',
+      objective: { id: 'greetings_basics.greet_by_time' },
+    });
   });
 
   it('continues at streak 1, rotates at streak 2, and blocks current category at streak 3', () => {
@@ -268,6 +273,198 @@ describe('deterministic category selection', () => {
   });
 });
 
+describe('deterministic Learning Objective selection', () => {
+  it('selects the next uncovered objective for Category Depth', () => {
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        sourceSession('1', 'greetings_basics', 'Morning hellos', '2026-05-03T08:00:00.000Z', {
+          learningObjectiveId: 'greetings_basics.greet_by_time',
+        }),
+      ],
+    });
+
+    expect(evidence.categoryRotation.selectedCategory).toBe('greetings_basics');
+    expect(evidence.coveredLearningObjectives).toEqual([
+      expect.objectContaining({
+        id: 'greetings_basics.greet_by_time',
+        topicIdentities: ['morning hellos'],
+      }),
+    ]);
+    expect(evidence.learningObjectiveSelection).toMatchObject({
+      mode: 'canonical',
+      reason: 'selected_uncovered_objective',
+      objective: { id: 'greetings_basics.exchange_names' },
+    });
+  });
+
+  it('treats paraphrased Lesson Topics as one covered canonical objective', () => {
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        sourceSession(
+          '2',
+          'greetings_basics',
+          'Introducing your country of origin',
+          '2026-05-04T08:00:00.000Z',
+          { learningObjectiveId: 'greetings_basics.exchange_origins' },
+        ),
+        sourceSession(
+          '1',
+          'greetings_basics',
+          'Saying where you are from',
+          '2026-05-03T08:00:00.000Z',
+          { learningObjectiveId: 'greetings_basics.exchange_origins' },
+        ),
+      ],
+    });
+
+    expect(evidence.coveredLearningObjectives).toEqual([
+      expect.objectContaining({
+        id: 'greetings_basics.exchange_origins',
+        count: 2,
+        topicIdentities: ['introducing your country of origin', 'saying where you are from'],
+      }),
+    ]);
+    expect(evidence.learningObjectiveSelection.objective?.id).not.toBe(
+      'greetings_basics.exchange_origins',
+    );
+  });
+
+  it('selects a covered objective only when current Review Evidence maps to it', () => {
+    const objectiveIds = [
+      'greetings_basics.greet_by_time',
+      'greetings_basics.exchange_names',
+      'greetings_basics.exchange_origins',
+      'greetings_basics.ask_and_answer_wellbeing',
+      'greetings_basics.use_polite_thanks_and_apologies',
+      'greetings_basics.open_and_close_brief_interactions',
+    ];
+    const sessions = objectiveIds.map((learningObjectiveId, index) =>
+      sourceSession(
+        `objective-${index}`,
+        'greetings_basics',
+        index === 2 ? 'Saying where you are from' : `Greeting objective ${index}`,
+        `2026-05-${String(index + 2).padStart(2, '0')}T08:00:00.000Z`,
+        {
+          learningObjectiveId,
+          accuracy: index === 2 ? 50 : 100,
+          keyPhraseDetails:
+            index === 2 ? [{ japanese: 'どちらからですか', romaji: 'dochira kara desu ka' }] : [],
+        },
+      ),
+    );
+    sessions.unshift(
+      sourceSession('other', 'food_dining', 'Ordering tea', '2026-05-08T08:00:00.000Z'),
+      sourceSession(
+        'origin-review',
+        'greetings_basics',
+        'Saying where you are from',
+        '2026-05-09T08:00:00.000Z',
+        {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          accuracy: 0,
+          keyPhraseDetails: [{ japanese: 'どちらからですか', romaji: 'dochira kara desu ka' }],
+        },
+      ),
+    );
+
+    const originExercise = {
+      ...exercise,
+      id: 'origin-exercise',
+      japanese: 'どちらからですか',
+      romaji: 'dochira kara desu ka',
+    };
+    const evidence = buildCoverageEvidence({
+      sessions,
+      exerciseResults: [
+        {
+          sessionId: 'origin-review',
+          exerciseId: 'origin-exercise-1',
+          isCorrect: false,
+          answerText: 'incorrect',
+          createdAt: '2026-05-09T08:10:00.000Z',
+          exercise: originExercise,
+        },
+        {
+          sessionId: 'origin-review',
+          exerciseId: 'origin-exercise-2',
+          isCorrect: false,
+          answerText: 'incorrect again',
+          createdAt: '2026-05-09T08:11:00.000Z',
+          exercise: { ...originExercise, id: 'origin-exercise-2' },
+        },
+      ],
+    });
+
+    expect(evidence.learningObjectiveSelection).toMatchObject({
+      mode: 'canonical',
+      reason: 'selected_review_candidate_objective',
+      objective: { id: 'greetings_basics.exchange_origins' },
+      reviewCandidate: expect.objectContaining({
+        topicIdentity: 'saying where you are from',
+      }),
+    });
+  });
+
+  it('uses exact-topic compatibility for categories without a canonical catalog yet', () => {
+    const evidence = buildCoverageEvidence({
+      sessions: [sourceSession('1', 'food_dining', 'Ordering food', '2026-05-03T08:00:00.000Z')],
+    });
+
+    expect(evidence.categoryRotation.selectedCategory).toBe('food_dining');
+    expect(evidence.learningObjectiveSelection).toEqual({
+      mode: 'legacy_exact_topic',
+      reason: 'category_not_migrated_compatibility',
+      objective: null,
+      reviewCandidate: null,
+    });
+  });
+
+  it('rotates to the next viable category when the selected catalog is saturated', () => {
+    const objectiveIds = [
+      'greetings_basics.greet_by_time',
+      'greetings_basics.exchange_names',
+      'greetings_basics.exchange_origins',
+      'greetings_basics.ask_and_answer_wellbeing',
+      'greetings_basics.use_polite_thanks_and_apologies',
+      'greetings_basics.open_and_close_brief_interactions',
+    ];
+    const olderGreetingSessions = objectiveIds
+      .slice(1)
+      .map((learningObjectiveId, index) =>
+        sourceSession(
+          `older-${index}`,
+          'greetings_basics',
+          `Covered greeting objective ${index}`,
+          `2026-05-${String(index + 1).padStart(2, '0')}T08:00:00.000Z`,
+          { learningObjectiveId, accuracy: 100 },
+        ),
+      );
+
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        sourceSession(
+          'latest',
+          'greetings_basics',
+          'Morning greetings',
+          '2026-05-08T08:00:00.000Z',
+          { learningObjectiveId: 'greetings_basics.greet_by_time', accuracy: 100 },
+        ),
+        sourceSession('separator', 'food_dining', 'Ordering tea', '2026-05-07T08:00:00.000Z'),
+        ...olderGreetingSessions,
+      ],
+    });
+
+    expect(evidence.categoryRotation).toMatchObject({
+      selectedCategory: 'travel_essentials',
+      selectionReason: 'rotated_to_available_learning_objective',
+    });
+    expect(evidence.learningObjectiveSelection).toMatchObject({
+      reason: 'selected_uncovered_objective',
+      objective: { id: 'travel_essentials.recognize_numbers' },
+    });
+  });
+});
+
 describe('review candidate derivation', () => {
   it('keeps journal, summary weakness, and handoff mentions advisory', () => {
     const evidence = buildCoverageEvidence({
@@ -318,6 +515,79 @@ describe('review candidate derivation', () => {
     });
 
     expect(evidence.reviewCandidates).toEqual([]);
+  });
+
+  it('resolves older topic Review Evidence after canonical mastery under a new title', () => {
+    const sessions = [
+      sourceSession(
+        'mastery',
+        'greetings_basics',
+        'Introducing your country of origin',
+        '2026-05-05T08:00:00.000Z',
+        {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          accuracy: 100,
+          keyPhraseDetails: [
+            { japanese: 'アメリカから来ました', romaji: 'amerika kara kimashita' },
+          ],
+        },
+      ),
+      sourceSession(
+        'weakness',
+        'greetings_basics',
+        'Saying where you are from',
+        '2026-05-04T08:00:00.000Z',
+        {
+          learningObjectiveId: 'greetings_basics.exchange_origins',
+          accuracy: 0,
+          keyPhraseDetails: [
+            { japanese: 'アメリカから来ました', romaji: 'amerika kara kimashita' },
+          ],
+        },
+      ),
+    ];
+    const unrelatedExercise = {
+      ...exercise,
+      japanese: 'どこですか',
+      romaji: 'doko desu ka',
+    };
+
+    const evidence = buildCoverageEvidence({
+      sessions,
+      exerciseResults: [
+        {
+          sessionId: 'weakness',
+          exerciseId: 'weakness-result-1',
+          isCorrect: false,
+          answerText: 'incorrect',
+          createdAt: '2026-05-04T08:10:00.000Z',
+          exercise: unrelatedExercise,
+        },
+        {
+          sessionId: 'weakness',
+          exerciseId: 'weakness-result-2',
+          isCorrect: false,
+          answerText: 'incorrect again',
+          createdAt: '2026-05-04T08:11:00.000Z',
+          exercise: { ...unrelatedExercise, id: 'weakness-result-2' },
+        },
+      ],
+    });
+
+    expect(evidence.coveredLearningObjectives).toEqual([
+      expect.objectContaining({
+        id: 'greetings_basics.exchange_origins',
+        lastMasteredAt: '2026-05-05T08:00:00.000Z',
+      }),
+    ]);
+    expect(evidence.reviewCandidates).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'lesson_topic',
+          identity: 'saying where you are from',
+        }),
+      ]),
+    );
   });
 
   it('resolves an earlier same-session phrase miss after a later correct result', () => {

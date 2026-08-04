@@ -3,6 +3,12 @@ import {
   isTopicCategoryKey,
   type TopicCategoryKey,
 } from '$lib/topic-categories';
+import {
+  getLearningObjective,
+  getLearningObjectivesForCategory,
+  hasCanonicalLearningObjectives,
+  type LearningObjective,
+} from '$lib/learning-objectives';
 import type { Exercise, KeyPhrase, Session, SessionKeyPhraseDetail, SessionMeta } from '$lib/types';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 
@@ -47,6 +53,17 @@ export type CoveredTopic = {
   lastSeenAt: string;
 };
 
+export type CoveredLearningObjective = {
+  id: string;
+  category: TopicCategoryKey;
+  count: number;
+  sessionIds: string[];
+  topicIdentities: string[];
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastMasteredAt: string | null;
+};
+
 export type CoveredKeyPhrase = {
   primaryIdentity: string;
   identities: string[];
@@ -88,6 +105,7 @@ export type CategorySelectionReason =
   | 'continued_current_category_for_review_candidate'
   | 'rotated_after_two_session_streak'
   | 'mandatory_rotation_after_three_session_streak'
+  | 'rotated_to_available_learning_objective'
   | 'selected_ranked_candidate';
 
 export type CategoryRotationEvidence = {
@@ -101,9 +119,22 @@ export type CategoryRotationEvidence = {
   blockedCategories: TopicCategoryKey[];
 };
 
+export type LearningObjectiveSelectionReason =
+  | 'selected_uncovered_objective'
+  | 'selected_review_candidate_objective'
+  | 'category_not_migrated_compatibility';
+
+export type LearningObjectiveSelection = {
+  mode: 'canonical' | 'legacy_exact_topic';
+  reason: LearningObjectiveSelectionReason;
+  objective: LearningObjective | null;
+  reviewCandidate: ReviewCandidate | null;
+};
+
 export type CompactCoverageEvidence = {
   source: CoverageEvidence['source'];
   categoryRotation: CategoryRotationEvidence;
+  learningObjectiveSelection: LearningObjectiveSelection;
   categoryCoverage: Array<{
     category: TopicCategoryKey;
     count: number;
@@ -135,7 +166,9 @@ export type CoverageEvidence = {
     ignoredCompletedAiSessions: number;
   };
   categoryRotation: CategoryRotationEvidence;
+  learningObjectiveSelection: LearningObjectiveSelection;
   coveredCategories: CoveredCategory[];
+  coveredLearningObjectives: CoveredLearningObjective[];
   coveredTopics: CoveredTopic[];
   coveredKeyPhrases: CoveredKeyPhrase[];
   reviewCandidates: ReviewCandidate[];
@@ -149,6 +182,10 @@ export type ParseCoverageSourceSessionsResult = {
 };
 
 type MutableCategory = Omit<CoveredCategory, 'sessionIds'> & { sessionIds: Set<string> };
+type MutableLearningObjective = Omit<CoveredLearningObjective, 'sessionIds' | 'topicIdentities'> & {
+  sessionIds: Set<string>;
+  topicIdentities: Set<string>;
+};
 type MutableTopic = Omit<CoveredTopic, 'sessionIds'> & { sessionIds: Set<string> };
 type MutablePhrase = Omit<CoveredKeyPhrase, 'identities' | 'sessionIds'> & {
   identities: Set<string>;
@@ -423,6 +460,44 @@ function addTopic(
   if (!current.category && input.category) current.category = input.category;
 }
 
+function addLearningObjective(
+  objectives: Map<string, MutableLearningObjective>,
+  input: {
+    id: string;
+    category: TopicCategoryKey;
+    topicIdentity?: string;
+    mastered: boolean;
+    sessionId: string;
+    seenAt: string;
+  },
+): void {
+  const current = objectives.get(input.id);
+  if (!current) {
+    objectives.set(input.id, {
+      id: input.id,
+      category: input.category,
+      count: 1,
+      sessionIds: new Set([input.sessionId]),
+      topicIdentities: new Set(input.topicIdentity ? [input.topicIdentity] : []),
+      firstSeenAt: input.seenAt,
+      lastSeenAt: input.seenAt,
+      lastMasteredAt: input.mastered ? input.seenAt : null,
+    });
+    return;
+  }
+
+  current.count += 1;
+  current.sessionIds.add(input.sessionId);
+  if (input.topicIdentity) current.topicIdentities.add(input.topicIdentity);
+  current.firstSeenAt = earliestIso(current.firstSeenAt, input.seenAt);
+  current.lastSeenAt = latestIso(current.lastSeenAt, input.seenAt);
+  if (input.mastered) {
+    current.lastMasteredAt = current.lastMasteredAt
+      ? latestIso(current.lastMasteredAt, input.seenAt)
+      : input.seenAt;
+  }
+}
+
 function addPhrase(
   phrases: Map<string, MutablePhrase>,
   identityToPrimary: Map<string, string>,
@@ -513,6 +588,23 @@ function toCoveredTopics(topics: Map<string, MutableTopic>): CoveredTopic[] {
   return Array.from(topics.values())
     .map((topic) => ({ ...topic, sessionIds: Array.from(topic.sessionIds) }))
     .sort(compareCoverageRecencyThenCount);
+}
+
+function toCoveredLearningObjectives(
+  objectives: Map<string, MutableLearningObjective>,
+): CoveredLearningObjective[] {
+  return Array.from(objectives.values())
+    .map((objective) => ({
+      ...objective,
+      sessionIds: Array.from(objective.sessionIds),
+      topicIdentities: Array.from(objective.topicIdentities),
+    }))
+    .sort((left, right) => {
+      const categoryDiff =
+        TOPIC_CATEGORY_KEYS.indexOf(left.category) - TOPIC_CATEGORY_KEYS.indexOf(right.category);
+      if (categoryDiff !== 0) return categoryDiff;
+      return left.id.localeCompare(right.id);
+    });
 }
 
 function toCoveredPhrases(phrases: Map<string, MutablePhrase>): CoveredKeyPhrase[] {
@@ -680,6 +772,139 @@ function selectCategory(input: {
     preferredCategories: rankedAllowed,
     blockedCategories,
   };
+}
+
+function reviewCandidateMatchesObjective(
+  candidate: ReviewCandidate,
+  objective: CoveredLearningObjective,
+): boolean {
+  return (
+    candidate.evidenceSessionIds.some((sessionId) => objective.sessionIds.includes(sessionId)) ||
+    (candidate.category === objective.category &&
+      Boolean(
+        candidate.topicIdentity && objective.topicIdentities.includes(candidate.topicIdentity),
+      ))
+  );
+}
+
+function reviewCandidateForObjective(
+  objective: CoveredLearningObjective,
+  reviewCandidates: ReviewCandidate[],
+): ReviewCandidate | null {
+  return (
+    reviewCandidates.find((candidate) => reviewCandidateMatchesObjective(candidate, objective)) ??
+    null
+  );
+}
+
+function isResolvedByCanonicalObjectiveMastery(
+  candidate: ReviewCandidate,
+  coveredLearningObjectives: CoveredLearningObjective[],
+): boolean {
+  if (candidate.type !== 'lesson_topic') return false;
+
+  return coveredLearningObjectives.some((objective) => {
+    if (!objective.lastMasteredAt || !reviewCandidateMatchesObjective(candidate, objective)) {
+      return false;
+    }
+    const masteryTime = dateValue(objective.lastMasteredAt);
+    const candidateTime = dateValue(candidate.lastSeenAt);
+    return candidate.reasonCodes.includes('structured_review_intent')
+      ? masteryTime > candidateTime
+      : masteryTime >= candidateTime;
+  });
+}
+
+function selectObjectiveInCategory(input: {
+  category: TopicCategoryKey;
+  coveredLearningObjectives: CoveredLearningObjective[];
+  reviewCandidates: ReviewCandidate[];
+}): LearningObjectiveSelection | null {
+  if (!hasCanonicalLearningObjectives(input.category)) {
+    return {
+      mode: 'legacy_exact_topic',
+      reason: 'category_not_migrated_compatibility',
+      objective: null,
+      reviewCandidate: null,
+    };
+  }
+
+  const objectives = getLearningObjectivesForCategory(input.category);
+  const coveredById = new Map(
+    input.coveredLearningObjectives
+      .filter((objective) => objective.category === input.category)
+      .map((objective) => [objective.id, objective] as const),
+  );
+  const uncovered = objectives.find((objective) => !coveredById.has(objective.id));
+  if (uncovered) {
+    return {
+      mode: 'canonical',
+      reason: 'selected_uncovered_objective',
+      objective: uncovered,
+      reviewCandidate: null,
+    };
+  }
+
+  for (const candidate of input.reviewCandidates) {
+    const coveredObjective = input.coveredLearningObjectives.find(
+      (objective) =>
+        objective.category === input.category &&
+        reviewCandidateMatchesObjective(candidate, objective),
+    );
+    if (!coveredObjective) continue;
+    const objective = getLearningObjective(coveredObjective.id);
+    if (!objective) continue;
+    return {
+      mode: 'canonical',
+      reason: 'selected_review_candidate_objective',
+      objective,
+      reviewCandidate: reviewCandidateForObjective(coveredObjective, input.reviewCandidates),
+    };
+  }
+
+  return null;
+}
+
+function selectLearningObjective(input: {
+  categoryRotation: CategoryRotationEvidence;
+  coveredLearningObjectives: CoveredLearningObjective[];
+  reviewCandidates: ReviewCandidate[];
+}): {
+  categoryRotation: CategoryRotationEvidence;
+  learningObjectiveSelection: LearningObjectiveSelection;
+} {
+  const categories = Array.from(
+    new Set([
+      input.categoryRotation.selectedCategory,
+      ...input.categoryRotation.preferredCategories,
+      ...input.categoryRotation.allowedCategories,
+    ]),
+  ).filter((category) => !input.categoryRotation.blockedCategories.includes(category));
+
+  for (const category of categories) {
+    const selection = selectObjectiveInCategory({
+      category,
+      coveredLearningObjectives: input.coveredLearningObjectives,
+      reviewCandidates: input.reviewCandidates,
+    });
+    if (!selection) continue;
+    if (category === input.categoryRotation.selectedCategory) {
+      return {
+        categoryRotation: input.categoryRotation,
+        learningObjectiveSelection: selection,
+      };
+    }
+    return {
+      categoryRotation: {
+        ...input.categoryRotation,
+        selectedCategory: category,
+        selectionReason: 'rotated_to_available_learning_objective',
+      },
+      learningObjectiveSelection: selection,
+    };
+  }
+
+  throw new Error('No eligible Learning Objective or compatibility category is available.');
 }
 
 function upsertReviewCandidate(
@@ -917,6 +1142,7 @@ function deriveResultReviewCandidates(input: {
 function buildPromptSnapshot(input: {
   source: CoverageEvidence['source'];
   categoryRotation: CategoryRotationEvidence;
+  learningObjectiveSelection: LearningObjectiveSelection;
   coveredCategories: CoveredCategory[];
   coveredTopics: CoveredTopic[];
   coveredKeyPhrases: CoveredKeyPhrase[];
@@ -925,6 +1151,12 @@ function buildPromptSnapshot(input: {
   return {
     source: input.source,
     categoryRotation: input.categoryRotation,
+    learningObjectiveSelection: {
+      ...input.learningObjectiveSelection,
+      reviewCandidate: input.learningObjectiveSelection.reviewCandidate
+        ? promptReviewCandidate(input.learningObjectiveSelection.reviewCandidate)
+        : null,
+    },
     categoryCoverage: input.coveredCategories.map((category) => ({
       category: category.category,
       count: category.count,
@@ -984,6 +1216,7 @@ export function buildCoverageEvidence(input: {
 }): CoverageEvidence {
   const sessions = sortedNewestSessions(input.sessions);
   const categories = new Map<TopicCategoryKey, MutableCategory>();
+  const learningObjectives = new Map<string, MutableLearningObjective>();
   const topics = new Map<string, MutableTopic>();
   const phrases = new Map<string, MutablePhrase>();
   const phraseIdentityToPrimary = new Map<string, string>();
@@ -999,6 +1232,20 @@ export function buildCoverageEvidence(input: {
         identity: topicIdentity,
         topic: session.meta.topic,
         category,
+        sessionId: session.sessionId,
+        seenAt,
+      });
+    }
+
+    const learningObjective = session.meta.learningObjectiveId
+      ? getLearningObjective(session.meta.learningObjectiveId)
+      : null;
+    if (learningObjective && learningObjective.category === category) {
+      addLearningObjective(learningObjectives, {
+        id: learningObjective.id,
+        category: learningObjective.category,
+        topicIdentity: topicIdentity ?? undefined,
+        mastered: session.meta.accuracy === 100,
         sessionId: session.sessionId,
         seenAt,
       });
@@ -1020,6 +1267,7 @@ export function buildCoverageEvidence(input: {
   }
 
   const coveredCategories = toCoveredCategories(categories);
+  const coveredLearningObjectives = toCoveredLearningObjectives(learningObjectives);
   const coveredTopics = toCoveredTopics(topics);
   const coveredKeyPhrases = toCoveredPhrases(phrases);
   const candidates = new Map<string, MutableReviewCandidate>();
@@ -1037,8 +1285,15 @@ export function buildCoverageEvidence(input: {
     exerciseResults: input.exerciseResults ?? [],
   });
 
-  const reviewCandidates = toReviewCandidates(candidates);
-  const categoryRotation = selectCategory({ sessions, categories, reviewCandidates });
+  const reviewCandidates = toReviewCandidates(candidates).filter(
+    (candidate) => !isResolvedByCanonicalObjectiveMastery(candidate, coveredLearningObjectives),
+  );
+  const initialCategoryRotation = selectCategory({ sessions, categories, reviewCandidates });
+  const { categoryRotation, learningObjectiveSelection } = selectLearningObjective({
+    categoryRotation: initialCategoryRotation,
+    coveredLearningObjectives,
+    reviewCandidates,
+  });
   const totalCompletedAiSessions = input.totalCompletedAiSessionCount ?? sessions.length;
   const ignoredCompletedAiSessions =
     input.ignoredCompletedAiSessionCount ?? Math.max(0, totalCompletedAiSessions - sessions.length);
@@ -1051,13 +1306,16 @@ export function buildCoverageEvidence(input: {
   return {
     source,
     categoryRotation,
+    learningObjectiveSelection,
     coveredCategories,
+    coveredLearningObjectives,
     coveredTopics,
     coveredKeyPhrases,
     reviewCandidates,
     promptSnapshot: buildPromptSnapshot({
       source,
       categoryRotation,
+      learningObjectiveSelection,
       coveredCategories,
       coveredTopics,
       coveredKeyPhrases,

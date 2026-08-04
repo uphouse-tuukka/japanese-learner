@@ -217,6 +217,28 @@ function joinList(values: string[]): string {
   return values.length > 0 ? values.join(', ') : 'none';
 }
 
+function formatLearningObjectiveContext(evidence: CompactCoverageEvidence): string[] {
+  const selection = evidence.learningObjectiveSelection;
+  if (selection.mode === 'legacy_exact_topic' || !selection.objective) {
+    return [
+      'Learning Objective catalog compatibility mode is active for this Topic Category.',
+      'Do not invent a Learning Objective identity; return top-level learningObjectiveId as null.',
+    ];
+  }
+
+  const objective = selection.objective;
+  return [
+    'LEARNING OBJECTIVE - AUTHORITATIVE APP-SIDE RAIL:',
+    `Learning Objective identity MUST be exactly "${objective.id}". Copy it unchanged into the top-level learningObjectiveId field.`,
+    `Learning Objective description: ${objective.description}`,
+    `Focused generation guidance: ${objective.generationGuidance}`,
+    `Objective selection reason: ${selection.reason}.`,
+    selection.reviewCandidate
+      ? `This objective was selected for eligible review based on ${selection.reviewCandidate.type} Review Evidence (${selection.reviewCandidate.reasonCodes.join('+')}).`
+      : 'This objective is fresh coverage. Do not substitute another objective or reinterpret its identity.',
+  ];
+}
+
 function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undefined): string {
   if (!evidence) return '';
 
@@ -251,6 +273,7 @@ function formatCoverageEvidenceContext(evidence: CompactCoverageEvidence | undef
     rotation.blockedCategories.length > 0
       ? `Blocked Topic Categories: ${rotation.blockedCategories.join(', ')}.`
       : 'Blocked Topic Categories: none.',
+    ...formatLearningObjectiveContext(evidence),
     categoryCoverage ? `Covered category counts: ${categoryCoverage}.` : '',
     avoidTopics
       ? `Avoid covered Lesson Topics unless listed as Review Candidates: ${avoidTopics}.`
@@ -469,6 +492,10 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           .filter(Boolean)
           .join(' ')
       : '';
+  const selectedLearningObjective =
+    input.coverageEvidence?.learningObjectiveSelection.objective ?? null;
+  const selectedTopicCategory =
+    input.coverageEvidence?.categoryRotation.selectedCategory ?? 'food_dining';
 
   const priorNotes = sessionHistory
     .slice(0, 3)
@@ -512,7 +539,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
         role: 'system',
         content: [
           'You are a Japanese tutor that adapts each session based on learner history.',
-          'Output valid JSON only with top-level keys: lesson, exercises, focus.',
+          'Output valid JSON only with top-level keys: learningObjectiveId, lesson, exercises, focus.',
           `Current user level: ${input.userLevel}. Apply levelInstructions() as hard constraints for allowed exercise types, difficulty range, and translation directions.`,
           '',
           categoryContext,
@@ -534,6 +561,7 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
           '- Avoid repeating recent cultural notes or the same micro-theme (especially repeated sumimasen politeness trivia) unless essential to the new lesson.',
           '',
           '2) Required output structure:',
+          '- learningObjectiveId must exactly follow the authoritative Learning Objective rail above, or be null only when compatibility mode explicitly says so.',
           '- lesson must include: category (one of the category keys above), topic, explanation, culturalNote, keyPhrases (3-5 items).',
           '- each key phrase: japanese, romaji, english, usage.',
           '- every exercise must include: type, title, tags, difficulty, japanese, romaji, englishContext, plus type-specific fields.',
@@ -587,50 +615,56 @@ export function buildSessionPlanPrompt(input: SessionPlanPromptInput): SessionPl
             learningJournal,
             curriculumValidationFeedback: input.curriculumValidationFeedback ?? [],
           },
+          selectedLearningObjective,
           targetExerciseCount,
-          requiredOutputExample: {
-            lesson: {
-              topic: 'Ordering at a restaurant',
-              category: 'food_dining',
-              explanation: 'When eating out in Japan, you can use a few polite phrases...',
-              culturalNote: "In Japan, you don't tip. Service is included.",
-              keyPhrases: [
-                {
-                  japanese: 'すみません',
-                  romaji: 'sumimasen',
-                  english: 'Excuse me',
-                  usage: "Use to politely call the server's attention",
-                },
-              ],
+          requiredOutputContract: {
+            learningObjectiveId: {
+              const: selectedLearningObjective?.id ?? null,
+              rule: selectedLearningObjective
+                ? 'Copy this app-selected identity exactly.'
+                : 'Return null because this Topic Category is in compatibility mode.',
             },
-            exercises: [
-              {
-                type: 'multiple_choice',
-                title: 'Choose the greeting',
-                japanese: 'こんにちは',
-                romaji: 'konnichiwa',
-                englishContext: 'A common daytime greeting',
-                tags: ['greetings'],
-                difficulty: 1,
-                question: 'What does こんにちは (konnichiwa) mean?',
-                choices: ['Good morning', 'Good evening', 'Hello / Good afternoon', 'Goodbye'],
-                correctAnswer: 'Hello / Good afternoon',
+            lesson: {
+              category: {
+                const: selectedTopicCategory,
+                rule: 'Copy this app-selected Topic Category exactly.',
               },
-              {
-                type: 'translation',
-                title: 'Translate the phrase',
-                japanese: 'ありがとうございます',
-                romaji: 'arigatou gozaimasu',
-                englishContext: 'A polite expression of gratitude',
-                tags: ['polite_expressions'],
-                difficulty: 1,
-                direction: 'ja_to_en',
-                prompt: 'ありがとうございます (arigatou gozaimasu)',
-                expectedAnswer: 'Thank you very much',
-                acceptedAnswers: ['Thank you very much', 'Thank you'],
+              topic: {
+                type: 'string',
+                rule: selectedLearningObjective
+                  ? `Write a concise learner-facing Lesson Topic that fulfills only this communicative goal: ${selectedLearningObjective.description}`
+                  : `Write a fresh exact Lesson Topic within ${selectedTopicCategory}.`,
               },
-            ],
-            focus: 'restaurant_ordering',
+              explanation: {
+                type: 'string',
+                rule: selectedLearningObjective
+                  ? `Teach this objective directly and follow its focused guidance: ${selectedLearningObjective.generationGuidance}`
+                  : `Teach only the fresh Lesson Topic chosen within ${selectedTopicCategory}.`,
+              },
+              culturalNote: {
+                type: 'string',
+                rule: 'Provide one authentic note directly relevant to this lesson, avoiding recent notes.',
+              },
+              keyPhrases: {
+                type: 'array',
+                minItems: 3,
+                maxItems: 5,
+                itemFields: ['japanese', 'romaji', 'english', 'usage'],
+                rule: selectedLearningObjective
+                  ? `Every phrase must directly support ${selectedLearningObjective.id} and obey Coverage Evidence avoid/review rails.`
+                  : 'Every phrase must directly support the fresh Lesson Topic and obey Coverage Evidence avoid/review rails.',
+              },
+            },
+            exercises: {
+              type: 'array',
+              targetItems: targetExerciseCount,
+              allowedTypes: LEVEL_RULES[input.userLevel].allowedTypes,
+              rule: 'Quiz only material taught in the objective-aligned lesson and follow every level and exercise-field rule above.',
+            },
+            focus: {
+              type: 'string',
+              rule: 'Return a short internal focus label aligned with the selected objective and lesson.',
+            },
           },
         }),
       },

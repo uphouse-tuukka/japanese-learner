@@ -19,7 +19,19 @@ const baseCoverage = {
     preferredCategories: ['greetings_basics'],
     blockedCategories: ['food_dining'],
   },
+  learningObjectiveSelection: {
+    mode: 'canonical',
+    reason: 'selected_uncovered_objective',
+    objective: {
+      id: 'greetings_basics.greet_by_time',
+      category: 'greetings_basics',
+      description: 'Choose and use a basic greeting that fits the time of day.',
+      generationGuidance: 'Teach an appropriate time-of-day greeting.',
+    },
+    reviewCandidate: null,
+  },
   coveredCategories: [],
+  coveredLearningObjectives: [],
   coveredTopics: [
     {
       identity: 'ordering food',
@@ -83,6 +95,7 @@ function plan(
     category?: string;
     topic?: string;
     keyPhrases?: KeyPhrase[];
+    learningObjectiveId?: string | null;
   } = {},
 ): SessionPlan {
   return {
@@ -102,7 +115,13 @@ function plan(
     },
     exercises: [],
     tokenUsage: { input: 10, output: 20 },
-    metadata: {},
+    metadata: {
+      ...(overrides.learningObjectiveId === null
+        ? {}
+        : {
+            learningObjectiveId: overrides.learningObjectiveId ?? 'greetings_basics.greet_by_time',
+          }),
+    },
   };
 }
 
@@ -124,6 +143,116 @@ describe('validateGeneratedSessionPlan', () => {
       expect(result.reasonCodes).toContain('category_mismatch');
       expect(result.details.selectedCategory).toBe('greetings_basics');
       expect(result.details.generatedCategory).toBe('food_dining');
+    }
+  });
+
+  it('requires the app-selected canonical Learning Objective identity', () => {
+    const missing = validateGeneratedSessionPlan({
+      plan: plan({ learningObjectiveId: null }),
+      coverageEvidence: baseCoverage,
+    });
+    const unknown = validateGeneratedSessionPlan({
+      plan: plan({ learningObjectiveId: 'greetings_basics.model_invented_goal' }),
+      coverageEvidence: baseCoverage,
+    });
+    const wrongCategory = validateGeneratedSessionPlan({
+      plan: plan({ learningObjectiveId: 'travel_essentials.recognize_numbers' }),
+      coverageEvidence: baseCoverage,
+    });
+
+    for (const result of [missing, unknown, wrongCategory]) {
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reasonCodes).toContain('invalid_learning_objective_identity');
+        expect(result.details.selectedLearningObjectiveId).toBe('greetings_basics.greet_by_time');
+      }
+    }
+  });
+
+  it('rejects a paraphrased mastered objective even when its Lesson Topic title looks fresh', () => {
+    const coverageWithMastery = {
+      ...baseCoverage,
+      coveredLearningObjectives: [
+        {
+          id: 'greetings_basics.exchange_origins',
+          category: 'greetings_basics',
+          count: 1,
+          sessionIds: ['origin-mastery'],
+          topicIdentities: ['saying where you are from'],
+          firstSeenAt: '2026-05-01T08:00:00.000Z',
+          lastSeenAt: '2026-05-01T08:00:00.000Z',
+          lastMasteredAt: '2026-05-01T08:00:00.000Z',
+        },
+      ],
+    } as CoverageEvidence;
+
+    const result = validateGeneratedSessionPlan({
+      plan: plan({
+        topic: 'Introducing your country of origin',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
+      }),
+      coverageEvidence: coverageWithMastery,
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reasonCodes).toContain('repeated_learning_objective');
+      expect(result.details.generatedLearningObjectiveId).toBe('greetings_basics.exchange_origins');
+    }
+  });
+
+  it('keeps exact-topic validation for unmigrated categories without requiring an objective id', () => {
+    const compatibilityCoverage = {
+      ...baseCoverage,
+      categoryRotation: {
+        ...baseCoverage.categoryRotation,
+        currentCategory: 'food_dining',
+        selectedCategory: 'food_dining',
+        allowedCategories: ['food_dining'],
+        preferredCategories: ['food_dining'],
+        blockedCategories: [],
+      },
+      learningObjectiveSelection: {
+        mode: 'legacy_exact_topic',
+        reason: 'category_not_migrated_compatibility',
+        objective: null,
+        reviewCandidate: null,
+      },
+    } as CoverageEvidence;
+
+    const fresh = validateGeneratedSessionPlan({
+      plan: plan({
+        category: 'food_dining',
+        topic: 'Paying at a restaurant',
+        learningObjectiveId: null,
+      }),
+      coverageEvidence: compatibilityCoverage,
+    });
+    const repeated = validateGeneratedSessionPlan({
+      plan: plan({
+        category: 'food_dining',
+        topic: 'Ordering food',
+        learningObjectiveId: null,
+      }),
+      coverageEvidence: compatibilityCoverage,
+    });
+    const inventedObjective = validateGeneratedSessionPlan({
+      plan: plan({
+        category: 'food_dining',
+        topic: 'Paying at a restaurant',
+        learningObjectiveId: 'food_dining.model_invented_goal',
+      }),
+      coverageEvidence: compatibilityCoverage,
+    });
+
+    expect(fresh.valid).toBe(true);
+    expect(repeated.valid).toBe(false);
+    if (!repeated.valid) {
+      expect(repeated.reasonCodes).toContain('repeated_lesson_topic');
+    }
+    expect(inventedObjective.valid).toBe(false);
+    if (!inventedObjective.valid) {
+      expect(inventedObjective.reasonCodes).toContain('invalid_learning_objective_identity');
     }
   });
 

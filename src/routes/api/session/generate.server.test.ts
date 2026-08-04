@@ -138,7 +138,7 @@ const generatedPlan = {
     input: 10,
     output: 20,
   },
-  metadata: {},
+  metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
 
 function buildGeneratedPlan(
@@ -154,13 +154,14 @@ function buildGeneratedPlan(
     lesson: { ...lesson, ...overrides.lesson },
     exercises,
     tokenUsage: overrides.tokenUsage ?? generatedPlan.tokenUsage,
-    metadata: overrides.metadata ?? {},
+    metadata: overrides.metadata ?? generatedPlan.metadata,
   };
 }
 
 function buildSessionSummary(input: {
   category: string;
   topic: string;
+  learningObjectiveId?: string;
   accuracy?: number;
   keyPhraseDetails?: Array<{
     japanese?: string;
@@ -176,6 +177,7 @@ function buildSessionSummary(input: {
   return JSON.stringify({
     summaryText: `Summary for ${input.topic}`,
     category: input.category,
+    learningObjectiveId: input.learningObjectiveId,
     topic: input.topic,
     accuracy: input.accuracy ?? 80,
     strengths: [],
@@ -197,6 +199,7 @@ function buildCompletedAiSession(input: {
   createdAt: string;
   category: string;
   topic: string;
+  learningObjectiveId?: string;
   accuracy?: number;
   keyPhraseDetails?: Array<{
     japanese?: string;
@@ -369,6 +372,7 @@ describe('POST /api/session/generate', () => {
       plannedCoverage: {
         version: 1,
         category: 'greetings_basics',
+        learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'Basic greetings',
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
@@ -404,20 +408,88 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it('persists an app-selected Learning Objective identity when generation provides one', async () => {
+  it('passes and persists the app-selected Learning Objective identity', async () => {
+    const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockGenerateSessionPlan.mockResolvedValueOnce(
-      buildGeneratedPlan({ metadata: { learningObjectiveId: 'greetings_basics.first_meeting' } }),
+      buildGeneratedPlan({
+        metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
+      }),
     );
 
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
 
     expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coverageEvidence: expect.objectContaining({
+          learningObjectiveSelection: expect.objectContaining({
+            mode: 'canonical',
+            reason: 'selected_uncovered_objective',
+            objective: expect.objectContaining({
+              id: 'greetings_basics.greet_by_time',
+            }),
+          }),
+        }),
+      }),
+    );
     expect(mockCreateSessionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         plannedCoverage: expect.objectContaining({
           category: 'greetings_basics',
-          learningObjectiveId: 'greetings_basics.first_meeting',
+          learningObjectiveId: 'greetings_basics.greet_by_time',
           lessonTopic: 'Basic greetings',
+        }),
+      }),
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      '[api/session/generate] selected curriculum target',
+      expect.objectContaining({
+        selectedCategory: 'greetings_basics',
+        selectedLearningObjectiveId: 'greetings_basics.greet_by_time',
+        learningObjectiveSelectionReason: 'selected_uncovered_objective',
+        parseableCompletedAiSessions: 0,
+        ignoredCompletedAiSessions: 0,
+      }),
+    );
+  });
+
+  it('rejects and does not persist a model-invented identity in compatibility categories', async () => {
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+      buildCompletedAiSession({
+        id: 'food-1',
+        createdAt: '2026-05-03T08:00:00.000Z',
+        category: 'food_dining',
+        topic: 'Ordering food',
+      }),
+    ]);
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: {
+            topic: 'Paying at a restaurant',
+            category: 'food_dining',
+          },
+          metadata: { learningObjectiveId: 'food_dining.model_invented_goal' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: {
+            topic: 'Paying at a restaurant',
+            category: 'food_dining',
+          },
+          metadata: {},
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockCreateSessionRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plannedCoverage: expect.not.objectContaining({
+          learningObjectiveId: expect.anything(),
         }),
       }),
     );
@@ -492,6 +564,7 @@ describe('POST /api/session/generate', () => {
     mockGenerateSessionPlan.mockResolvedValueOnce(
       buildGeneratedPlan({
         lesson: { topic: 'Restaurant payment', category: 'food_dining' },
+        metadata: {},
       }),
     );
 
@@ -529,7 +602,7 @@ describe('POST /api/session/generate', () => {
     );
   });
 
-  it('rejects a mastered topic after seven intervening sessions despite journal and positive handoff mentions', async () => {
+  it('rejects a paraphrased mastered objective after seven intervening sessions', async () => {
     const masteredPhrase = {
       japanese: 'ください',
       romaji: 'kudasai',
@@ -541,20 +614,22 @@ describe('POST /api/session/generate', () => {
         id: 'old-weakness',
         createdAt: '2026-05-01T08:00:00.000Z',
         category: 'greetings_basics',
-        topic: 'Basic greetings',
+        topic: 'Saying where you are from',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
         accuracy: 0,
-        weaknesses: ['Basic greetings were difficult.'],
-        handoffNotes: ['Review Basic greetings.'],
+        weaknesses: ['The origin exchange was difficult.'],
+        handoffNotes: ['Review the origin exchange.'],
         keyPhraseDetails: [masteredPhrase],
       }),
       buildCompletedAiSession({
         id: 'mastery',
         createdAt: '2026-05-02T08:00:00.000Z',
         category: 'greetings_basics',
-        topic: 'Basic greetings',
+        topic: 'Saying where you are from',
+        learningObjectiveId: 'greetings_basics.exchange_origins',
         accuracy: 100,
-        weaknesses: ['Explore more nuance in Basic greetings.'],
-        handoffNotes: ['Basic greetings are now a strength.'],
+        weaknesses: ['Explore more nuance in origin exchanges.'],
+        handoffNotes: ['Origin exchanges are now a strength.'],
         keyPhraseDetails: [masteredPhrase],
       }),
       ...[
@@ -564,13 +639,19 @@ describe('POST /api/session/generate', () => {
         ['shopping', 'Choosing a size'],
         ['directions', 'Finding an exit'],
         ['hotel_accommodation', 'Checking in'],
-        ['greetings_basics', 'Greeting shop staff'],
+        ['greetings_basics', 'Morning greetings'],
       ].map(([category, topic], index) =>
         buildCompletedAiSession({
           id: `intervening-${index + 1}`,
           createdAt: `2026-05-${String(index + 3).padStart(2, '0')}T08:00:00.000Z`,
           category,
           topic,
+          learningObjectiveId:
+            category === 'greetings_basics'
+              ? 'greetings_basics.greet_by_time'
+              : category === 'travel_essentials'
+                ? 'travel_essentials.understand_prices_and_payments'
+                : undefined,
           accuracy: 100,
         }),
       ),
@@ -578,11 +659,11 @@ describe('POST /api/session/generate', () => {
     mockGetUser.mockResolvedValueOnce(
       buildMockUser({
         progressJournal: [
-          '**Categories & topics covered** - greetings_basics: Basic greetings',
+          '**Categories & topics covered** - greetings_basics: Saying where you are from',
           '**Vocabulary bank** - ください',
           '**Persistent weak spots** - none',
-          '**Progress snapshot** - Basic greetings mastered',
-          '**Learning trajectory** - building beyond Basic greetings',
+          '**Progress snapshot** - origin exchanges mastered',
+          '**Learning trajectory** - building beyond origin exchanges',
         ].join('\n'),
       }),
     );
@@ -606,8 +687,18 @@ describe('POST /api/session/generate', () => {
       },
     ]);
     mockGenerateSessionPlan
-      .mockResolvedValueOnce(buildGeneratedPlan({ lesson: { topic: 'Basic greetings' } }))
-      .mockResolvedValueOnce(buildGeneratedPlan({ lesson: { topic: 'Greeting a shopkeeper' } }));
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Introducing your country of origin' },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_origins' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { topic: 'Introducing yourself by name' },
+          metadata: { learningObjectiveId: 'greetings_basics.exchange_names' },
+        }),
+      );
 
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
 
@@ -616,15 +707,20 @@ describe('POST /api/session/generate', () => {
     expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        learningJournal: expect.stringContaining('Basic greetings mastered'),
-        coverageEvidence: expect.objectContaining({ reviewCandidates: [] }),
+        learningJournal: expect.stringContaining('origin exchanges mastered'),
+        coverageEvidence: expect.objectContaining({
+          reviewCandidates: [],
+          learningObjectiveSelection: expect.objectContaining({
+            objective: expect.objectContaining({ id: 'greetings_basics.exchange_names' }),
+          }),
+        }),
       }),
     );
     expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         curriculumValidationFeedback: expect.arrayContaining([
-          expect.stringContaining('repeated_lesson_topic'),
+          expect.stringContaining('repeated_learning_objective'),
         ]),
       }),
     );
@@ -734,6 +830,7 @@ describe('POST /api/session/generate', () => {
       plannedCoverage: {
         version: 1,
         category: 'greetings_basics',
+        learningObjectiveId: 'greetings_basics.greet_by_time',
         lessonTopic: 'First greetings',
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
@@ -753,6 +850,47 @@ describe('POST /api/session/generate', () => {
       tokensIn: 13,
       tokensOut: 21,
     });
+  });
+
+  it('retries when the model invents a Learning Objective identity', async () => {
+    const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockGenerateSessionPlan
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: { learningObjectiveId: 'greetings_basics.model_invented_goal' },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildGeneratedPlan({
+          metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
+          tokenUsage: { input: 13, output: 21 },
+        }),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('invalid_learning_objective_identity'),
+          expect.stringContaining('greetings_basics.greet_by_time'),
+        ]),
+      }),
+    );
+    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ sessionId: null, tokensIn: 11, tokensOut: 22 }),
+    );
+    const validationLog = logSpy.mock.calls.find(
+      ([message]) => message === '[api/session/generate] curriculum validation failed',
+    );
+    expect(validationLog?.[1]).toEqual(
+      expect.objectContaining({ generatedLearningObjectiveStatus: 'unrecognized' }),
+    );
+    expect(JSON.stringify(validationLog?.[1])).not.toContain('model_invented_goal');
   });
 
   it('fails closed without creating a session when both generation attempts violate curriculum rails', async () => {
@@ -808,7 +946,7 @@ describe('POST /api/session/generate', () => {
           input: 10,
           output: 20,
         },
-        metadata: {},
+        metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
       });
 
     const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');

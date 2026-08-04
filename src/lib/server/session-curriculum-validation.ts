@@ -4,12 +4,16 @@ import {
   type CoverageEvidence,
   type CoveredKeyPhrase,
 } from '$lib/server/session-coverage-evidence';
+import { getLearningObjective } from '$lib/learning-objectives';
 import { isTopicCategoryKey, type TopicCategoryKey } from '$lib/topic-categories';
 import type { Lesson } from '$lib/types';
 
 export type SessionCurriculumValidationReasonCode =
   | 'category_mismatch'
   | 'blocked_category'
+  | 'invalid_learning_objective_identity'
+  | 'learning_objective_mismatch'
+  | 'repeated_learning_objective'
   | 'repeated_lesson_topic'
   | 'repeated_key_phrases';
 
@@ -22,6 +26,13 @@ export type SessionCurriculumValidationDetails = {
   repeatedNonReviewKeyPhraseCount: number;
   repeatedNonReviewKeyPhrases: string[];
   repeatedLessonTopic: string | null;
+  selectedLearningObjectiveId: string | null;
+  generatedLearningObjectiveId: string | null;
+  generatedLearningObjectiveStatus:
+    | 'missing'
+    | 'unrecognized'
+    | 'recognized_selected'
+    | 'recognized_other';
 };
 
 export type SessionCurriculumValidationResult =
@@ -38,6 +49,7 @@ export type SessionCurriculumValidationResult =
 
 type GeneratedSessionPlanLike = {
   lesson: Pick<Lesson, 'topic' | 'category' | 'keyPhrases'>;
+  metadata: Record<string, unknown>;
 };
 
 function displayKeyPhrase(phrase: Lesson['keyPhrases'][number]): string {
@@ -89,6 +101,22 @@ export function validateGeneratedSessionPlan(input: {
   const categoryRotation = coverageEvidence.categoryRotation;
   const selectedCategory = categoryRotation.selectedCategory;
   const generatedCategory = plan.lesson.category ?? null;
+  const selectedLearningObjective = coverageEvidence.learningObjectiveSelection.objective;
+  const generatedLearningObjectiveId =
+    typeof plan.metadata.learningObjectiveId === 'string' &&
+    plan.metadata.learningObjectiveId.trim()
+      ? plan.metadata.learningObjectiveId.trim()
+      : null;
+  const generatedLearningObjective = generatedLearningObjectiveId
+    ? getLearningObjective(generatedLearningObjectiveId)
+    : null;
+  const generatedLearningObjectiveStatus = !generatedLearningObjectiveId
+    ? 'missing'
+    : !generatedLearningObjective
+      ? 'unrecognized'
+      : generatedLearningObjective.id === selectedLearningObjective?.id
+        ? 'recognized_selected'
+        : 'recognized_other';
   const reasonCodes: SessionCurriculumValidationReasonCode[] = [];
 
   if (generatedCategory !== selectedCategory) {
@@ -100,6 +128,25 @@ export function validateGeneratedSessionPlan(input: {
     categoryRotation.blockedCategories.includes(generatedCategory)
   ) {
     reasonCodes.push('blocked_category');
+  }
+
+  if (coverageEvidence.learningObjectiveSelection.mode === 'canonical') {
+    if (
+      !selectedLearningObjective ||
+      !generatedLearningObjective ||
+      generatedLearningObjective.category !== selectedCategory
+    ) {
+      reasonCodes.push('invalid_learning_objective_identity');
+    } else if (generatedLearningObjective.id !== selectedLearningObjective.id) {
+      const repeatsCoveredObjective = coverageEvidence.coveredLearningObjectives.some(
+        (objective) => objective.id === generatedLearningObjective.id,
+      );
+      reasonCodes.push(
+        repeatsCoveredObjective ? 'repeated_learning_objective' : 'learning_objective_mismatch',
+      );
+    }
+  } else if (generatedLearningObjectiveId) {
+    reasonCodes.push('invalid_learning_objective_identity');
   }
 
   const generatedTopicIdentity = normalizeTopicIdentity(plan.lesson.topic);
@@ -132,6 +179,9 @@ export function validateGeneratedSessionPlan(input: {
     repeatedNonReviewKeyPhraseCount: uniqueRepeatedNonReviewKeyPhrases.length,
     repeatedNonReviewKeyPhrases: uniqueRepeatedNonReviewKeyPhrases,
     repeatedLessonTopic: repeatedLessonTopic?.topic ?? null,
+    selectedLearningObjectiveId: selectedLearningObjective?.id ?? null,
+    generatedLearningObjectiveId,
+    generatedLearningObjectiveStatus,
   };
 
   return reasonCodes.length === 0

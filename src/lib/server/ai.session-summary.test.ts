@@ -615,6 +615,22 @@ describe('generateSessionPlan — exercise-level validation resilience', () => {
     expect(plan.exercises).toHaveLength(2);
     expect(plan.exercises.map((exercise) => exercise.id)).not.toContain('translation-en-to-ja');
   });
+
+  it('returns the model Learning Objective identity in server plan metadata', async () => {
+    mockModelOutput({
+      ...minimalSessionPlanPayload(),
+      learningObjectiveId: 'greetings_basics.exchange_origins',
+    });
+
+    const plan = await generateSessionPlan({
+      userId: 'user-1',
+      userName: 'Tester',
+      userLevel: 'beginner',
+      exerciseCount: 4,
+    });
+
+    expect(plan.metadata.learningObjectiveId).toBe('greetings_basics.exchange_origins');
+  });
 });
 
 // ---------------------------------------------------------------------------
