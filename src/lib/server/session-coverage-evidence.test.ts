@@ -405,7 +405,7 @@ describe('deterministic Learning Objective selection', () => {
     });
   });
 
-  it('uses exact-topic compatibility for categories without a canonical catalog yet', () => {
+  it('keeps legacy exact-topic coverage without inventing a canonical mapping', () => {
     const evidence = buildCoverageEvidence({
       sessions: [
         sourceSession('1', 'emergencies_health', 'Finding a pharmacy', '2026-05-03T08:00:00.000Z'),
@@ -413,10 +413,17 @@ describe('deterministic Learning Objective selection', () => {
     });
 
     expect(evidence.categoryRotation.selectedCategory).toBe('emergencies_health');
-    expect(evidence.learningObjectiveSelection).toEqual({
-      mode: 'legacy_exact_topic',
-      reason: 'category_not_migrated_compatibility',
-      objective: null,
+    expect(evidence.coveredTopics).toEqual([
+      expect.objectContaining({
+        topic: 'Finding a pharmacy',
+        category: 'emergencies_health',
+      }),
+    ]);
+    expect(evidence.coveredLearningObjectives).toEqual([]);
+    expect(evidence.learningObjectiveSelection).toMatchObject({
+      mode: 'canonical',
+      reason: 'selected_uncovered_objective',
+      objective: { id: 'emergencies_health.describe_symptoms_and_severity' },
       reviewCandidate: null,
     });
   });

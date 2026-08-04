@@ -112,15 +112,18 @@
 
 ### Canonical Learning Objectives
 
-- Greetings & Basics, Travel Essentials, Food & Dining, Transport, Shopping, Directions & Navigation, and Hotel & Accommodation use an app-owned catalog of stable Learning Objective identities.
+- Every Topic Category uses an app-owned catalog of stable Learning Objective identities.
 - The core travel-scenario catalogs separate ordering, menu clarification, dietary needs, transport stages, product discovery, purchase tasks, route finding, indoor navigation, check-in, accommodation services, and problem resolution into materially distinct communicative goals.
+- Emergencies & Health separates symptom description, pharmacy help, medical access, emergency calling, accident response, property reports, and critical intake details.
+- Social & Conversation builds beyond basic name and origin exchanges through expanded introductions, hobbies, small talk, travel experiences, compliments, invitations, and shared preferences.
+- Sightseeing & Culture separates attraction access, cultural interpretation, photo help, site etiquette, activities, recommendations, and visitor announcements.
+- Bars & Nightlife teaches venue-specific choices and boundaries such as serving style, alcohol-free requests, rounds, charges, karaoke, last order, and nightlife invitations instead of cosmetically repeating restaurant tasks.
 - Each catalog entry declares its Topic Category, a stable communicative-goal key, a learner-facing description, and focused generation guidance.
 - The application deterministically selects an uncovered Learning Objective or a currently eligible review objective after selecting the Topic Category.
 - The model must copy the selected identity exactly and may vary the Lesson Topic wording without changing that identity.
 - Coverage and validation use the stable identity, so semantic title variants such as saying where the learner is from and introducing their country of origin remain one objective.
 - A mastered objective remains unavailable as fresh coverage across the learner's full parseable history.
 - When a migrated category has no uncovered or review-eligible objective, selection moves deterministically to the next allowed category with viable work.
-- Emergencies & Health, Social & Conversation, Sightseeing & Culture, and Bars & Nightlife keep the lower-confidence exact Lesson Topic compatibility path until their catalog migration is complete.
 - Legacy completed sessions without a recognized Learning Objective identity remain exact topic and phrase Coverage Evidence and are not semantically guessed.
 
 ### Level Constraints
