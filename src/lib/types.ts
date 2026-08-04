@@ -195,6 +195,7 @@ export interface PlannedSessionCoverage {
   lessonTopic: string;
   /** Bounded server-generated lesson and exercise text used only for review-context freshness. */
   lessonTreatment?: string;
+  lessonTreatmentComplete?: true;
   culturalNote: string;
   keyPhraseDetails: KeyPhrase[];
 }

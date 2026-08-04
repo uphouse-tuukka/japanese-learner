@@ -402,9 +402,11 @@ export function parseCoverageSourceSessions(
       createdAt: session.createdAt,
       completedAt: session.completedAt,
       meta,
-      treatmentContextIds: session.plannedCoverage?.lessonTreatment
-        ? detectIntentionalReviewTransferContextIds(session.plannedCoverage.lessonTreatment)
-        : null,
+      treatmentContextIds:
+        session.plannedCoverage?.lessonTreatment &&
+        session.plannedCoverage.lessonTreatmentComplete === true
+          ? detectIntentionalReviewTransferContextIds(session.plannedCoverage.lessonTreatment)
+          : null,
     });
   }
 

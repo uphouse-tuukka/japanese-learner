@@ -130,6 +130,7 @@ describe('coverage source parsing', () => {
             explanation: 'Talk with another passenger inside a railway terminal.',
             exercises: [],
           }),
+          lessonTreatmentComplete: true,
           culturalNote: 'Ask politely.',
           keyPhraseDetails: [
             {

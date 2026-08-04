@@ -326,6 +326,7 @@ function buildCompletedAiSession(input: {
           explanation: `Practice ${input.topic} in a neutral indoor setting.`,
           exercises: [],
         }),
+      lessonTreatmentComplete: true,
       culturalNote: 'Test note.',
       keyPhraseDetails: [],
     },
@@ -489,6 +490,7 @@ describe('POST /api/session/generate', () => {
           explanation: lesson.explanation,
           exercises,
         }),
+        lessonTreatmentComplete: true,
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },
@@ -848,7 +850,11 @@ describe('POST /api/session/generate', () => {
               : [],
           lessonTreatment:
             learningObjectiveId === 'greetings_basics.exchange_origins'
-              ? 'Exchange origins with another passenger inside a railway terminal.'
+              ? JSON.stringify({
+                  topic,
+                  explanation: 'Exchange origins with another passenger inside a railway terminal.',
+                  exercises: [],
+                })
               : undefined,
         }),
       ]),
@@ -1275,6 +1281,7 @@ describe('POST /api/session/generate', () => {
           explanation: lesson.explanation,
           exercises,
         }),
+        lessonTreatmentComplete: true,
         culturalNote: 'Use a calm, friendly greeting when entering a small shop.',
         keyPhraseDetails: keyPhrases,
       },

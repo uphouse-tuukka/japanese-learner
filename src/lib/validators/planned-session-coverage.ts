@@ -18,6 +18,16 @@ function boundedOptionalString(value: unknown, maxLength: number): string | unde
   return boundedRequiredString(value, maxLength) ?? undefined;
 }
 
+function hasCompleteLessonTreatment(value: string): boolean {
+  const treatment = parseJsonObject(value);
+  return Boolean(
+    treatment &&
+    typeof treatment.topic === 'string' &&
+    typeof treatment.explanation === 'string' &&
+    Array.isArray(treatment.exercises),
+  );
+}
+
 function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const parsed = value as Record<string, unknown>;
@@ -50,6 +60,15 @@ function normalizePlannedSessionCoverage(value: unknown): PlannedSessionCoverage
     MAX_LESSON_TREATMENT_LENGTH,
   );
   if (lessonTreatment) coverage.lessonTreatment = lessonTreatment;
+  if (
+    lessonTreatment &&
+    parsed.lessonTreatmentComplete === true &&
+    typeof parsed.lessonTreatment === 'string' &&
+    parsed.lessonTreatment.trim().length <= MAX_LESSON_TREATMENT_LENGTH &&
+    hasCompleteLessonTreatment(lessonTreatment)
+  ) {
+    coverage.lessonTreatmentComplete = true;
+  }
   const learningObjectiveId = boundedOptionalString(
     parsed.learningObjectiveId,
     MAX_OBJECTIVE_ID_LENGTH,
@@ -63,16 +82,19 @@ export function buildPlannedSessionCoverage(input: {
   exercises: Exercise[];
   learningObjectiveId?: unknown;
 }): PlannedSessionCoverage {
+  const lessonTreatment = JSON.stringify({
+    topic: input.lesson.topic,
+    explanation: input.lesson.explanation,
+    exercises: input.exercises,
+  });
   const coverage = normalizePlannedSessionCoverage({
     version: 1,
     category: input.lesson.category,
     learningObjectiveId: input.learningObjectiveId,
     lessonTopic: input.lesson.topic,
-    lessonTreatment: JSON.stringify({
-      topic: input.lesson.topic,
-      explanation: input.lesson.explanation,
-      exercises: input.exercises,
-    }),
+    lessonTreatment,
+    lessonTreatmentComplete:
+      lessonTreatment.length <= MAX_LESSON_TREATMENT_LENGTH ? true : undefined,
     culturalNote: input.lesson.culturalNote,
     keyPhraseDetails: input.lesson.keyPhrases,
   });
