@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-07-15
+**Last updated:** 2026-08-04
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -32,7 +32,7 @@ Use this index before following older plans or decisions. Status labels are cons
 - Status: active
 - Description: Prompt/content quality guidance for AI-generated learning sessions, including Learn-cycle topic category order and Travel Essentials rails.
 - Source files affected: `src/lib/server/ai-session-prompts.ts`, `src/lib/topic-categories.ts`, `src/lib/server/session-coverage-evidence.ts`, `src/lib/server/ai.ts`, `src/routes/api/session/**`
-- Last verified: 2026-07-02
+- Last verified: 2026-08-04
 
 ### `documents/plans/inline-audio-tts.md`
 
