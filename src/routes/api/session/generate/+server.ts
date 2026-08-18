@@ -91,6 +91,28 @@ function failedGenerationUsage(error: unknown): FailedGenerationUsage | null {
   return { model, input, output };
 }
 
+async function generateSessionPlanWithTimeout(
+  input: Parameters<typeof generateSessionPlan>[0],
+  timeoutMs: number,
+): ReturnType<typeof generateSessionPlan> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
+
+  try {
+    return await withAbort(
+      generateSessionPlan(input, { signal: controller.signal }),
+      controller.signal,
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('timeout', { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function legacySummaryToHistory(summary: string): SessionHistoryItem {
   return {
     date: new Date().toISOString(),
@@ -298,113 +320,105 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       .slice(0, 5)
       .map((item) => item.answerText.trim());
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort('timeout'),
-      resolveSessionGenerationTimeoutMs(),
-    );
+    const generationTimeoutMs = resolveSessionGenerationTimeoutMs();
     let plan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
 
-    try {
-      let lastError: Error | null = null;
-      let curriculumValidationFeedback: string[] = [];
-      for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
-        try {
-          const generatedPlan = await withAbort(
-            generateSessionPlan({
-              userId: user.id,
-              userName: user.name,
-              userLevel: user.level,
-              japaneseWritingEnabled: user.japaneseWritingEnabled,
-              exerciseCount,
-              sessionHistory,
-              recentAccuracy,
-              coveredTopics,
-              totalSessionCount: coverageEvidence.source.totalCompletedAiSessions,
-              coverageEvidence: coverageEvidence.promptSnapshot,
-              learningJournal: user.progressJournal,
-              curriculumValidationFeedback,
-              performanceInsights: {
-                overallAccuracy,
-                weakExerciseIds,
-                strongExerciseIds,
-                recentWrongAnswers,
-              },
-            }),
-            controller.signal,
-          );
+    let lastError: Error | null = null;
+    let curriculumValidationFeedback: string[] = [];
+    for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        const generatedPlan = await generateSessionPlanWithTimeout(
+          {
+            userId: user.id,
+            userName: user.name,
+            userLevel: user.level,
+            japaneseWritingEnabled: user.japaneseWritingEnabled,
+            exerciseCount,
+            sessionHistory,
+            recentAccuracy,
+            coveredTopics,
+            totalSessionCount: coverageEvidence.source.totalCompletedAiSessions,
+            coverageEvidence: coverageEvidence.promptSnapshot,
+            learningJournal: user.progressJournal,
+            curriculumValidationFeedback,
+            performanceInsights: {
+              overallAccuracy,
+              weakExerciseIds,
+              strongExerciseIds,
+              recentWrongAnswers,
+            },
+          },
+          generationTimeoutMs,
+        );
 
-          const validation = validateGeneratedSessionPlan({
-            plan: generatedPlan,
-            coverageEvidence,
+        const validation = validateGeneratedSessionPlan({
+          plan: generatedPlan,
+          coverageEvidence,
+        });
+        if (!validation.valid) {
+          await recordUsageEvent({
+            userId,
+            sessionId: null,
+            model: generatedPlan.model,
+            tokensIn: generatedPlan.tokenUsage.input,
+            tokensOut: generatedPlan.tokenUsage.output,
           });
-          if (!validation.valid) {
-            await recordUsageEvent({
-              userId,
-              sessionId: null,
-              model: generatedPlan.model,
-              tokensIn: generatedPlan.tokenUsage.input,
-              tokensOut: generatedPlan.tokenUsage.output,
-            });
-            lastError = new Error('Generated session failed curriculum validation.');
-            curriculumValidationFeedback = validationFeedbackForRetry(validation);
-            console.warn('[api/session/generate] curriculum validation failed', {
-              attempt,
-              maxAttempts: MAX_GENERATION_ATTEMPTS,
-              userId,
-              ...curriculumDiagnosticContext(coverageEvidence),
-              validationReasonCodes: validation.reasonCodes,
-              generatedLearningObjectiveStatus: validation.details.generatedLearningObjectiveStatus,
-              generatedCategory: validation.details.generatedCategory,
-              blockedCategories: validation.details.blockedCategories,
-              preferredCategories: validation.details.preferredCategories,
-              repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
-              intentionalReviewStatus: validation.details.intentionalReviewStatus,
-            });
-            continue;
-          }
-
-          logInfo('api/session/generate', 'curriculum plan approved', {
+          lastError = new Error('Generated session failed curriculum validation.');
+          curriculumValidationFeedback = validationFeedbackForRetry(validation);
+          console.warn('[api/session/generate] curriculum validation failed', {
             attempt,
-            validationReasonCodes: validation.reasonCodes,
+            maxAttempts: MAX_GENERATION_ATTEMPTS,
+            userId,
             ...curriculumDiagnosticContext(coverageEvidence),
+            validationReasonCodes: validation.reasonCodes,
+            generatedLearningObjectiveStatus: validation.details.generatedLearningObjectiveStatus,
+            generatedCategory: validation.details.generatedCategory,
+            blockedCategories: validation.details.blockedCategories,
+            preferredCategories: validation.details.preferredCategories,
+            repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
+            intentionalReviewStatus: validation.details.intentionalReviewStatus,
           });
-          plan = generatedPlan;
-          break;
-        } catch (error) {
-          if (controller.signal.aborted) {
-            throw error;
-          }
+          continue;
+        }
 
-          const rejectedUsage = failedGenerationUsage(error);
-          if (rejectedUsage) {
-            await recordUsageEvent({
-              userId,
-              sessionId: null,
-              model: rejectedUsage.model,
-              tokensIn: rejectedUsage.input,
-              tokensOut: rejectedUsage.output,
-            });
-          }
+        logInfo('api/session/generate', 'curriculum plan approved', {
+          attempt,
+          validationReasonCodes: validation.reasonCodes,
+          ...curriculumDiagnosticContext(coverageEvidence),
+        });
+        plan = generatedPlan;
+        break;
+      } catch (error) {
+        if (error instanceof Error && error.message === 'timeout') {
+          throw error;
+        }
 
-          lastError = error instanceof Error ? error : new Error(String(error));
-          if (attempt < MAX_GENERATION_ATTEMPTS) {
-            console.warn('[api/session/generate] generation attempt failed, retrying', {
-              attempt,
-              maxAttempts: MAX_GENERATION_ATTEMPTS,
-              userId,
-              error: lastError.message,
-            });
-            continue;
-          }
+        const rejectedUsage = failedGenerationUsage(error);
+        if (rejectedUsage) {
+          await recordUsageEvent({
+            userId,
+            sessionId: null,
+            model: rejectedUsage.model,
+            tokensIn: rejectedUsage.input,
+            tokensOut: rejectedUsage.output,
+          });
+        }
+
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < MAX_GENERATION_ATTEMPTS) {
+          console.warn('[api/session/generate] generation attempt failed, retrying', {
+            attempt,
+            maxAttempts: MAX_GENERATION_ATTEMPTS,
+            userId,
+            error: lastError.message,
+          });
+          continue;
         }
       }
+    }
 
-      if (!plan) {
-        throw lastError ?? new Error('Failed to generate AI teaching session.');
-      }
-    } finally {
-      clearTimeout(timeoutId);
+    if (!plan) {
+      throw lastError ?? new Error('Failed to generate AI teaching session.');
     }
 
     const session = await createSessionRecord({

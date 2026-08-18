@@ -177,21 +177,27 @@ export class SessionPlanGenerationError extends Error {
   }
 }
 
-export async function generateSessionPlan(input: SessionPlanPromptInput): Promise<SessionPlan> {
+export async function generateSessionPlan(
+  input: SessionPlanPromptInput,
+  options: { signal?: AbortSignal } = {},
+): Promise<SessionPlan> {
   const client = getOpenAiClient();
   const sessionPrompt = buildSessionPlanPrompt(input);
   const { targetExerciseCount } = sessionPrompt;
 
-  const response = await client.responses.create({
-    model: SESSION_MODEL,
-    temperature: 0.3,
-    input: sessionPrompt.messages,
-    text: {
-      format: {
-        type: 'json_object',
+  const response = await client.responses.create(
+    {
+      model: SESSION_MODEL,
+      temperature: 0.3,
+      input: sessionPrompt.messages,
+      text: {
+        format: {
+          type: 'json_object',
+        },
       },
     },
-  });
+    options.signal ? { signal: options.signal } : undefined,
+  );
   const usage = getUsageFromResponse(response);
 
   try {

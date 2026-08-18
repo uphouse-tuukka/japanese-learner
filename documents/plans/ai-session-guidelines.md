@@ -158,3 +158,4 @@
 - **Model:** gpt-5.4 for Learn session generation and summaries
 - **Temperature:** 0.3 for generation, 0.2 for summaries
 - **Output format:** JSON mode enabled
+- **Generation timeout:** `SESSION_GENERATION_TIMEOUT_MS` applies independently to each generation attempt, and a timeout aborts the in-flight provider request.
