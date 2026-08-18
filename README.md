@@ -84,7 +84,7 @@ Important values:
 - `PRACTICE_MODE_ENABLED`: enables/disables practice mode features.
 - `MISSIONS_UNLOCK_ALL`: optional dev override to unlock all missions.
 - `DISABLE_PORTFOLIO_QUOTA`: dev-only portfolio/public challenge quota bypass.
-- `SESSION_GENERATION_TIMEOUT_MS`: AI session generation timeout in milliseconds (default `30000`).
+- `SESSION_GENERATION_TIMEOUT_MS`: Per-attempt AI session generation timeout in milliseconds (default `30000`).
 - `MONTHLY_TOKEN_BUDGET`: deprecated/unused; do not set it.
 
 ## Project docs

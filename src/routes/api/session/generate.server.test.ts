@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGenerateSessionPlan,
+  mockGenerateSessionPlanOptions,
   mockDeleteStaleGhostSessions,
   mockGetCompletedAiExerciseResultsForUser,
   mockGetCompletedAiSessionsForUser,
@@ -14,6 +15,7 @@ const {
   mockGetUser,
 } = vi.hoisted(() => ({
   mockGenerateSessionPlan: vi.fn(),
+  mockGenerateSessionPlanOptions: vi.fn(),
   mockDeleteStaleGhostSessions: vi.fn(),
   mockGetCompletedAiExerciseResultsForUser: vi.fn(),
   mockGetCompletedAiSessionsForUser: vi.fn(),
@@ -27,7 +29,10 @@ const {
 }));
 
 vi.mock('$lib/server/ai', () => ({
-  generateSessionPlan: mockGenerateSessionPlan,
+  generateSessionPlan: (input: unknown, options: unknown) => {
+    mockGenerateSessionPlanOptions(options);
+    return mockGenerateSessionPlan(input);
+  },
   TOPIC_CATEGORIES: [
     { key: 'greetings_basics' },
     { key: 'travel_essentials' },
@@ -418,6 +423,7 @@ describe('POST /api/session/generate', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     mockGenerateSessionPlan.mockReset();
+    mockGenerateSessionPlanOptions.mockReset();
     mockDeleteStaleGhostSessions.mockReset();
     mockGetCompletedAiExerciseResultsForUser.mockReset();
     mockGetCompletedAiSessionsForUser.mockReset();
@@ -1255,6 +1261,64 @@ describe('POST /api/session/generate', () => {
       ok: false,
       error: expect.stringMatching(/timed out/i),
     });
+    const options = mockGenerateSessionPlanOptions.mock.calls[0]?.[0] as {
+      signal?: AbortSignal;
+    };
+    expect(options.signal?.aborted).toBe(true);
+  });
+
+  it('gives a curriculum-validation retry its own generation timeout', async () => {
+    vi.stubEnv('SESSION_GENERATION_TIMEOUT_MS', '50');
+    mockGenerateSessionPlan
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  buildGeneratedPlan({
+                    lesson: alternateCategoryLesson,
+                    tokenUsage: { input: 11, output: 22 },
+                  }),
+                ),
+              35,
+            ),
+          ),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  buildGeneratedPlan({
+                    lesson: { topic: 'First greetings', category: 'greetings_basics' },
+                    tokenUsage: { input: 13, output: 21 },
+                  }),
+                ),
+              35,
+            ),
+          ),
+      );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockCreateSessionRecord).toHaveBeenCalledTimes(1);
+    expect(mockGenerateSessionPlanOptions).toHaveBeenNthCalledWith(1, {
+      signal: expect.any(AbortSignal),
+    });
+    expect(mockGenerateSessionPlanOptions).toHaveBeenNthCalledWith(2, {
+      signal: expect.any(AbortSignal),
+    });
+    const firstOptions = mockGenerateSessionPlanOptions.mock.calls[0]?.[0] as {
+      signal?: AbortSignal;
+    };
+    const secondOptions = mockGenerateSessionPlanOptions.mock.calls[1]?.[0] as {
+      signal?: AbortSignal;
+    };
+    expect(firstOptions.signal).not.toBe(secondOptions.signal);
   });
 
   it('records rejected generation usage with a null session id and retries after curriculum validation rejects the first plan', async () => {

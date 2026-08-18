@@ -478,6 +478,23 @@ describe('generateSessionPlan — anti-repeat cultural note context', () => {
     mockModelOutput(minimalSessionPlanPayload());
   });
 
+  it('passes an abort signal to the OpenAI request', async () => {
+    const controller = new AbortController();
+
+    await generateSessionPlan(
+      {
+        userId: 'user-1',
+        userName: 'Tester',
+        userLevel: 'beginner',
+        coverageEvidence: defaultCoverageEvidence,
+        sessionHistory: [],
+      },
+      { signal: controller.signal },
+    );
+
+    expect(mockResponsesCreate.mock.calls[0]?.[1]).toEqual({ signal: controller.signal });
+  });
+
   it('includes a RECENT CULTURAL NOTES block when session history has cultural notes', async () => {
     await generateSessionPlan({
       userId: 'user-1',
