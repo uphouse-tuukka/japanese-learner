@@ -153,6 +153,11 @@ function validationFeedbackForRetry(
     );
   }
   if (validation.reasonCodes.includes('repeated_key_phrases')) {
+    if (validation.details.repeatedNonReviewKeyPhrases.length > 0) {
+      feedback.push(
+        `Replace these rejected Lesson Key Phrases with fresh phrases: ${validation.details.repeatedNonReviewKeyPhrases.join('; ')}.`,
+      );
+    }
     feedback.push(
       'Do not repeat any covered Lesson Key Phrase unless it is the explicitly selected Review Candidate.',
     );

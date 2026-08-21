@@ -1178,6 +1178,18 @@ function buildPromptSnapshot(input: {
   coveredKeyPhrases: CoveredKeyPhrase[];
   reviewCandidates: ReviewCandidate[];
 }): CompactCoverageEvidence {
+  const selectedCategory = input.categoryRotation.selectedCategory;
+  const prioritizedTopics = prioritizeSelectedCategory(
+    input.coveredTopics,
+    selectedCategory,
+    MAX_PROMPT_AVOID_TOPICS,
+  );
+  const prioritizedKeyPhrases = prioritizeSelectedCategory(
+    input.coveredKeyPhrases,
+    selectedCategory,
+    MAX_PROMPT_AVOID_KEY_PHRASES,
+  );
+
   return {
     source: input.source,
     categoryRotation: input.categoryRotation,
@@ -1192,28 +1204,37 @@ function buildPromptSnapshot(input: {
       count: category.count,
       lastSeenAt: category.lastSeenAt,
     })),
-    avoidTopics: input.coveredTopics.slice(0, MAX_PROMPT_AVOID_TOPICS).map((topic) => ({
+    avoidTopics: prioritizedTopics.map((topic) => ({
       identity: truncatePromptField(topic.identity),
       topic: truncatePromptField(topic.topic),
       category: topic.category,
       count: topic.count,
       lastSeenAt: topic.lastSeenAt,
     })),
-    avoidKeyPhrases: input.coveredKeyPhrases
-      .slice(0, MAX_PROMPT_AVOID_KEY_PHRASES)
-      .map((phrase) => ({
-        primaryIdentity: truncatePromptField(phrase.primaryIdentity),
-        identities: phrase.identities.map(truncatePromptField),
-        display: truncatePromptField(phrase.display),
-        category: phrase.category,
-        topic: truncateOptionalPromptField(phrase.topic),
-        count: phrase.count,
-        lastSeenAt: phrase.lastSeenAt,
-      })),
+    avoidKeyPhrases: prioritizedKeyPhrases.map((phrase) => ({
+      primaryIdentity: truncatePromptField(phrase.primaryIdentity),
+      identities: phrase.identities.map(truncatePromptField),
+      display: truncatePromptField(phrase.display),
+      category: phrase.category,
+      topic: truncateOptionalPromptField(phrase.topic),
+      count: phrase.count,
+      lastSeenAt: phrase.lastSeenAt,
+    })),
     reviewCandidates: input.reviewCandidates
       .slice(0, MAX_PROMPT_REVIEW_CANDIDATES)
       .map(promptReviewCandidate),
   };
+}
+
+function prioritizeSelectedCategory<T extends { category?: TopicCategoryKey }>(
+  items: T[],
+  selectedCategory: TopicCategoryKey,
+  limit: number,
+): T[] {
+  return [
+    ...items.filter((item) => item.category === selectedCategory),
+    ...items.filter((item) => item.category !== selectedCategory),
+  ].slice(0, limit);
 }
 
 function truncatePromptField(value: string): string {
