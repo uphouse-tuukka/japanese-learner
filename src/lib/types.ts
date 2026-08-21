@@ -273,6 +273,7 @@ export interface SessionMeta {
   keyPhraseDetails?: SessionKeyPhraseDetail[];
   culturalNote?: string;
   miniLesson?: SessionMiniLesson | null;
+  levelUpRecommendation?: LevelUpRecommendation | null;
   hadLevelUpRecommendation?: boolean;
   coverageSource?: 'server_generated_plan' | 'legacy_client_fallback';
 }

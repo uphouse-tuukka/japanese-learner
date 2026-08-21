@@ -374,6 +374,7 @@ export async function generateSessionSummary(input: {
   ]);
   let levelUpRecommendation: SessionSummary['levelUpRecommendation'] = null;
   if (
+    !input.suppressPromotion &&
     nextLevel &&
     input.userLevel !== 'ready_for_japan' &&
     recommendationRaw &&

@@ -6,6 +6,7 @@ import type { SessionMeta, SessionReviewIntent, SessionSummary } from '$lib/type
 import {
   claimSessionCompletion,
   completeSessionRecord,
+  getLatestCompletedLearningSessionSummary,
   getProgressJournal,
   getRecentSessionSummaries,
   getSession,
@@ -113,7 +114,7 @@ function buildIdempotentSummary(
         accuracy: typeof meta.accuracy === 'number' ? meta.accuracy : 0,
         generatedAt: new Date().toISOString(),
         miniLesson: meta.miniLesson ?? null,
-        levelUpRecommendation: null,
+        levelUpRecommendation: meta.levelUpRecommendation ?? null,
       };
     } catch {
       return {
@@ -240,17 +241,19 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       handoffNotes = summary.nextSteps ?? [];
     } else {
       try {
-        const progressJournal = await getProgressJournal(userId);
-        const recentSessions = await getRecentSessionSummaries(userId, 5);
+        const [progressJournal, recentSessions, previousSessionSummary] = await Promise.all([
+          getProgressJournal(userId),
+          getRecentSessionSummaries(userId, 5),
+          getLatestCompletedLearningSessionSummary(userId),
+        ]);
         const recentSessionsCompact = recentSessions.map((s) => ({
           topic: s.topic,
           accuracy: s.accuracy,
           keyPhrases: s.keyPhrases.slice(0, 5),
           exerciseTypes: s.exerciseTypes,
         }));
-        const recentlyRecommendedPromotion = recentSessions.some(
-          (s) => s.hadLevelUpRecommendation === true,
-        );
+        const previousSessionRecommendedPromotion =
+          previousSessionSummary?.hadLevelUpRecommendation === true;
         const summaryInput = {
           sessionId,
           userId,
@@ -262,7 +265,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           recentSessions: recentSessionsCompact,
           exercises,
           results,
-          suppressPromotion: recentlyRecommendedPromotion,
+          suppressPromotion: previousSessionRecommendedPromotion,
         };
         const aiResult = await generateSessionSummary(summaryInput);
         summary = aiResult.summary;
@@ -323,6 +326,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,
         culturalNote,
         miniLesson: summary.miniLesson ?? null,
+        levelUpRecommendation: summary.levelUpRecommendation ?? null,
         hadLevelUpRecommendation: !!summary.levelUpRecommendation,
         coverageSource: 'server_generated_plan',
       } satisfies SessionMeta),

@@ -197,7 +197,7 @@ export async function getRecentSessionSummaries(userId: string, limit = 5): Prom
     sql: `
 SELECT summary
 FROM sessions
-WHERE user_id = ? AND status = 'completed' AND summary IS NOT NULL
+WHERE user_id = ? AND mode = 'ai' AND status = 'completed' AND summary IS NOT NULL
 ORDER BY datetime(completed_at) DESC, datetime(created_at) DESC
 LIMIT ?
 `,
@@ -218,6 +218,25 @@ LIMIT ?
   }
 
   return summaries;
+}
+
+/** Returns the immediately previous completed Learning Session summary without falling through malformed rows. */
+export async function getLatestCompletedLearningSessionSummary(
+  userId: string,
+): Promise<SessionMeta | null> {
+  const db = await getDb();
+  const result = await db.execute({
+    sql: `
+SELECT summary
+FROM sessions
+WHERE user_id = ? AND mode = 'ai' AND status = 'completed'
+ORDER BY datetime(completed_at) DESC, datetime(created_at) DESC
+LIMIT 1
+`,
+    args: [userId],
+  });
+  const raw = (result.rows[0] as Record<string, unknown> | undefined)?.summary;
+  return typeof raw === 'string' && raw.trim() ? parseSessionMeta(raw) : null;
 }
 
 export async function countSeedExercises(): Promise<number> {

@@ -1,8 +1,10 @@
-import type {
-  SessionKeyPhraseDetail,
-  SessionMeta,
-  SessionMiniLesson,
-  SessionReviewIntent,
+import {
+  LEVEL_ORDER,
+  type LevelUpRecommendation,
+  type SessionKeyPhraseDetail,
+  type SessionMeta,
+  type SessionMiniLesson,
+  type SessionReviewIntent,
 } from '$lib/types';
 import { asStringArray, parseJsonObject } from './common';
 
@@ -135,6 +137,27 @@ function parseMiniLesson(value: unknown): SessionMiniLesson | null | undefined {
   };
 }
 
+function parseLevelUpRecommendation(value: unknown): LevelUpRecommendation | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const raw = value as Record<string, unknown>;
+  if (
+    typeof raw.recommendedLevel !== 'string' ||
+    !LEVEL_ORDER.includes(raw.recommendedLevel as LevelUpRecommendation['recommendedLevel']) ||
+    typeof raw.reason !== 'string' ||
+    !raw.reason.trim()
+  ) {
+    return undefined;
+  }
+
+  return {
+    recommendedLevel: raw.recommendedLevel as LevelUpRecommendation['recommendedLevel'],
+    reason: raw.reason,
+  };
+}
+
 export function parseSessionMeta(value: string | null | undefined): SessionMeta | null {
   if (!value) {
     return null;
@@ -160,6 +183,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
   const nextSteps = asStringArray(parsed.nextSteps);
   const handoffNotes = asStringArray(parsed.handoffNotes);
   const miniLesson = parseMiniLesson(parsed.miniLesson);
+  const levelUpRecommendation = parseLevelUpRecommendation(parsed.levelUpRecommendation);
   const keyPhraseDetails = sanitizeKeyPhraseDetails(parsed.keyPhraseDetails);
   const reviewIntents = sanitizeReviewIntents(parsed.reviewIntents);
 
@@ -180,6 +204,7 @@ export function parseSessionMeta(value: string | null | undefined): SessionMeta 
     keyPhraseDetails: keyPhraseDetails.length > 0 ? keyPhraseDetails : undefined,
     culturalNote: typeof parsed.culturalNote === 'string' ? parsed.culturalNote : undefined,
     miniLesson,
+    levelUpRecommendation,
     hadLevelUpRecommendation:
       typeof parsed.hadLevelUpRecommendation === 'boolean'
         ? parsed.hadLevelUpRecommendation
