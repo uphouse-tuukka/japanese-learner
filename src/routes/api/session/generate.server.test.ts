@@ -1378,6 +1378,59 @@ describe('POST /api/session/generate', () => {
     });
   });
 
+  it('identifies rejected Lesson Key Phrases so the retry can replace them', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGetCompletedAiSessionsForUser.mockResolvedValueOnce([
+      buildCompletedAiSession({
+        id: 'completed-greeting',
+        createdAt: '2026-05-03T08:00:00.000Z',
+        category: 'greetings_basics',
+        topic: 'Earlier greeting context',
+        keyPhraseDetails: [keyPhrases[0]],
+      }),
+    ]);
+    mockGenerateSessionPlan.mockImplementation(
+      (input: { curriculumValidationFeedback?: string[] }) => {
+        const retryIdentifiesRejectedPhrase = input.curriculumValidationFeedback?.some((item) =>
+          item.includes('こんにちは'),
+        );
+        return Promise.resolve(
+          buildGeneratedPlan({
+            lesson: {
+              keyPhrases: retryIdentifiesRejectedPhrase
+                ? [
+                    keyPhrases[1],
+                    keyPhrases[2],
+                    {
+                      japanese: 'こんばんは',
+                      romaji: 'konbanwa',
+                      english: 'Good evening',
+                      usage: 'Use as an evening greeting.',
+                    },
+                  ]
+                : keyPhrases,
+            },
+          }),
+        );
+      },
+    );
+
+    const response = await generateSession({ userId: 'user-1', exerciseCount: 8 }, 'user-1');
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+    expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        curriculumValidationFeedback: expect.arrayContaining([
+          expect.stringContaining('こんにちは'),
+        ]),
+      }),
+    );
+    expect(mockCreateSessionRecord).toHaveBeenCalledTimes(1);
+  });
+
   it('retries when the model invents a Learning Objective identity', async () => {
     const logSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockGenerateSessionPlan

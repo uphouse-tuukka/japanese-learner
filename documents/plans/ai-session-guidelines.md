@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-21
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -148,6 +148,8 @@
 - Never repeat a covered canonical Learning Objective as fresh coverage, regardless of intervening-session count
 - Only the explicitly selected and currently eligible Review Candidate may authorize intentional repetition.
 - Keep exact Lesson Topic avoidance for lower-confidence legacy completed history
+- Within bounded prompt avoid lists, prioritize covered Lesson Topics and Lesson Key Phrases from the app-selected Topic Category before globally recent coverage.
+- When curriculum validation rejects repeated Lesson Key Phrases, identify those rejected phrases in the private retry feedback so the model can replace them with fresh phrases.
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries
 - Adjust difficulty based on recent accuracy (>80% increase, <50% reinforce)

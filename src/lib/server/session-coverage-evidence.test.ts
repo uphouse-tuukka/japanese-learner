@@ -1014,6 +1014,82 @@ describe('review candidate derivation', () => {
     expect(evidence.promptSnapshot.reviewCandidates).toHaveLength(5);
   });
 
+  it('prioritizes covered topics and phrases from the selected Topic Category in prompt caps', () => {
+    const otherCategories = [
+      'greetings_basics',
+      'travel_essentials',
+      'food_dining',
+      'transport',
+      'shopping',
+      'directions',
+      'hotel_accommodation',
+      'social_conversation',
+      'sightseeing_culture',
+      'bars_nightlife',
+    ] as const;
+    const recentSessions = otherCategories
+      .flatMap((category) => [0, 1, 2].map(() => category))
+      .map((category, index) =>
+        sourceSession(
+          `recent-${index}`,
+          category,
+          `Recent topic ${index}`,
+          new Date(Date.UTC(2026, 6, 1, index)).toISOString(),
+          {
+            keyPhraseDetails: [
+              {
+                romaji: `recent phrase ${index}`,
+                english: `Recent phrase ${index}`,
+              },
+            ],
+          },
+        ),
+      );
+    recentSessions.push(
+      sourceSession(
+        'recent-bars-final',
+        'bars_nightlife',
+        'Recent bar topic final',
+        new Date(Date.UTC(2026, 6, 2, 12)).toISOString(),
+        {
+          keyPhraseDetails: [{ romaji: 'recent bar phrase final' }],
+        },
+      ),
+    );
+
+    const evidence = buildCoverageEvidence({
+      sessions: [
+        ...recentSessions,
+        sourceSession(
+          'older-health',
+          'emergencies_health',
+          'Earlier symptom description',
+          '2026-06-01T08:00:00.000Z',
+          {
+            keyPhraseDetails: [
+              {
+                japanese: '呼吸が苦しいです',
+                romaji: 'kokyuu ga kurushii desu',
+                english: 'I am having difficulty breathing',
+              },
+            ],
+          },
+        ),
+      ],
+    });
+
+    expect(evidence.categoryRotation.selectedCategory).toBe('emergencies_health');
+    expect(evidence.promptSnapshot.avoidTopics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ identity: 'earlier symptom description' }),
+      ]),
+    );
+    expect(evidence.promptSnapshot.avoidKeyPhrases).toHaveLength(30);
+    expect(evidence.promptSnapshot.avoidKeyPhrases).toEqual(
+      expect.arrayContaining([expect.objectContaining({ primaryIdentity: 'ja:呼吸が苦しいです' })]),
+    );
+  });
+
   it('truncates prompt-facing evidence fields defensively', () => {
     const longTopic = `Ordering food ${'with very long context '.repeat(20)}`;
     const longPhrase = `sumimasen ${'with extra spelling detail '.repeat(20)}`;
