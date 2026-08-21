@@ -27,6 +27,7 @@ const {
   mockCompleteSessionRecord,
   mockGenerateSessionSummary,
   mockGenerateUpdatedJournal,
+  mockGetLatestCompletedLearningSessionSummary,
   mockGetProgressJournal,
   mockGetRecentSessionSummaries,
   mockGetSession,
@@ -45,6 +46,7 @@ const {
   mockCompleteSessionRecord: vi.fn(),
   mockGenerateSessionSummary: vi.fn(),
   mockGenerateUpdatedJournal: vi.fn(),
+  mockGetLatestCompletedLearningSessionSummary: vi.fn(),
   mockGetProgressJournal: vi.fn(),
   mockGetRecentSessionSummaries: vi.fn(),
   mockGetSession: vi.fn(),
@@ -63,6 +65,7 @@ const {
 vi.mock('$lib/server/db', () => ({
   claimSessionCompletion: mockClaimSessionCompletion,
   completeSessionRecord: mockCompleteSessionRecord,
+  getLatestCompletedLearningSessionSummary: mockGetLatestCompletedLearningSessionSummary,
   getProgressJournal: mockGetProgressJournal,
   getRecentSessionSummaries: mockGetRecentSessionSummaries,
   getSession: mockGetSession,
@@ -156,6 +159,7 @@ function expectNoWrites() {
   expect(mockClaimSessionCompletion).not.toHaveBeenCalled();
   expect(mockGetUserById).not.toHaveBeenCalled();
   expect(mockGetSessionExercises).not.toHaveBeenCalled();
+  expect(mockGetLatestCompletedLearningSessionSummary).not.toHaveBeenCalled();
   expect(mockGetProgressJournal).not.toHaveBeenCalled();
   expect(mockGetRecentSessionSummaries).not.toHaveBeenCalled();
   expect(mockGetSession).not.toHaveBeenCalled();
@@ -178,6 +182,7 @@ describe('POST /api/session/complete', () => {
     mockCompleteSessionRecord.mockReset();
     mockGenerateSessionSummary.mockReset();
     mockGenerateUpdatedJournal.mockReset();
+    mockGetLatestCompletedLearningSessionSummary.mockReset();
     mockGetProgressJournal.mockReset();
     mockGetRecentSessionSummaries.mockReset();
     mockGetSession.mockReset();
@@ -222,6 +227,7 @@ describe('POST /api/session/complete', () => {
       },
     });
     mockGetProgressJournal.mockResolvedValue(null);
+    mockGetLatestCompletedLearningSessionSummary.mockResolvedValue(null);
     mockGetRecentSessionSummaries.mockResolvedValue([]);
     mockGetSession.mockResolvedValue({
       id: 'session-1',
@@ -373,6 +379,11 @@ describe('POST /api/session/complete', () => {
           exerciseTypes: ['translation'],
           keyPhrases: ['こんにちは'],
           miniLesson: null,
+          levelUpRecommendation: {
+            recommendedLevel: 'elementary',
+            reason: 'Your recent sessions show consistent mastery.',
+          },
+          hadLevelUpRecommendation: true,
         }),
         createdAt: '2026-01-01T00:00:00.000Z',
         completedAt: '2026-01-01T00:05:00.000Z',
@@ -399,7 +410,10 @@ describe('POST /api/session/complete', () => {
         accuracy: 50,
         generatedAt: expect.any(String),
         miniLesson: null,
-        levelUpRecommendation: null,
+        levelUpRecommendation: {
+          recommendedLevel: 'elementary',
+          reason: 'Your recent sessions show consistent mastery.',
+        },
       },
       xp: null,
     });
@@ -907,6 +921,110 @@ describe('POST /api/session/complete', () => {
       ],
     });
   });
+
+  it('persists the complete promotion recommendation for completion retries', async () => {
+    mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+    mockGenerateSessionSummary.mockResolvedValueOnce({
+      summary: {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        summary: 'Your recent work shows consistent mastery.',
+        strengths: ['Strong recall'],
+        weaknesses: ['Keep expanding your range'],
+        accuracy: 100,
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        levelUpRecommendation: {
+          recommendedLevel: 'elementary',
+          reason: 'Your recent sessions show consistent mastery.',
+        },
+      },
+      handoffNotes: [],
+      reviewIntents: [],
+      tokenUsage: { model: 'gpt-5.4', tokensIn: 10, tokensOut: 20 },
+    });
+
+    const response = await completeSession({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      results: validResults(),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      summary: {
+        levelUpRecommendation: {
+          recommendedLevel: 'elementary',
+          reason: 'Your recent sessions show consistent mastery.',
+        },
+      },
+    });
+    const [, completion] = mockCompleteSessionRecord.mock.calls[0] as [string, { summary: string }];
+    expect(JSON.parse(completion.summary)).toMatchObject({
+      levelUpRecommendation: {
+        recommendedLevel: 'elementary',
+        reason: 'Your recent sessions show consistent mastery.',
+      },
+      hadLevelUpRecommendation: true,
+    });
+  });
+
+  it.each([
+    {
+      name: 'the immediately previous Learning Session included a promotion',
+      previousPromotionFlag: true,
+      recentPromotionFlags: [],
+      expectedSuppression: true,
+    },
+    {
+      name: 'only an older parseable session included a promotion',
+      previousPromotionFlag: null,
+      recentPromotionFlags: [true],
+      expectedSuppression: false,
+    },
+  ])(
+    'suppresses promotion when $name',
+    async ({ previousPromotionFlag, recentPromotionFlags, expectedSuppression }) => {
+      mockCheckBudget.mockResolvedValueOnce({ allowed: true });
+      mockGetLatestCompletedLearningSessionSummary.mockResolvedValueOnce(
+        previousPromotionFlag === null
+          ? null
+          : {
+              summaryText: 'Immediately previous summary',
+              topic: 'Immediately previous topic',
+              accuracy: 90,
+              strengths: ['Consistent recall'],
+              weaknesses: [],
+              exerciseTypes: ['translation'],
+              keyPhrases: [],
+              hadLevelUpRecommendation: previousPromotionFlag,
+            },
+      );
+      mockGetRecentSessionSummaries.mockResolvedValueOnce(
+        recentPromotionFlags.map((hadLevelUpRecommendation, index) => ({
+          summaryText: `Recent summary ${index + 1}`,
+          topic: `Recent topic ${index + 1}`,
+          accuracy: 90,
+          strengths: ['Consistent recall'],
+          weaknesses: [],
+          exerciseTypes: ['translation'],
+          keyPhrases: [],
+          hadLevelUpRecommendation,
+        })),
+      );
+
+      const response = await completeSession({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        results: validResults(),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockGetLatestCompletedLearningSessionSummary).toHaveBeenCalledWith('user-1');
+      expect(mockGenerateSessionSummary).toHaveBeenCalledWith(
+        expect.objectContaining({ suppressPromotion: expectedSuppression }),
+      );
+    },
+  );
 
   it('ignores partially malformed browser-authored key phrase details', async () => {
     const response = await completeSession({

@@ -217,6 +217,26 @@ describe('generateSessionSummary', () => {
     });
   });
 
+  it('passes through an eligible next-level promotion unless promotion is suppressed', async () => {
+    const promotion = {
+      recommendedLevel: 'elementary',
+      reason: 'Recent sessions show consistent mastery above 80 percent.',
+    };
+    mockModelOutput(validSummaryModelPayload({ levelUpRecommendation: promotion }));
+
+    const eligibleResult = await generateSessionSummary(baseSessionInput());
+
+    expect(eligibleResult.summary.levelUpRecommendation).toEqual(promotion);
+
+    mockModelOutput(validSummaryModelPayload({ levelUpRecommendation: promotion }));
+    const suppressedResult = await generateSessionSummary({
+      ...baseSessionInput(),
+      suppressPromotion: true,
+    });
+
+    expect(suppressedResult.summary.levelUpRecommendation).toBeNull();
+  });
+
   it('returns null miniLesson when the model omits mini_lesson', async () => {
     mockModelOutput(validSummaryModelPayload({ mini_lesson: undefined }));
 

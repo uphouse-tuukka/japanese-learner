@@ -125,7 +125,7 @@ A newly generated Learning Session stores its Topic Category, canonical Learning
 Learning Session completion uses that stored metadata even when resumed browser lesson data is missing or altered.
 Learning Session completion fails closed when valid server-owned planned metadata is unavailable and never accepts browser-authored coverage as a fallback.
 Legacy completed sessions without canonical Learning Objective identities retain exact normalized Lesson Topic and Lesson Key Phrase coverage at lower confidence.
-A completed retry by the same user returns the stored completion summary without duplicate exercise results, XP, token usage, or journal side effects.
+A completed retry by the same user returns the stored completion summary, including any promotion recommendation, without duplicate exercise results, XP, token usage, or journal side effects.
 A concurrent completion for the same in-flight claim returns `409`, and an unknown or cross-user completed session returns `404`.
 Stale `completing` claims older than 30 minutes are reclaimed or removed with their partial exercise results when new session work starts.
 Journal generation, compare-and-swap persistence, and token telemetry run inside Vercel's supported deferred function lifecycle after the completed record is durable.

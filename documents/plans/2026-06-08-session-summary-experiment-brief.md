@@ -106,6 +106,14 @@ Verification evidence from the prototype lock:
   - 51 test files / 407 tests;
   - build.
 
+## Production promotion behavior
+
+Updated: 2026-08-21
+
+- When a completed Learning Session includes a promotion recommendation, show it after Today’s Unlock and before milestones or session exit actions.
+- Persist the complete recommendation so an idempotent completion retry restores the same promotion opportunity.
+- Suppress a new recommendation only when the immediately previous completed Learning Session included one, and enforce that suppression after model output is normalized.
+
 ## Constraints and non-goals
 
 - This is a product/design direction brief, not the implementation plan.

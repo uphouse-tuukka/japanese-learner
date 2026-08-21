@@ -85,6 +85,14 @@
 - Persistence must compare the journal snapshot used for generation with the current stored value, and a stale update must not overwrite newer Learning Journal state.
 - Provider token accounting must still be attempted if journal persistence fails or detects a stale source snapshot.
 
+### Level-up recommendations
+
+- Session-summary generation may recommend only the next level in the canonical level order.
+- When the immediately previous completed Learning Session included a level-up recommendation, the next Learning Session suppresses another recommendation.
+- Practice sessions and older Learning Sessions do not extend that suppression window.
+- The server enforces suppression even if the model returns a recommendation anyway.
+- Completion persists the complete recommendation and restores it on an idempotent completion retry so the learner retains the same promotion opportunity.
+
 ### Review Evidence
 
 - Review Candidates must represent current unresolved item-level weakness, not every historical mistake.

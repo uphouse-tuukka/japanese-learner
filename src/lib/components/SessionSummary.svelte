@@ -158,7 +158,75 @@
         </blockquote>
       </section>
 
-      <section class="actions-card stagger-3 stagger-item" aria-label="Session actions">
+      {#if recommendation && levelUpStatus !== 'declined'}
+        <section class="level-up-card stagger-3 stagger-item" aria-label="Level up recommendation">
+          <div class="level-up-content">
+            <div class="level-up-header">
+              <span class="level-up-icon" aria-hidden="true"></span>
+              <h3>Promotion Available!</h3>
+            </div>
+
+            <p class="level-up-reason">
+              <RichJapaneseText text={recommendation.reason} />
+            </p>
+
+            <div class="level-transition">
+              <div class="level-box old">
+                <span class="label">Current</span>
+                <span class="value">{currentLevelLabel}</span>
+              </div>
+              <div class="level-arrow" aria-hidden="true">→</div>
+              <div class="level-box new">
+                <span class="label">Next Level</span>
+                <span class="value">
+                  {nextLevelLabel}
+                  {#if isReadyForJapan}
+                    🇯🇵
+                  {/if}
+                </span>
+              </div>
+            </div>
+
+            <div class="level-actions">
+              {#if levelUpStatus === 'accepted'}
+                <div class="success-message">
+                  <span class="hanko-success">合格</span>
+                  <div>
+                    <strong>Omedetou!</strong>
+                    <span class="sub">Level updated successfully.</span>
+                  </div>
+                </div>
+              {:else if levelUpStatus === 'error'}
+                <div class="error-message">
+                  Something went wrong. Please try again.
+                  <button class="btn-text" onclick={() => (levelUpStatus = 'idle')}>Retry</button>
+                </div>
+              {:else}
+                <button
+                  class="btn btn-celebrate"
+                  onclick={acceptLevelUp}
+                  disabled={levelUpStatus === 'loading'}
+                >
+                  {#if levelUpStatus === 'loading'}
+                    Updating...
+                  {:else}
+                    Accept Promotion
+                  {/if}
+                </button>
+                <button
+                  class="btn btn-gentle"
+                  onclick={declineLevelUp}
+                  disabled={levelUpStatus === 'loading'}
+                >
+                  Not Yet
+                </button>
+              {/if}
+            </div>
+          </div>
+        </section>
+      {/if}
+
+      <section class="actions-card stagger-5 stagger-item" aria-label="Session actions">
         <div>
           <h3>Ready to close the session?</h3>
           <p>The takeaway is saved. No extra drill hiding here.</p>
@@ -199,74 +267,6 @@
         </div>
       </section>
     {/each}
-  {/if}
-
-  {#if recommendation && levelUpStatus !== 'declined'}
-    <section class="level-up-card stagger-5 stagger-item" aria-label="Level up recommendation">
-      <div class="level-up-content">
-        <div class="level-up-header">
-          <span class="level-up-icon" aria-hidden="true"></span>
-          <h3>Promotion Available!</h3>
-        </div>
-
-        <p class="level-up-reason">
-          <RichJapaneseText text={recommendation.reason} />
-        </p>
-
-        <div class="level-transition">
-          <div class="level-box old">
-            <span class="label">Current</span>
-            <span class="value">{currentLevelLabel}</span>
-          </div>
-          <div class="level-arrow" aria-hidden="true">→</div>
-          <div class="level-box new">
-            <span class="label">Next Level</span>
-            <span class="value">
-              {nextLevelLabel}
-              {#if isReadyForJapan}
-                🇯🇵
-              {/if}
-            </span>
-          </div>
-        </div>
-
-        <div class="level-actions">
-          {#if levelUpStatus === 'accepted'}
-            <div class="success-message">
-              <span class="hanko-success">合格</span>
-              <div>
-                <strong>Omedetou!</strong>
-                <span class="sub">Level updated successfully.</span>
-              </div>
-            </div>
-          {:else if levelUpStatus === 'error'}
-            <div class="error-message">
-              Something went wrong. Please try again.
-              <button class="btn-text" onclick={() => (levelUpStatus = 'idle')}>Retry</button>
-            </div>
-          {:else}
-            <button
-              class="btn btn-celebrate"
-              onclick={acceptLevelUp}
-              disabled={levelUpStatus === 'loading'}
-            >
-              {#if levelUpStatus === 'loading'}
-                Updating...
-              {:else}
-                Accept Promotion
-              {/if}
-            </button>
-            <button
-              class="btn btn-gentle"
-              onclick={declineLevelUp}
-              disabled={levelUpStatus === 'loading'}
-            >
-              Not Yet
-            </button>
-          {/if}
-        </div>
-      </div>
-    </section>
   {/if}
 </section>
 

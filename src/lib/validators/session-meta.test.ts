@@ -21,6 +21,10 @@ function validSessionMeta(overrides: Record<string, unknown> = {}) {
       english: 'What do you recommend?',
       note: 'Useful when choosing from a menu.',
     },
+    levelUpRecommendation: {
+      recommendedLevel: 'elementary',
+      reason: 'Recent sessions show consistent mastery.',
+    },
     hadLevelUpRecommendation: true,
     ...overrides,
   });
@@ -48,6 +52,10 @@ describe('parseSessionMeta', () => {
         romaji: 'osusume wa nan desu ka',
         english: 'What do you recommend?',
         note: 'Useful when choosing from a menu.',
+      },
+      levelUpRecommendation: {
+        recommendedLevel: 'elementary',
+        reason: 'Recent sessions show consistent mastery.',
       },
       hadLevelUpRecommendation: true,
     });
