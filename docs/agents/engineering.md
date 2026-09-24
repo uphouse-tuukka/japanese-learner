@@ -45,12 +45,6 @@ Repository-specific validation commands and product or permission boundaries sti
 - When doing bug fixes, always start by reproducing the bug in an end-to-end setting that is as close as practical to how an end user experiences it.
   This ensures the fix addresses the real problem.
 
-## Development Servers
-
-- Whenever launching or opening a server that the user is intended to access, such as a server presenting visual variants, make it accessible from another computer over Tailscale because work on this machine is performed through SSH.
-  Do not bind such servers only to localhost.
-  Use a tailnet-accessible binding or Tailscale Serve as appropriate, keep the server off the public internet unless explicitly requested, and provide the reachable URL.
-
 ## End-to-End Review
 
 The discovered defects below are an explicit exception to the usual restriction on unrelated changes.
