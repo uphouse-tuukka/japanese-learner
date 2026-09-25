@@ -42,7 +42,8 @@ It did not use live OpenAI services, microphone hardware, or browser acceptance 
 - Missed regression: `audio_too_large`, `unsupported_audio_type`, or `empty_transcript` could accidentally become a generic 500 response or expose an unsafe message even though lower-level tests remain green.
 - Evidence: the route tests authentication, request parsing, budget failure, success, and unexpected errors, but no expected `SpeakingCheckError` branch.
 - Recommendation: add one public-route case for each distinct status/message contract without parameterising the cases.
-- Result: implemented with three independent route cases.
+- Result: implemented with three independent route cases that exercise the real compatibility adapter while mocking only the shared voice boundary.
+  Each case proves the corresponding `VoiceAssessmentError` is mapped through `checkSpeakingAnswer` to the route's safe 400 response.
 
 ### P2: Shared voice coverage should own size and usage-shape behavior explicitly
 
@@ -95,6 +96,7 @@ No test was skipped, hidden through parameterisation, or weakened to obtain the 
 
 Meaningful coverage improved at the learner-facing HTTP boundary.
 The suite now proves the distinct safe 400 responses for oversized audio, unsupported audio, and missing speech, including that provider-specific details are not returned.
+Those route cases traverse the compatibility adapter, so regressions in `VoiceAssessmentError` to `SpeakingCheckError` mapping cannot be masked by directly injecting the post-mapping error.
 Shared voice tests now directly own maximum-size validation, duration-only usage behavior, exact token accounting, transcription guardrails, and semantic assessment guardrails.
 
 Checks run:
