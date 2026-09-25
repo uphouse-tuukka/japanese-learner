@@ -43,7 +43,7 @@ vi.mock('$lib/server/config', () => ({
   },
 }));
 
-import { assessMissionVoiceTurn } from '$lib/server/voice-assessment';
+import { assessMissionVoiceTurn, transcribeJapaneseAudio } from '$lib/server/voice-assessment';
 
 function validMissionInput() {
   return {
@@ -84,7 +84,38 @@ describe('assessMissionVoiceTurn', () => {
       expect.objectContaining({ language: 'ja' }),
     );
     expect(mockClient.responses.create).toHaveBeenCalledTimes(1);
-    expect(mockRecordUsageEvent).toHaveBeenCalledTimes(2);
+    expect(mockRecordUsageEvent.mock.calls.map(([event]) => event)).toEqual(
+      expect.arrayContaining([
+        {
+          userId: 'user-1',
+          model: 'gpt-4o-mini-transcribe',
+          tokensIn: 12,
+          tokensOut: 4,
+        },
+        {
+          userId: 'user-1',
+          model: 'gpt-4.1',
+          tokensIn: 100,
+          tokensOut: 20,
+        },
+      ]),
+    );
+
+    const transcriptionRequest = mockClient.audio.transcriptions.create.mock.calls[0]?.[0];
+    const transcriptionPrompt = transcriptionRequest.prompt as string;
+    expect(transcriptionPrompt).toContain('Japanese learner speaking practice');
+    expect(transcriptionPrompt).toContain(
+      'Communicative goal: Order one item politely in Japanese.',
+    );
+    expect(transcriptionPrompt).toContain(
+      'Possible successful responses: ラーメンをください; ラーメンをお願いします',
+    );
+    expect(transcriptionPrompt).toContain(
+      'Use this context only to resolve close or ambiguous Japanese speech',
+    );
+    expect(transcriptionPrompt).toContain(
+      'Do not invent or correct the answer if the audio is clearly different',
+    );
 
     const assessmentRequest = mockClient.responses.create.mock.calls[0]?.[0];
     const assessmentPrompt = assessmentRequest.input[1].content as string;
@@ -93,6 +124,16 @@ describe('assessMissionVoiceTurn', () => {
     expect(assessmentPrompt).toContain(
       'Rubric: Accept a clear request for one ramen. Do not require exact wording.',
     );
+    expect(assessmentPrompt).toContain('semantically correct');
+    expect(assessmentPrompt).toContain('Do not grade pronunciation');
+    expect(assessmentPrompt).toContain(
+      'Accept minor particle, kana/kanji, spacing, formality, and clipped-politeness differences',
+    );
+    expect(assessmentPrompt).toContain('Do not accept a transcript whose core meaning changes');
+
+    const systemInstruction = assessmentRequest.input[0].content as string;
+    expect(systemInstruction).toContain('feedback field must be in English');
+    expect(systemInstruction).toContain('Be encouraging without accepting clearly wrong answers');
 
     const diagnosticMetadata = mockLogInfo.mock.calls[0]?.[2];
     expect(diagnosticMetadata).toEqual({
@@ -180,6 +221,40 @@ describe('assessMissionVoiceTurn', () => {
       feedback: 'The recording format could not be assessed. Please record again.',
     });
     expect(mockGetOpenAiClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized audio before any provider call', async () => {
+    const input = validMissionInput();
+    Object.defineProperty(input.audio, 'size', { value: 5 * 1024 * 1024 + 1 });
+
+    await expect(assessMissionVoiceTurn(input)).resolves.toEqual({
+      outcome: 'could_not_assess',
+      reason: 'invalid_audio',
+      feedback: 'The recording format could not be assessed. Please record again.',
+    });
+    expect(mockGetOpenAiClient).not.toHaveBeenCalled();
+  });
+
+  it('does not record duration-only transcription usage as tokens', async () => {
+    mockClient.audio.transcriptions.create.mockResolvedValue({
+      text: 'ラーメンをお願いします',
+      usage: { seconds: 2.8 },
+    });
+
+    await expect(transcribeJapaneseAudio(validMissionInput())).resolves.toBe(
+      'ラーメンをお願いします',
+    );
+
+    expect(mockRecordUsageEvent).not.toHaveBeenCalled();
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      'voice-assessment',
+      'duration usage returned without tokens',
+      {
+        userId: 'user-1',
+        model: 'gpt-4o-mini-transcribe',
+        duration: 2.8,
+      },
+    );
   });
 
   it('returns could not assess when semantic assessment fails', async () => {

@@ -1,23 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockCheckBudget, mockCheckSpeakingAnswer } = vi.hoisted(() => ({
-  mockCheckBudget: vi.fn(),
-  mockCheckSpeakingAnswer: vi.fn(),
-}));
+const { mockCheckBudget, mockTranscribeJapaneseAudio, mockAssessJapaneseTranscript } = vi.hoisted(
+  () => ({
+    mockCheckBudget: vi.fn(),
+    mockTranscribeJapaneseAudio: vi.fn(),
+    mockAssessJapaneseTranscript: vi.fn(),
+  }),
+);
 
 vi.mock('$lib/server/token-limiter', () => ({
   checkBudget: mockCheckBudget,
 }));
 
-vi.mock('$lib/server/speaking-checker', async (importOriginal) => {
-  const original = await importOriginal<typeof import('$lib/server/speaking-checker')>();
+vi.mock('$lib/server/voice-assessment', async (importOriginal) => {
+  const original = await importOriginal<typeof import('$lib/server/voice-assessment')>();
   return {
     ...original,
-    checkSpeakingAnswer: mockCheckSpeakingAnswer,
+    transcribeJapaneseAudio: mockTranscribeJapaneseAudio,
+    assessJapaneseTranscript: mockAssessJapaneseTranscript,
   };
 });
 
 import { POST } from './check/+server';
+import { VoiceAssessmentError } from '$lib/server/voice-assessment';
 
 function buildCookies(selectedUserId: string | null = 'user-1') {
   const cookieValue = selectedUserId ?? undefined;
@@ -65,9 +70,9 @@ describe('POST /api/speaking/check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCheckBudget.mockResolvedValue({ allowed: true });
-    mockCheckSpeakingAnswer.mockResolvedValue({
-      transcript: '水をください',
-      correct: true,
+    mockTranscribeJapaneseAudio.mockResolvedValue('水をください');
+    mockAssessJapaneseTranscript.mockResolvedValue({
+      accepted: true,
       confidence: 'high',
       feedback: 'Good natural request.',
     });
@@ -79,7 +84,7 @@ describe('POST /api/speaking/check', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ ok: false, error: 'Not authenticated.' });
     expect(mockCheckBudget).not.toHaveBeenCalled();
-    expect(mockCheckSpeakingAnswer).not.toHaveBeenCalled();
+    expect(mockTranscribeJapaneseAudio).not.toHaveBeenCalled();
   });
 
   it('rejects non-multipart requests', async () => {
@@ -93,7 +98,7 @@ describe('POST /api/speaking/check', () => {
       ok: false,
       error: 'Expected multipart/form-data.',
     });
-    expect(mockCheckSpeakingAnswer).not.toHaveBeenCalled();
+    expect(mockTranscribeJapaneseAudio).not.toHaveBeenCalled();
   });
 
   it('rejects requests without an audio file', async () => {
@@ -104,7 +109,7 @@ describe('POST /api/speaking/check', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ ok: false, error: 'Missing audio file.' });
-    expect(mockCheckSpeakingAnswer).not.toHaveBeenCalled();
+    expect(mockTranscribeJapaneseAudio).not.toHaveBeenCalled();
   });
 
   it('returns 429 when the token budget is exhausted before calling the helper', async () => {
@@ -118,7 +123,7 @@ describe('POST /api/speaking/check', () => {
       error: 'Daily AI budget exhausted. Please try again later.',
     });
     expect(mockCheckBudget).toHaveBeenCalledWith('user-1');
-    expect(mockCheckSpeakingAnswer).not.toHaveBeenCalled();
+    expect(mockTranscribeJapaneseAudio).not.toHaveBeenCalled();
   });
 
   it('rejects oversized metadata before calling the helper', async () => {
@@ -126,7 +131,7 @@ describe('POST /api/speaking/check', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ ok: false, error: 'Invalid prompt.' });
-    expect(mockCheckSpeakingAnswer).not.toHaveBeenCalled();
+    expect(mockTranscribeJapaneseAudio).not.toHaveBeenCalled();
   });
 
   it('passes parsed metadata to the speaking checker and returns its result', async () => {
@@ -142,20 +147,65 @@ describe('POST /api/speaking/check', () => {
       confidence: 'high',
       feedback: 'Good natural request.',
     });
-    expect(mockCheckSpeakingAnswer).toHaveBeenCalledWith({
+    expect(mockTranscribeJapaneseAudio).toHaveBeenCalledWith({
       userId: 'user-1',
       audio: expect.any(File),
-      prompt: 'Say that you would like water.',
-      responseKind: 'situational_response',
-      expectedAnswer: '水をください',
-      expectedRomaji: 'mizu o kudasai',
-      acceptedAnswers: ['お水をください', '水お願いします'],
+      goal: 'Say that you would like water.\nResponse kind: situational_response',
+      alternatives: ['水をください', 'mizu o kudasai', 'お水をください', '水お願いします'],
+    });
+    expect(mockAssessJapaneseTranscript).toHaveBeenCalledWith({
+      userId: 'user-1',
+      transcript: '水をください',
+      goal: 'Say that you would like water.\nResponse kind: situational_response',
+      alternatives: ['水をください', 'mizu o kudasai', 'お水をください', '水お願いします'],
       rubric: 'Accept a polite request for water in Japanese.',
     });
   });
 
+  it('maps an oversized-audio voice error through the speaking checker to a safe response', async () => {
+    mockTranscribeJapaneseAudio.mockRejectedValue(
+      new VoiceAssessmentError('provider-specific detail', 'audio_too_large'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Audio file is too large. Please record a shorter answer.',
+    });
+  });
+
+  it('maps an unsupported-audio voice error through the speaking checker to a safe response', async () => {
+    mockTranscribeJapaneseAudio.mockRejectedValue(
+      new VoiceAssessmentError('provider-specific detail', 'unsupported_audio_type'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Unsupported audio format. Please try again.',
+    });
+  });
+
+  it('maps a missing-speech voice error through the speaking checker to a safe response', async () => {
+    mockTranscribeJapaneseAudio.mockRejectedValue(
+      new VoiceAssessmentError('provider-specific detail', 'empty_transcript'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'No speech was detected. Please try again.',
+    });
+  });
+
   it('returns a safe 500 when the helper fails unexpectedly', async () => {
-    mockCheckSpeakingAnswer.mockRejectedValue(new Error('OpenAI internals should not leak'));
+    mockTranscribeJapaneseAudio.mockRejectedValue(new Error('OpenAI internals should not leak'));
 
     const response = await post(validFormData());
 
