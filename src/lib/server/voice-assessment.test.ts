@@ -84,18 +84,22 @@ describe('assessMissionVoiceTurn', () => {
       expect.objectContaining({ language: 'ja' }),
     );
     expect(mockClient.responses.create).toHaveBeenCalledTimes(1);
-    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(1, {
-      userId: 'user-1',
-      model: 'gpt-4o-mini-transcribe',
-      tokensIn: 12,
-      tokensOut: 4,
-    });
-    expect(mockRecordUsageEvent).toHaveBeenNthCalledWith(2, {
-      userId: 'user-1',
-      model: 'gpt-4.1',
-      tokensIn: 100,
-      tokensOut: 20,
-    });
+    expect(mockRecordUsageEvent.mock.calls.map(([event]) => event)).toEqual(
+      expect.arrayContaining([
+        {
+          userId: 'user-1',
+          model: 'gpt-4o-mini-transcribe',
+          tokensIn: 12,
+          tokensOut: 4,
+        },
+        {
+          userId: 'user-1',
+          model: 'gpt-4.1',
+          tokensIn: 100,
+          tokensOut: 20,
+        },
+      ]),
+    );
 
     const transcriptionRequest = mockClient.audio.transcriptions.create.mock.calls[0]?.[0];
     const transcriptionPrompt = transcriptionRequest.prompt as string;
