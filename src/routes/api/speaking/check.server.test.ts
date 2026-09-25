@@ -18,6 +18,7 @@ vi.mock('$lib/server/speaking-checker', async (importOriginal) => {
 });
 
 import { POST } from './check/+server';
+import { SpeakingCheckError } from '$lib/server/speaking-checker';
 
 function buildCookies(selectedUserId: string | null = 'user-1') {
   const cookieValue = selectedUserId ?? undefined;
@@ -151,6 +152,48 @@ describe('POST /api/speaking/check', () => {
       expectedRomaji: 'mizu o kudasai',
       acceptedAnswers: ['お水をください', '水お願いします'],
       rubric: 'Accept a polite request for water in Japanese.',
+    });
+  });
+
+  it('returns the safe oversized-audio response from the speaking checker', async () => {
+    mockCheckSpeakingAnswer.mockRejectedValue(
+      new SpeakingCheckError('provider-specific detail', 'audio_too_large'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Audio file is too large. Please record a shorter answer.',
+    });
+  });
+
+  it('returns the safe unsupported-audio response from the speaking checker', async () => {
+    mockCheckSpeakingAnswer.mockRejectedValue(
+      new SpeakingCheckError('provider-specific detail', 'unsupported_audio_type'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'Unsupported audio format. Please try again.',
+    });
+  });
+
+  it('returns the safe missing-speech response from the speaking checker', async () => {
+    mockCheckSpeakingAnswer.mockRejectedValue(
+      new SpeakingCheckError('provider-specific detail', 'empty_transcript'),
+    );
+
+    const response = await post(validFormData());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: 'No speech was detected. Please try again.',
     });
   });
 

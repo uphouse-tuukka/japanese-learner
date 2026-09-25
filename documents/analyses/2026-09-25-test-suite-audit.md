@@ -33,7 +33,8 @@ It did not use live OpenAI services, microphone hardware, or browser acceptance 
 - Evidence: commit `a3b0c50` extracted `voice-assessment.ts` but retained the earlier provider-level compatibility tests; the adapter now primarily maps shared results and selected errors.
 - Recommendation: keep the compatibility success mapping and invalid-assessment fallback, move any missing shared assertions to `voice-assessment.test.ts`, and remove the seven overlapping adapter cases.
 - Remaining protection after removal: audio validation, provider requests, prompts, usage accounting, missing speech, and assessment failures remain at the shared voice seam; adapter output and recovery remain at the adapter seam.
-- Status before implementation: accepted.
+- Result: implemented.
+  Seven overlapping adapter cases were removed while adapter success and recovery behavior remain protected.
 
 ### P1: The speaking HTTP route lacks direct safe-error response coverage
 
@@ -41,14 +42,15 @@ It did not use live OpenAI services, microphone hardware, or browser acceptance 
 - Missed regression: `audio_too_large`, `unsupported_audio_type`, or `empty_transcript` could accidentally become a generic 500 response or expose an unsafe message even though lower-level tests remain green.
 - Evidence: the route tests authentication, request parsing, budget failure, success, and unexpected errors, but no expected `SpeakingCheckError` branch.
 - Recommendation: add one public-route case for each distinct status/message contract without parameterising the cases.
-- Status before implementation: accepted.
+- Result: implemented with three independent route cases.
 
 ### P2: Shared voice coverage should own size and usage-shape behavior explicitly
 
 - Location: `src/lib/server/voice-assessment.test.ts`.
 - Missed regression: removing the adapter duplicates without replacement would leave maximum audio size and duration-only usage accounting indirectly or incompletely protected.
 - Recommendation: add an oversized-audio case at the shared mission seam and strengthen the existing accepted-path assertions for exact token usage and prompt safety; add a direct exported transcription case for duration-only usage.
-- Status before implementation: accepted.
+- Result: implemented.
+  The accepted shared path now verifies exact token events and the safety-critical prompt rails, and dedicated cases cover oversized audio and duration-only transcription usage.
 
 ### P3: Source-text schema assertions look suspicious but protect distinct contracts
 
@@ -84,3 +86,20 @@ The exercise UI source-contract suite remains a deliberate architecture guardrai
 Run the focused speaking assessment and API route files after remediation.
 Then run `npm run check`, the complete Vitest suite with the same verbose counting method, and `npm run validate:ci`.
 Record the final executed test count and exact checks here after implementation.
+
+## Implementation and verification results
+
+The final suite executes 687 passing cases across the same 78 files, compared with the 689-case baseline.
+The two-case net reduction uses the same Vitest verbose-reporter count before and after.
+No test was skipped, hidden through parameterisation, or weakened to obtain the reduction.
+
+Meaningful coverage improved at the learner-facing HTTP boundary.
+The suite now proves the distinct safe 400 responses for oversized audio, unsupported audio, and missing speech, including that provider-specific details are not returned.
+Shared voice tests now directly own maximum-size validation, duration-only usage behavior, exact token accounting, transcription guardrails, and semantic assessment guardrails.
+
+Checks run:
+
+- `npm test -- src/lib/server/speaking-checker.test.ts src/lib/server/voice-assessment.test.ts src/routes/api/speaking/check.server.test.ts`: 3 files and 22 tests passed.
+- `npm run check`: passed with 0 errors and 0 warnings.
+- `npm test -- --reporter=verbose`: 78 files and 687 tests passed in 10.48 seconds.
+- `npm run validate:ci`: passed, including formatting, type checks, lint, 687 tests, and the production build.
