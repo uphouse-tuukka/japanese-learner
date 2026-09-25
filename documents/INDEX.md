@@ -224,6 +224,12 @@ Use this index before following older plans or decisions. Status labels are cons
 
 ## Analyses
 
+### `documents/analyses/2026-09-25-test-suite-audit.md`
+
+- Status: analysis
+- Description: Test-suite confidence and maintenance audit for issue #64, including the baseline count, prioritised findings, retained protections, remediation evidence, and verification results.
+- Last verified: 2026-09-25
+
 ### `documents/analyses/ai-model-comparison.md`
 
 - Status: analysis
