@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { createSessionRecord } from '$lib/server/db';
 
 const {
   mockGenerateSessionPlan,
@@ -145,6 +146,33 @@ const generatedPlan = {
   },
   metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
 };
+
+const incompleteCoverageCases = [
+  {
+    name: 'missing cultural note',
+    lesson: { culturalNote: '' },
+    correction: /cultural[\s_]*note/i,
+  },
+  {
+    name: 'missing phrase usage',
+    lesson: {
+      keyPhrases: keyPhrases.map((phrase, index) =>
+        index === 0 ? { ...phrase, usage: '' } : phrase,
+      ),
+    },
+    correction: /usage/i,
+  },
+  {
+    name: 'one key phrase',
+    lesson: { keyPhrases: keyPhrases.slice(0, 1) },
+    correction: /3\s*(?:-|to)\s*5|at least (?:3|three)|(?:three|3).*phrases/i,
+  },
+  {
+    name: 'two key phrases',
+    lesson: { keyPhrases: keyPhrases.slice(0, 2) },
+    correction: /3\s*(?:-|to)\s*5|at least (?:3|three)|(?:three|3).*phrases/i,
+  },
+] satisfies Array<{ name: string; lesson: Partial<typeof lesson>; correction: RegExp }>;
 
 const hotelTransferTask =
   'In a hotel lobby, apply the selected Learning Objective through a new interaction and transfer challenge.';
@@ -1377,6 +1405,153 @@ describe('POST /api/session/generate', () => {
       tokensOut: 21,
     });
   });
+
+  it.each(incompleteCoverageCases)(
+    'retries incomplete planned coverage with $name and persists only the corrected plan',
+    async ({ lesson: incompleteLesson, correction }) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const correctedLesson = {
+        ...lesson,
+        topic: 'Greeting a shopkeeper',
+        culturalNote: 'Greet staff calmly when entering a small shop.',
+      };
+      mockGenerateSessionPlan
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: incompleteLesson,
+            tokenUsage: { input: 11, output: 22 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: correctedLesson,
+            tokenUsage: { input: 13, output: 21 },
+          }),
+        );
+      mockCreateSessionRecord.mockImplementationOnce(
+        async (input: Parameters<typeof createSessionRecord>[0]) => ({ ...session, ...input }),
+      );
+      const expectedRecord = {
+        userId: 'user-1',
+        mode: 'ai',
+        status: 'planned',
+        model: 'gpt-5.4',
+        tokenInput: 13,
+        tokenOutput: 21,
+        plannedCoverage: {
+          version: 1,
+          category: 'greetings_basics',
+          learningObjectiveId: 'greetings_basics.greet_by_time',
+          lessonTopic: 'Greeting a shopkeeper',
+          lessonTreatment: JSON.stringify({
+            topic: 'Greeting a shopkeeper',
+            explanation: 'Learn a few polite greeting phrases.',
+            exercises,
+          }),
+          lessonTreatmentComplete: true,
+          culturalNote: 'Greet staff calmly when entering a small shop.',
+          keyPhraseDetails: keyPhrases,
+        },
+      };
+
+      const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        ok: true,
+        state: 'active',
+        session: { ...session, ...expectedRecord },
+        lesson: correctedLesson,
+        exercises,
+      });
+      expect(mockCreateSessionRecord.mock.calls).toEqual([[expectedRecord]]);
+      expect(mockAttachExercisesToSession.mock.calls).toEqual([['session-1', exercises]]);
+      expect(mockRecordUsageEvent.mock.calls).toEqual([
+        [
+          {
+            userId: 'user-1',
+            sessionId: null,
+            model: 'gpt-5.4',
+            tokensIn: 11,
+            tokensOut: 22,
+          },
+        ],
+        [
+          {
+            userId: 'user-1',
+            sessionId: 'session-1',
+            model: 'gpt-5.4',
+            tokensIn: 13,
+            tokensOut: 21,
+          },
+        ],
+      ]);
+      expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          curriculumValidationFeedback: expect.arrayContaining([expect.stringMatching(correction)]),
+        }),
+      );
+    },
+  );
+
+  it.each(incompleteCoverageCases)(
+    'fails closed for two plans with $name and records both returned usage events',
+    async ({ lesson: incompleteLesson, correction }) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockGenerateSessionPlan
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: incompleteLesson,
+            tokenUsage: { input: 11, output: 22 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: incompleteLesson,
+            tokenUsage: { input: 12, output: 23 },
+          }),
+        );
+
+      const response = await generateSession({ userId: 'user-1', exerciseCount: 8 });
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: 'Failed to generate AI teaching session.',
+      });
+      expect(mockCreateSessionRecord).not.toHaveBeenCalled();
+      expect(mockAttachExercisesToSession).not.toHaveBeenCalled();
+      expect.soft(mockRecordUsageEvent.mock.calls).toEqual([
+        [
+          {
+            userId: 'user-1',
+            sessionId: null,
+            model: 'gpt-5.4',
+            tokensIn: 11,
+            tokensOut: 22,
+          },
+        ],
+        [
+          {
+            userId: 'user-1',
+            sessionId: null,
+            model: 'gpt-5.4',
+            tokensIn: 12,
+            tokensOut: 23,
+          },
+        ],
+      ]);
+      expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          curriculumValidationFeedback: expect.arrayContaining([expect.stringMatching(correction)]),
+        }),
+      );
+    },
+  );
 
   it('identifies rejected Lesson Key Phrases so the retry can replace them', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
