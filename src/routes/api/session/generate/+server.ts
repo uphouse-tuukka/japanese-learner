@@ -20,11 +20,12 @@ import {
 import { checkBudget, recordUsageEvent } from '$lib/server/token-limiter';
 import { withAbort } from '$lib/server/async';
 import { resolveSessionGenerationTimeoutMs } from '$lib/server/config';
-import { logInfo } from '$lib/server/logger';
+import { logError, logInfo, logWarn } from '$lib/server/logger';
 import { matchSelectedUser } from '$lib/server/selected-user';
 import { getUser } from '$lib/server/users';
 import { parseSessionMeta } from '$lib/validators/session-meta';
 import { buildPlannedSessionCoverage } from '$lib/validators/planned-session-coverage';
+import { isTopicCategoryKey } from '$lib/topic-categories';
 import type { Exercise, Lesson, Session, SessionMiniLesson } from '$lib/types';
 
 type GenerateRequest = {
@@ -59,6 +60,37 @@ type SessionHistoryItem = {
 const MAX_GENERATION_ATTEMPTS = 2;
 
 type FailedGenerationUsage = { model: string; input: number; output: number };
+
+type AcceptedGeneration = {
+  plan: Awaited<ReturnType<typeof generateSessionPlan>>;
+  plannedCoverage: ReturnType<typeof buildPlannedSessionCoverage>;
+};
+
+type GenerationStage = 'generation' | 'curriculum_validation' | 'planned_coverage';
+type RequestStage =
+  | GenerationStage
+  | 'request_validation'
+  | 'stale_session_cleanup'
+  | 'budget_check'
+  | 'user_lookup'
+  | 'history_loading'
+  | 'coverage_evidence'
+  | 'performance_loading'
+  | 'generation_config'
+  | 'rejected_usage_recording'
+  | 'session_creation'
+  | 'exercise_attachment'
+  | 'accepted_usage_recording';
+
+class SessionGenerationTimeoutError extends Error {}
+
+function providerHttpStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object' || !('status' in error)) return null;
+  const status = error.status;
+  return typeof status === 'number' && Number.isInteger(status) && status >= 400 && status <= 599
+    ? status
+    : null;
+}
 
 function curriculumDiagnosticContext(coverageEvidence: CoverageEvidence) {
   return {
@@ -105,7 +137,7 @@ async function generateSessionPlanWithTimeout(
     );
   } catch (error) {
     if (controller.signal.aborted) {
-      throw new Error('timeout', { cause: error });
+      throw new SessionGenerationTimeoutError('timeout', { cause: error });
     }
     throw error;
   } finally {
@@ -166,6 +198,8 @@ function validationFeedbackForRetry(
 }
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
+  let stage: RequestStage = 'request_validation';
+  let generationAttempt: number | null = null;
   try {
     const bodyResult = await readJsonBody(request);
     if (!bodyResult.ok) {
@@ -186,8 +220,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const userId = selectedUser.userId;
     const exerciseCount = Math.min(Math.max(Number(body.exerciseCount ?? 6), 4), 12);
 
+    stage = 'stale_session_cleanup';
     await deleteStaleGhostSessions(userId);
 
+    stage = 'budget_check';
     const budgetCheck = await checkBudget(userId);
     if (!budgetCheck.allowed) {
       const response: GenerateResponse = {
@@ -201,14 +237,17 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return json(response, { status: 429 });
     }
 
+    stage = 'user_lookup';
     const user = await getUser(userId);
     if (!user) {
       return jsonError('User not found.', 404);
     }
 
+    stage = 'history_loading';
     const priorSessions = await getSessionsForUser(userId, 10);
     const completedAiSessions = await getCompletedAiSessionsForUser(userId);
     const completedAiExerciseResults = await getCompletedAiExerciseResultsForUser(userId);
+    stage = 'coverage_evidence';
     const parsedCoverageSources = parseCoverageSourceSessions(completedAiSessions);
     const coverageEvidence = buildCoverageEvidence({
       sessions: parsedCoverageSources.sessions,
@@ -289,6 +328,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const coveredTopics = Array.from(
       new Set(latestParsedHistory.map((item) => item.topic.trim()).filter(Boolean)),
     );
+    stage = 'performance_loading';
     const exerciseResults = await getExerciseResultsForUser(userId);
     const totalResultCount = exerciseResults.length;
     const totalCorrectCount = exerciseResults.filter((item) => item.isCorrect).length;
@@ -325,12 +365,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       .slice(0, 5)
       .map((item) => item.answerText.trim());
 
+    stage = 'generation_config';
     const generationTimeoutMs = resolveSessionGenerationTimeoutMs();
-    let plan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
+    let accepted: AcceptedGeneration | null = null;
 
-    let lastError: Error | null = null;
+    let lastError: unknown = new Error('Failed to generate AI teaching session.');
     let curriculumValidationFeedback: string[] = [];
     for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+      generationAttempt = attempt;
+      stage = 'generation';
+      let rejectedUsage: FailedGenerationUsage | null = null;
       try {
         const generatedPlan = await generateSessionPlanWithTimeout(
           {
@@ -355,77 +399,101 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           },
           generationTimeoutMs,
         );
+        rejectedUsage = { model: generatedPlan.model, ...generatedPlan.tokenUsage };
 
+        stage = 'curriculum_validation';
         const validation = validateGeneratedSessionPlan({
           plan: generatedPlan,
           coverageEvidence,
         });
         if (!validation.valid) {
-          await recordUsageEvent({
-            userId,
-            sessionId: null,
-            model: generatedPlan.model,
-            tokensIn: generatedPlan.tokenUsage.input,
-            tokensOut: generatedPlan.tokenUsage.output,
-          });
           lastError = new Error('Generated session failed curriculum validation.');
           curriculumValidationFeedback = validationFeedbackForRetry(validation);
-          console.warn('[api/session/generate] curriculum validation failed', {
+          logWarn('api/session/generate', 'curriculum validation failed', {
             attempt,
             maxAttempts: MAX_GENERATION_ATTEMPTS,
+            stage,
+            errorCode: 'curriculum_validation_failed',
             userId,
             ...curriculumDiagnosticContext(coverageEvidence),
             validationReasonCodes: validation.reasonCodes,
             generatedLearningObjectiveStatus: validation.details.generatedLearningObjectiveStatus,
-            generatedCategory: validation.details.generatedCategory,
+            generatedCategory: isTopicCategoryKey(validation.details.generatedCategory)
+              ? validation.details.generatedCategory
+              : null,
             blockedCategories: validation.details.blockedCategories,
             preferredCategories: validation.details.preferredCategories,
             repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
             intentionalReviewStatus: validation.details.intentionalReviewStatus,
           });
-          continue;
+        } else {
+          stage = 'planned_coverage';
+          const plannedCoverage = buildPlannedSessionCoverage({
+            lesson: generatedPlan.lesson,
+            exercises: generatedPlan.exercises,
+            learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective.id,
+          });
+          logInfo('api/session/generate', 'curriculum plan approved', {
+            attempt,
+            validationReasonCodes: validation.reasonCodes,
+            ...curriculumDiagnosticContext(coverageEvidence),
+          });
+          accepted = { plan: generatedPlan, plannedCoverage };
+          break;
         }
-
-        logInfo('api/session/generate', 'curriculum plan approved', {
-          attempt,
-          validationReasonCodes: validation.reasonCodes,
-          ...curriculumDiagnosticContext(coverageEvidence),
-        });
-        plan = generatedPlan;
-        break;
       } catch (error) {
-        if (error instanceof Error && error.message === 'timeout') {
+        lastError = error;
+        if (stage === 'generation') {
+          rejectedUsage = failedGenerationUsage(error);
+        } else if (stage === 'planned_coverage') {
+          curriculumValidationFeedback = [
+            'Previous generation could not build required planned coverage metadata.',
+            'Lesson culturalNote must be a nonblank string.',
+            'Lesson keyPhrases must contain 3-5 key phrases.',
+            'Every key phrase must have nonblank japanese, romaji, english, and usage strings.',
+          ];
+        }
+        const timedOut = error instanceof SessionGenerationTimeoutError;
+        logWarn('api/session/generate', 'generation attempt rejected', {
+          attempt,
+          maxAttempts: MAX_GENERATION_ATTEMPTS,
+          stage,
+          userId,
+          errorCode: timedOut
+            ? 'generation_timeout'
+            : stage === 'planned_coverage'
+              ? 'invalid_planned_coverage'
+              : stage === 'curriculum_validation'
+                ? 'curriculum_validation_failed'
+                : rejectedUsage
+                  ? 'invalid_generated_response'
+                  : 'generation_failed',
+          providerHttpStatus: stage === 'generation' ? providerHttpStatus(error) : null,
+        });
+        if (timedOut) {
           throw error;
         }
-
-        const rejectedUsage = failedGenerationUsage(error);
-        if (rejectedUsage) {
-          await recordUsageEvent({
-            userId,
-            sessionId: null,
-            model: rejectedUsage.model,
-            tokensIn: rejectedUsage.input,
-            tokensOut: rejectedUsage.output,
-          });
-        }
-
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < MAX_GENERATION_ATTEMPTS) {
-          console.warn('[api/session/generate] generation attempt failed, retrying', {
-            attempt,
-            maxAttempts: MAX_GENERATION_ATTEMPTS,
-            userId,
-            error: lastError.message,
-          });
-          continue;
-        }
+      }
+      if (rejectedUsage) {
+        const rejectedStage = stage;
+        stage = 'rejected_usage_recording';
+        await recordUsageEvent({
+          userId,
+          sessionId: null,
+          model: rejectedUsage.model,
+          tokensIn: rejectedUsage.input,
+          tokensOut: rejectedUsage.output,
+        });
+        stage = rejectedStage;
       }
     }
 
-    if (!plan) {
-      throw lastError ?? new Error('Failed to generate AI teaching session.');
+    if (!accepted) {
+      throw lastError;
     }
 
+    const { plan, plannedCoverage } = accepted;
+    stage = 'session_creation';
     const session = await createSessionRecord({
       userId,
       mode: 'ai',
@@ -433,14 +501,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       model: plan.model,
       tokenInput: plan.tokenUsage.input,
       tokenOutput: plan.tokenUsage.output,
-      plannedCoverage: buildPlannedSessionCoverage({
-        lesson: plan.lesson,
-        exercises: plan.exercises,
-        learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective?.id,
-      }),
+      plannedCoverage,
     });
 
+    stage = 'exercise_attachment';
     await attachExercisesToSession(session.id, plan.exercises);
+    stage = 'accepted_usage_recording';
     await recordUsageEvent({
       userId,
       sessionId: session.id,
@@ -458,10 +524,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     };
     return json(response);
   } catch (error) {
-    if (error instanceof Error && error.message === 'timeout') {
+    const timedOut = error instanceof SessionGenerationTimeoutError;
+    logError('api/session/generate', 'failed', {
+      stage,
+      attempt: generationAttempt,
+      errorCode: timedOut ? 'generation_timeout' : 'session_generation_failed',
+      providerHttpStatus: stage === 'generation' ? providerHttpStatus(error) : null,
+    });
+    if (timedOut) {
       return jsonError('Session generation timed out. Please try again.', 503);
     }
-    console.error('[api/session/generate] failed', { error });
     return jsonError('Failed to generate AI teaching session.', 500);
   }
 };

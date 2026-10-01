@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-08-21
+**Last updated:** 2026-10-01
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -69,6 +69,8 @@
 ### Coverage metadata authority
 
 - A generated Learning Session must durably store its generated Topic Category, canonical app-selected Learning Objective identity, Lesson Topic, cultural note, and structured Lesson Key Phrases with the planned server session before responding successfully.
+- Generation validates required planned coverage inside each attempt before accepting the plan. Missing cultural notes, incomplete phrase fields, or fewer than three phrases trigger the existing bounded retry with metadata correction feedback.
+- Rejected planned coverage records the returned response's token usage without a session id. Only the accepted plan and its validated coverage reach session persistence.
 - Completion must build Coverage Evidence metadata from the stored generated plan, not from browser-authored lesson fields.
 - Missing, blank, altered, malformed, or resumed browser lesson data must not replace valid server-owned metadata.
 - Completion must fail closed before storing results when valid server-owned planned coverage metadata is unavailable.
