@@ -1045,6 +1045,383 @@ describe('POST /api/session/generate', () => {
     );
   });
 
+  describe('bounded Lesson Key Phrase recovery', () => {
+    const freshKeyPhrases = [
+      {
+        japanese: 'お名前は何ですか',
+        romaji: 'onamae wa nan desu ka',
+        english: 'What is your name?',
+        usage: 'Ask for a name politely.',
+      },
+      {
+        japanese: 'トゥーッカです',
+        romaji: 'Tuukka desu',
+        english: 'I am Tuukka.',
+        usage: 'State your name.',
+      },
+      {
+        japanese: 'こちらこそ',
+        romaji: 'kochira koso',
+        english: 'Likewise.',
+        usage: 'Return a polite first-meeting sentiment.',
+      },
+      {
+        japanese: 'お会いできてうれしいです',
+        romaji: 'oai dekite ureshii desu',
+        english: 'I am happy to meet you.',
+        usage: 'Express pleasure at meeting someone.',
+      },
+    ];
+    const coveredPhrase = keyPhrases[0];
+
+    beforeEach(() => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockGetCompletedAiSessionsForUser.mockResolvedValue([
+        buildCompletedAiSession({
+          id: 'covered-greeting',
+          createdAt: '2026-05-01T08:00:00.000Z',
+          category: 'greetings_basics',
+          topic: 'Earlier daytime greeting',
+          accuracy: 100,
+          keyPhraseDetails: [coveredPhrase],
+        }),
+      ]);
+    });
+
+    it.each([
+      { name: 'one covered phrase', repeats: [coveredPhrase] },
+      { name: 'display-identical covered duplicates', repeats: [coveredPhrase, coveredPhrase] },
+    ])('recovers $name without changing teaching content', async ({ repeats }) => {
+      const retainedPhrases = freshKeyPhrases.slice(0, 3);
+      const providerPlan = buildGeneratedPlan({
+        lesson: {
+          keyPhrases: [retainedPhrases[0], ...repeats, ...retainedPhrases.slice(1)],
+          explanation: 'You can say こんにちは (konnichiwa) before asking for a name.',
+        },
+      });
+      const originalPlan = structuredClone(providerPlan);
+      mockGenerateSessionPlan.mockResolvedValue(providerPlan);
+
+      const response = await generateSession({ userId: 'user-1' });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        ok: true,
+        state: 'active',
+        session,
+        lesson: { ...providerPlan.lesson, keyPhrases: retainedPhrases },
+        exercises,
+      });
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(1);
+      expect(mockCreateSessionRecord).toHaveBeenCalledExactlyOnceWith({
+        userId: 'user-1',
+        mode: 'ai',
+        status: 'planned',
+        model: 'gpt-5.4',
+        tokenInput: 10,
+        tokenOutput: 20,
+        plannedCoverage: {
+          version: 1,
+          category: 'greetings_basics',
+          learningObjectiveId: 'greetings_basics.greet_by_time',
+          lessonTopic: 'Basic greetings',
+          culturalNote: lesson.culturalNote,
+          keyPhraseDetails: retainedPhrases,
+          lessonTreatment: JSON.stringify({
+            topic: 'Basic greetings',
+            explanation: 'You can say こんにちは (konnichiwa) before asking for a name.',
+            exercises,
+          }),
+          lessonTreatmentComplete: true,
+        },
+      });
+      expect(mockAttachExercisesToSession).toHaveBeenCalledExactlyOnceWith('session-1', exercises);
+      expect(mockRecordUsageEvent).toHaveBeenCalledExactlyOnceWith({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        model: 'gpt-5.4',
+        tokensIn: 10,
+        tokensOut: 20,
+      });
+      expect(providerPlan).toEqual(originalPlan);
+    });
+
+    it('retries a covered phrase plus two fresh phrases and recovers four fresh phrases on the second attempt', async () => {
+      mockGenerateSessionPlan
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { keyPhrases: [coveredPhrase, ...freshKeyPhrases.slice(0, 2)] },
+            tokenUsage: { input: 11, output: 22 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { keyPhrases: [...freshKeyPhrases, coveredPhrase] },
+            tokenUsage: { input: 13, output: 21 },
+          }),
+        );
+
+      const response = await generateSession({ userId: 'user-1' });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        lesson: { ...lesson, keyPhrases: freshKeyPhrases },
+        exercises,
+      });
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+      expect(mockGenerateSessionPlan).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          curriculumValidationFeedback: expect.arrayContaining([
+            expect.stringContaining('こんにちは (konnichiwa)'),
+            expect.stringMatching(/(?:5.*complete|complete.*5)/i),
+          ]),
+        }),
+      );
+      expect(mockCreateSessionRecord).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          tokenInput: 13,
+          tokenOutput: 21,
+          plannedCoverage: expect.objectContaining({ keyPhraseDetails: freshKeyPhrases }),
+        }),
+      );
+      expect(mockRecordUsageEvent.mock.calls).toEqual([
+        [{ userId: 'user-1', sessionId: null, model: 'gpt-5.4', tokensIn: 11, tokensOut: 22 }],
+        [
+          {
+            userId: 'user-1',
+            sessionId: 'session-1',
+            model: 'gpt-5.4',
+            tokensIn: 13,
+            tokensOut: 21,
+          },
+        ],
+      ]);
+    });
+
+    it.each([
+      {
+        name: 'all phrases are covered',
+        phrases: [coveredPhrase, coveredPhrase, coveredPhrase],
+        objectiveId: 'greetings_basics.greet_by_time',
+      },
+      {
+        name: 'a repeated phrase and a wrong objective',
+        phrases: [coveredPhrase, ...freshKeyPhrases.slice(0, 3)],
+        objectiveId: 'greetings_basics.exchange_names',
+      },
+    ])('fails closed after two attempts when $name', async ({ phrases, objectiveId }) => {
+      mockGenerateSessionPlan
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { keyPhrases: phrases },
+            metadata: { learningObjectiveId: objectiveId },
+            tokenUsage: { input: 11, output: 22 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          buildGeneratedPlan({
+            lesson: { keyPhrases: phrases },
+            metadata: { learningObjectiveId: objectiveId },
+            tokenUsage: { input: 13, output: 21 },
+          }),
+        );
+
+      const response = await generateSession({ userId: 'user-1' });
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: 'Failed to generate AI teaching session.',
+      });
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+      expect(mockCreateSessionRecord).not.toHaveBeenCalled();
+      expect(mockAttachExercisesToSession).not.toHaveBeenCalled();
+      expect(mockRecordUsageEvent.mock.calls).toEqual([
+        [{ userId: 'user-1', sessionId: null, model: 'gpt-5.4', tokensIn: 11, tokensOut: 22 }],
+        [{ userId: 'user-1', sessionId: null, model: 'gpt-5.4', tokensIn: 13, tokensOut: 21 }],
+      ]);
+    });
+
+    it.each([2, 3])('keeps review plus %i fresh phrases', async (freshCount) => {
+      const forbiddenPhrase = keyPhrases[1];
+      const objectives = [
+        ['greetings_basics.greet_by_time', 'Greeting by time'],
+        ['greetings_basics.exchange_names', 'Exchanging names'],
+        ['greetings_basics.exchange_origins', 'Exchanging origins'],
+        ['greetings_basics.ask_and_answer_wellbeing', 'Asking about wellbeing'],
+        ['greetings_basics.use_polite_thanks_and_apologies', 'Polite thanks and apologies'],
+        ['greetings_basics.open_and_close_brief_interactions', 'Opening and closing interactions'],
+      ];
+      mockGetCompletedAiSessionsForUser.mockResolvedValue(
+        objectives.flatMap(([learningObjectiveId, topic], index) => [
+          buildCompletedAiSession({
+            id: `travel-${index}`,
+            createdAt: `2026-05-${String(index * 2 + 1).padStart(2, '0')}T08:00:00.000Z`,
+            category: 'travel_essentials',
+            topic: `Travel literacy ${index}`,
+          }),
+          buildCompletedAiSession({
+            id: `greeting-${index}`,
+            createdAt: `2026-05-${String(index * 2 + 2).padStart(2, '0')}T08:00:00.000Z`,
+            category: 'greetings_basics',
+            topic,
+            learningObjectiveId,
+            keyPhraseDetails: index === 0 ? [coveredPhrase, forbiddenPhrase] : [],
+            reviewIntents:
+              index === 0
+                ? [
+                    {
+                      type: 'key_phrase',
+                      identity: 'ja:こんにちは',
+                      display: 'こんにちは (konnichiwa)',
+                      reason: 'The learner still hesitates when choosing a daytime greeting.',
+                      reviewRequested: true,
+                    },
+                  ]
+                : [],
+            lessonTreatment: JSON.stringify({
+              topic,
+              explanation: 'Exchange greetings inside a railway terminal.',
+              exercises: [],
+            }),
+          }),
+        ]),
+      );
+      const retainedPhrases = [
+        freshKeyPhrases[0],
+        coveredPhrase,
+        ...freshKeyPhrases.slice(1, freshCount),
+      ];
+      const reviewTopic =
+        'Hotel lobby review: Choose and use a basic greeting that fits the time of day.';
+      mockGenerateSessionPlan.mockResolvedValue(
+        buildGeneratedPlan({
+          lesson: {
+            topic: reviewTopic,
+            keyPhrases: [
+              freshKeyPhrases[0],
+              forbiddenPhrase,
+              coveredPhrase,
+              ...freshKeyPhrases.slice(1, freshCount),
+            ],
+          },
+          metadata: {
+            learningObjectiveId: 'greetings_basics.greet_by_time',
+            intentionalReview: {
+              candidateType: 'key_phrase',
+              candidateIdentity: 'ja:こんにちは',
+              learningObjectiveId: 'greetings_basics.greet_by_time',
+              transferContextId: 'hotel_lobby',
+              transferTask: hotelTransferTask,
+            },
+          },
+        }),
+      );
+
+      const response = await generateSession({ userId: 'user-1' });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        lesson: { topic: reviewTopic, keyPhrases: retainedPhrases },
+        exercises,
+      });
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(1);
+      expect(mockCreateSessionRecord).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          plannedCoverage: expect.objectContaining({
+            learningObjectiveId: 'greetings_basics.greet_by_time',
+            lessonTopic: reviewTopic,
+            keyPhraseDetails: retainedPhrases,
+          }),
+        }),
+      );
+      expect(mockRecordUsageEvent).toHaveBeenCalledExactlyOnceWith({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        model: 'gpt-5.4',
+        tokensIn: 10,
+        tokensOut: 20,
+      });
+    });
+
+    it.each(['cultural note', 'phrase usage'])(
+      'accounts once per output and persists nothing when recovered coverage and its retry have a malformed %s',
+      async (missingField) => {
+        const incompletePhrases = freshKeyPhrases.slice(0, 3).map((phrase, index) => ({
+          ...phrase,
+          usage: missingField === 'phrase usage' && index === 1 ? '' : phrase.usage,
+        }));
+        const incompleteLesson = {
+          culturalNote: missingField === 'cultural note' ? ' ' : lesson.culturalNote,
+        };
+        mockGenerateSessionPlan
+          .mockResolvedValueOnce(
+            buildGeneratedPlan({
+              lesson: { ...incompleteLesson, keyPhrases: [coveredPhrase, ...incompletePhrases] },
+              tokenUsage: { input: 11, output: 22 },
+            }),
+          )
+          .mockResolvedValueOnce(
+            buildGeneratedPlan({
+              lesson: { ...incompleteLesson, keyPhrases: incompletePhrases },
+              tokenUsage: { input: 13, output: 21 },
+            }),
+          );
+
+        const response = await generateSession({ userId: 'user-1' });
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({
+          ok: false,
+          error: 'Failed to generate AI teaching session.',
+        });
+        expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(2);
+        expect(mockCreateSessionRecord).not.toHaveBeenCalled();
+        expect(mockAttachExercisesToSession).not.toHaveBeenCalled();
+        expect(mockRecordUsageEvent.mock.calls).toEqual([
+          [{ userId: 'user-1', sessionId: null, model: 'gpt-5.4', tokensIn: 11, tokensOut: 22 }],
+          [{ userId: 'user-1', sessionId: null, model: 'gpt-5.4', tokensIn: 13, tokensOut: 21 }],
+        ]);
+      },
+    );
+
+    it('does not call the provider again or account twice when rejection token accounting fails', async () => {
+      mockGenerateSessionPlan.mockResolvedValueOnce(
+        buildGeneratedPlan({
+          lesson: { keyPhrases: [coveredPhrase, ...freshKeyPhrases.slice(0, 2)] },
+          tokenUsage: { input: 11, output: 22 },
+        }),
+      );
+      mockRecordUsageEvent.mockRejectedValueOnce(
+        Object.assign(new Error('Token accounting unavailable.'), {
+          generationUsage: { model: 'gpt-5.4', input: 11, output: 22 },
+        }),
+      );
+
+      const response = await generateSession({ userId: 'user-1' });
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: 'Failed to generate AI teaching session.',
+      });
+      expect(mockGenerateSessionPlan).toHaveBeenCalledTimes(1);
+      expect(mockCreateSessionRecord).not.toHaveBeenCalled();
+      expect(mockAttachExercisesToSession).not.toHaveBeenCalled();
+      expect(mockRecordUsageEvent).toHaveBeenCalledExactlyOnceWith({
+        userId: 'user-1',
+        sessionId: null,
+        model: 'gpt-5.4',
+        tokensIn: 11,
+        tokensOut: 22,
+      });
+    });
+  });
+
   it('rejects a paraphrased mastered objective after seven intervening sessions', async () => {
     const masteredPhrase = {
       japanese: 'ください',
