@@ -160,6 +160,7 @@ function validationFeedbackForRetry(
     }
     feedback.push(
       'Do not repeat any covered Lesson Key Phrase unless it is the explicitly selected Review Candidate.',
+      'Return 5 complete Lesson Key Phrases, each with japanese, romaji, english, and usage.',
     );
   }
   return feedback;
@@ -326,13 +327,18 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       .map((item) => item.answerText.trim());
 
     const generationTimeoutMs = resolveSessionGenerationTimeoutMs();
-    let plan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
+    let approved: {
+      plan: Awaited<ReturnType<typeof generateSessionPlan>>;
+      plannedCoverage: ReturnType<typeof buildPlannedSessionCoverage>;
+    } | null = null;
 
     let lastError: Error | null = null;
     let curriculumValidationFeedback: string[] = [];
     for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+      let generatedPlan: Awaited<ReturnType<typeof generateSessionPlan>> | null = null;
+      let rejectedUsage: FailedGenerationUsage | null = null;
       try {
-        const generatedPlan = await generateSessionPlanWithTimeout(
+        generatedPlan = await generateSessionPlanWithTimeout(
           {
             userId: user.id,
             userName: user.name,
@@ -356,18 +362,29 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
           generationTimeoutMs,
         );
 
-        const validation = validateGeneratedSessionPlan({
-          plan: generatedPlan,
+        let candidatePlan = generatedPlan;
+        let validation = validateGeneratedSessionPlan({
+          plan: candidatePlan,
           coverageEvidence,
         });
+        if (
+          !validation.valid &&
+          validation.reasonCodes.length === 1 &&
+          validation.reasonCodes[0] === 'repeated_key_phrases'
+        ) {
+          const forbiddenIndexes = new Set(validation.details.repeatedNonReviewKeyPhraseIndexes);
+          const keyPhrases = candidatePlan.lesson.keyPhrases.filter(
+            (_phrase, index) => !forbiddenIndexes.has(index),
+          );
+          if (keyPhrases.length >= 3) {
+            candidatePlan = {
+              ...candidatePlan,
+              lesson: { ...candidatePlan.lesson, keyPhrases },
+            };
+            validation = validateGeneratedSessionPlan({ plan: candidatePlan, coverageEvidence });
+          }
+        }
         if (!validation.valid) {
-          await recordUsageEvent({
-            userId,
-            sessionId: null,
-            model: generatedPlan.model,
-            tokensIn: generatedPlan.tokenUsage.input,
-            tokensOut: generatedPlan.tokenUsage.output,
-          });
           lastError = new Error('Generated session failed curriculum validation.');
           curriculumValidationFeedback = validationFeedbackForRetry(validation);
           console.warn('[api/session/generate] curriculum validation failed', {
@@ -383,32 +400,26 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             repeatedNonReviewKeyPhraseCount: validation.details.repeatedNonReviewKeyPhraseCount,
             intentionalReviewStatus: validation.details.intentionalReviewStatus,
           });
-          continue;
+        } else {
+          const plannedCoverage = buildPlannedSessionCoverage({
+            lesson: candidatePlan.lesson,
+            exercises: candidatePlan.exercises,
+            learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective.id,
+          });
+          logInfo('api/session/generate', 'curriculum plan approved', {
+            attempt,
+            validationReasonCodes: validation.reasonCodes,
+            ...curriculumDiagnosticContext(coverageEvidence),
+          });
+          approved = { plan: candidatePlan, plannedCoverage };
+          break;
         }
-
-        logInfo('api/session/generate', 'curriculum plan approved', {
-          attempt,
-          validationReasonCodes: validation.reasonCodes,
-          ...curriculumDiagnosticContext(coverageEvidence),
-        });
-        plan = generatedPlan;
-        break;
       } catch (error) {
         if (error instanceof Error && error.message === 'timeout') {
           throw error;
         }
 
-        const rejectedUsage = failedGenerationUsage(error);
-        if (rejectedUsage) {
-          await recordUsageEvent({
-            userId,
-            sessionId: null,
-            model: rejectedUsage.model,
-            tokensIn: rejectedUsage.input,
-            tokensOut: rejectedUsage.output,
-          });
-        }
-
+        rejectedUsage = failedGenerationUsage(error);
         lastError = error instanceof Error ? error : new Error(String(error));
         if (attempt < MAX_GENERATION_ATTEMPTS) {
           console.warn('[api/session/generate] generation attempt failed, retrying', {
@@ -417,14 +428,30 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
             userId,
             error: lastError.message,
           });
-          continue;
         }
+      }
+      if (generatedPlan) {
+        rejectedUsage = {
+          model: generatedPlan.model,
+          input: generatedPlan.tokenUsage.input,
+          output: generatedPlan.tokenUsage.output,
+        };
+      }
+      if (rejectedUsage) {
+        await recordUsageEvent({
+          userId,
+          sessionId: null,
+          model: rejectedUsage.model,
+          tokensIn: rejectedUsage.input,
+          tokensOut: rejectedUsage.output,
+        });
       }
     }
 
-    if (!plan) {
+    if (!approved) {
       throw lastError ?? new Error('Failed to generate AI teaching session.');
     }
+    const { plan, plannedCoverage } = approved;
 
     const session = await createSessionRecord({
       userId,
@@ -433,11 +460,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       model: plan.model,
       tokenInput: plan.tokenUsage.input,
       tokenOutput: plan.tokenUsage.output,
-      plannedCoverage: buildPlannedSessionCoverage({
-        lesson: plan.lesson,
-        exercises: plan.exercises,
-        learningObjectiveId: coverageEvidence.learningObjectiveSelection.objective?.id,
-      }),
+      plannedCoverage,
     });
 
     await attachExercisesToSession(session.id, plan.exercises);

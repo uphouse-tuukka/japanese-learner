@@ -34,6 +34,7 @@ export type SessionCurriculumValidationDetails = {
   allowedCategories: TopicCategoryKey[];
   repeatedNonReviewKeyPhraseCount: number;
   repeatedNonReviewKeyPhrases: string[];
+  repeatedNonReviewKeyPhraseIndexes: number[];
   repeatedLessonTopic: string | null;
   selectedLearningObjectiveId: string | null;
   generatedLearningObjectiveId: string | null;
@@ -264,11 +265,14 @@ export function validateGeneratedSessionPlan(input: {
     reasonCodes.push('repeated_lesson_topic');
   }
 
-  const repeatedNonReviewKeyPhrases = plan.lesson.keyPhrases
-    .filter((phrase) =>
-      phraseRepeatsCoveredNonReviewPhrase(phrase, coverageEvidence, approvedReviewCandidate),
-    )
-    .map(displayKeyPhrase);
+  const repeatedNonReviewKeyPhraseIndexes: number[] = [];
+  const repeatedNonReviewKeyPhrases: string[] = [];
+  plan.lesson.keyPhrases.forEach((phrase, index) => {
+    if (phraseRepeatsCoveredNonReviewPhrase(phrase, coverageEvidence, approvedReviewCandidate)) {
+      repeatedNonReviewKeyPhraseIndexes.push(index);
+      repeatedNonReviewKeyPhrases.push(displayKeyPhrase(phrase));
+    }
+  });
   const uniqueRepeatedNonReviewKeyPhrases = Array.from(new Set(repeatedNonReviewKeyPhrases));
   if (uniqueRepeatedNonReviewKeyPhrases.length > 0) {
     reasonCodes.push('repeated_key_phrases');
@@ -282,6 +286,7 @@ export function validateGeneratedSessionPlan(input: {
     allowedCategories: categoryRotation.allowedCategories,
     repeatedNonReviewKeyPhraseCount: uniqueRepeatedNonReviewKeyPhrases.length,
     repeatedNonReviewKeyPhrases: uniqueRepeatedNonReviewKeyPhrases,
+    repeatedNonReviewKeyPhraseIndexes,
     repeatedLessonTopic: repeatedLessonTopic?.topic ?? null,
     selectedLearningObjectiveId: selectedLearningObjective.id,
     generatedLearningObjectiveId,

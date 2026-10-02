@@ -142,6 +142,7 @@ describe('validateGeneratedSessionPlan', () => {
     const result = validateGeneratedSessionPlan({ plan: plan(), coverageEvidence: baseCoverage });
 
     expect(result.valid).toBe(true);
+    expect(result.details.repeatedNonReviewKeyPhraseIndexes).toEqual([]);
   });
 
   it('rejects a generated plan outside the app-selected target category', () => {
@@ -496,6 +497,29 @@ describe('validateGeneratedSessionPlan', () => {
     }
   });
 
+  it('identifies every forbidden occurrence by index without deduplicating display-identical phrases', () => {
+    const result = validateGeneratedSessionPlan({
+      plan: plan({
+        keyPhrases: [
+          phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' }),
+          phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
+          phrase({ japanese: 'はじめまして', romaji: 'hajimemashite' }),
+          phrase({ japanese: 'ください', romaji: 'kudasai' }),
+          phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
+        ],
+      }),
+      coverageEvidence: baseCoverage,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.reasonCodes).toEqual(['repeated_key_phrases']);
+    expect(result.details).toMatchObject({
+      repeatedNonReviewKeyPhraseIndexes: [1, 3, 4],
+      repeatedNonReviewKeyPhraseCount: 2,
+      repeatedNonReviewKeyPhrases: ['すみません (sumimasen)', 'ください (kudasai)'],
+    });
+  });
+
   it('allows covered utility language as supporting context outside the key phrase list', () => {
     const supportingPlan = plan({
       keyPhrases: [phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' })],
@@ -604,6 +628,34 @@ describe('validateGeneratedSessionPlan', () => {
       }),
       coverageEvidence: coverageWithSelectedPhraseReview,
     });
+    const mixedReviewPlan = plan({
+      topic: greetingStationReviewTopic,
+      keyPhrases: [
+        phrase({ japanese: 'こんにちは', romaji: 'konnichiwa' }),
+        phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
+        phrase({ japanese: 'ください', romaji: 'kudasai' }),
+        phrase({ japanese: 'ください', romaji: 'kudasai' }),
+        phrase({ japanese: 'すみません', romaji: 'sumimasen' }),
+      ],
+      intentionalReview: {
+        candidateType: 'key_phrase',
+        candidateIdentity: 'ja:すみません',
+        learningObjectiveId: 'greetings_basics.greet_by_time',
+        transferContextId: 'station_encounter',
+        transferTask: stationTransferTask,
+      },
+    });
+    const mixedReview = validateGeneratedSessionPlan({
+      plan: mixedReviewPlan,
+      coverageEvidence: coverageWithSelectedPhraseReview,
+    });
+    const missingReviewClaim = validateGeneratedSessionPlan({
+      plan: {
+        ...mixedReviewPlan,
+        metadata: { learningObjectiveId: 'greetings_basics.greet_by_time' },
+      },
+      coverageEvidence: coverageWithSelectedPhraseReview,
+    });
 
     expect(repeatedUnselectedCandidate.valid).toBe(false);
     if (!repeatedUnselectedCandidate.valid) {
@@ -612,5 +664,16 @@ describe('validateGeneratedSessionPlan', () => {
       );
     }
     expect(explicitPhraseReview.valid).toBe(true);
+    expect(explicitPhraseReview.details.repeatedNonReviewKeyPhraseIndexes).toEqual([]);
+    expect(mixedReview.valid).toBe(false);
+    expect(mixedReview.reasonCodes).toEqual(['repeated_key_phrases']);
+    expect(mixedReview.details).toMatchObject({
+      intentionalReviewStatus: 'eligible',
+      repeatedNonReviewKeyPhraseIndexes: [2, 3],
+      repeatedNonReviewKeyPhrases: ['ください (kudasai)'],
+    });
+    expect(missingReviewClaim.valid).toBe(false);
+    expect(missingReviewClaim.reasonCodes).toEqual(['ineligible_review', 'repeated_key_phrases']);
+    expect(missingReviewClaim.details.repeatedNonReviewKeyPhraseIndexes).toEqual([1, 2, 3, 4]);
   });
 });
