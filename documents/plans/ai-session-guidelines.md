@@ -1,6 +1,6 @@
 # AI Session Generation Guidelines
 
-**Last updated:** 2026-08-21
+**Last updated:** 2026-10-02
 **Purpose:** Standards for AI-generated learning sessions. These guidelines inform prompt engineering and quality checks.
 
 ## Exercise Guidelines
@@ -69,6 +69,7 @@
 ### Coverage metadata authority
 
 - A generated Learning Session must durably store its generated Topic Category, canonical app-selected Learning Objective identity, Lesson Topic, cultural note, and structured Lesson Key Phrases with the planned server session before responding successfully.
+- Each bounded generation attempt must validate curriculum and build required planned coverage before accepting a plan. The stored coverage and response must use the same accepted lesson.
 - Completion must build Coverage Evidence metadata from the stored generated plan, not from browser-authored lesson fields.
 - Missing, blank, altered, malformed, or resumed browser lesson data must not replace valid server-owned metadata.
 - Completion must fail closed before storing results when valid server-owned planned coverage metadata is unavailable.
@@ -116,8 +117,12 @@
 - Teach one focused topic per session
 - Include practical, travel-relevant language
 - Cultural notes should be authentic and specific
-- Key phrases: 3-5 per lesson with japanese, romaji, english, usage
-- Every covered non-review Lesson Key Phrase is forbidden in the authoritative `lesson.keyPhrases` list and causes rejection and retry.
+- The authoritative `lesson.keyPhrases` list must contain 3-5 complete phrases, each with japanese, romaji, english, and usage.
+- Every covered non-review Lesson Key Phrase is forbidden in that list. When repetition is the only curriculum violation, the generation route removes every forbidden occurrence, including display-identical duplicates.
+- Recovery requires at least 3 retained entries, full curriculum revalidation, and valid planned coverage within the same generation attempt.
+- A currently eligible, explicitly selected Review Candidate phrase remains in the list and counts toward the existing 3-phrase minimum. There is no separate fresh-phrase minimum.
+- If fewer than 3 entries remain, the route rejects the response and uses the existing bounded retry. Private feedback identifies the rejected phrases and requests 5 complete Lesson Key Phrases.
+- Removed phrases may remain as supporting context in the unchanged explanation or exercises, but not as newly taught Lesson Key Phrases. Recovery preserves the cultural note, exercises, and plan metadata.
 - A covered utility phrase may still appear naturally in explanations or exercise context when it is not declared as a newly taught Lesson Key Phrase.
 
 ### Topic Categories
@@ -161,7 +166,8 @@
 - Address recent weaknesses in exercise selection
 - Follow prior next-steps from summaries
 - Adjust difficulty based on recent accuracy (>80% increase, <50% reinforce)
-- Record provider token usage with no session id for every returned generation response rejected during parsing, normalization, or curriculum validation.
+- Record provider token usage once with no session id for every returned generation response rejected during parsing, normalization, curriculum validation, or planned-coverage construction.
+- Rejection token-accounting failures must not trigger another provider call or a second accounting attempt for the same response.
 
 ## Model Configuration
 
