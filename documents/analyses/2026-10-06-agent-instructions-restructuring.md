@@ -30,3 +30,9 @@ Retained categories were the personal-app mission, preservation of existing lear
 
 The resulting pointers describe both the material and the branch that triggers it.
 The index and README project-docs list identify the new ownership so agents can reach the deeper references without loading them on every task.
+
+## Progressive disclosure correction
+
+The initial root pointer required the complete README and contribution guide for every edit.
+The correction limits universal reading to the task and repository protection sections.
+Setup, architecture, historical records, documentation workflow, and collaboration guidance now have explicit task triggers.
