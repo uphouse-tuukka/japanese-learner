@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-10-06
 
 Use this index before following older plans or decisions. Status labels are conservative:
 
@@ -60,16 +60,23 @@ Use this index before following older plans or decisions. Status labels are cons
 ### `AGENTS.md`
 
 - Status: active
-- Description: Root bootstrap document for AI agents: mission, mandatory reading, boot sequence, optional CodeGraph navigation, validation, and subagent workflow.
+- Description: Root routing guide for mission scope, mandatory context pointers, and repository-policy ownership.
 - Source files affected: repository workflow and validation docs
-- Last verified: 2026-05-26
+- Last verified: 2026-10-06
+
+### `CODING_STANDARDS.md`
+
+- Status: active
+- Description: Source of truth for implementation boundaries, Svelte and exercise UI rules, AI and logging constraints, and validation commands.
+- Source files affected: application code, tests, tooling, and implementation documentation
+- Last verified: 2026-10-06
 
 ### `documents/CONTRIBUTING.md`
 
 - Status: active
-- Description: Project contribution guide for code quality, docs rules, repo-local CodeGraph navigation, agent workflow, review gates, session completion data flow, and architecture notes.
+- Description: Project contribution guide for branch, publication, documentation, collaboration, and review workflow.
 - Source files affected: repository workflow and validation docs
-- Last verified: 2026-07-06
+- Last verified: 2026-10-06
 
 ### `documents/INDEX.md`
 
@@ -236,6 +243,13 @@ Use this index before following older plans or decisions. Status labels are cons
 - Description: Historical model comparison that supported the `gpt-4.1` decision; use current code and provider availability for live model choices.
 - Source files affected: `src/lib/server/ai.ts`, AI model constants and prompt code
 - Last verified: 2026-05-06
+
+### `documents/analyses/2026-10-06-agent-instructions-restructuring.md`
+
+- Status: analysis
+- Description: Rationale and record of the three sequential passes that moved each agent instruction category to one owning document and removed duplicated or stale guidance.
+- Source files affected: `AGENTS.md`, `CODING_STANDARDS.md`, `documents/CONTRIBUTING.md`, `README.md`, and this index
+- Last verified: 2026-10-06
 
 ## Missing external spec path
 
