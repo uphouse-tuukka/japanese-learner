@@ -26,7 +26,7 @@ Do not add agent coauthors to commits.
 
 ## Validation and review
 
-Follow `CODING_STANDARDS.md` for validation commands and documentation standards.
+Follow `CODING_STANDARDS.md` for validation commands.
 Run spec-compliance review before code-quality review.
 Record the exact validation and review results in the handoff.
 
